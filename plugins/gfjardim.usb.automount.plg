@@ -25,6 +25,13 @@ The 'source' file.
 </FILE>
 
 <!--
+ntfs-3g-2014.2.15-x86_64-1.txz
+-->
+<FILE Name="/boot/config/plugins/&name;/ntfs-3g-2014.2.15-x86_64-1.txz" Run="upgradepkg --install-new">
+<URL>https://raw.github.com/gfjardim/unRAID-plugins/master/source/packages/ntfs-3g-2014.2.15-x86_64-1.txz</URL>
+</FILE>
+
+<!--
 The 'post-install' script.
 -->
 <FILE Run="/bin/bash">
@@ -64,6 +71,9 @@ rm -f /tmp/plugins/&name;.plg
 
 # Uninstall the 'source' package
 removepkg &name;-&version;
+
+$remove ntfs-3g
+removepkg ntfs-3g-2014.2.15-x86_64-1
 </INLINE>
 </FILE>
 
