@@ -4,7 +4,7 @@
 <!ENTITY name      "gfjardim.usb.automount">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.03.08b">
+<!ENTITY version   "2015.03.08c">
 <!ENTITY launch    "Main/USBDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -13,6 +13,9 @@
 
 <CHANGES>
 ##&name;
+
+###2015.03.08c
+- Add exFAT fs support
 
 ###2015.03.08a
 - Remove USB Devices tab when no USB disk is plugged in.
@@ -34,6 +37,14 @@ ntfs-3g-2014.2.15-x86_64-1.txz
 <FILE Name="/boot/config/plugins/&name;/ntfs-3g-2014.2.15-x86_64-1.txz" Run="upgradepkg --install-new">
 <URL>https://raw.github.com/gfjardim/unRAID-plugins/master/source/packages/ntfs-3g-2014.2.15-x86_64-1.txz</URL>
 </FILE>
+
+<!--
+fuse-exfat-1.1.0-x86_64-1_SBo.tgz
+-->
+<FILE Name="/boot/config/plugins/&name;/fuse-exfat-1.1.0-x86_64-1_SBo.tgz" Run="upgradepkg --install-new">
+<URL>https://raw.github.com/gfjardim/unRAID-plugins/master/source/packages/fuse-exfat-1.1.0-x86_64-1_SBo.tgz</URL>
+</FILE>
+
 
 <!--
 The 'post-install' script.
@@ -76,8 +87,11 @@ rm -f /tmp/plugins/&name;.plg
 # Uninstall the 'source' package
 removepkg &name;-&version;
 
-$remove ntfs-3g
+# Remove ntfs-3g and extfs
 removepkg ntfs-3g-2014.2.15-x86_64-1
+removepkg fuse-exfat-1.1.0-x86_64-1_SBo
+
+
 </INLINE>
 </FILE>
 
