@@ -4,7 +4,7 @@
 <!ENTITY name      "gfjardim.usb.automount">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.03.08d">
+<!ENTITY version   "2015.03.08e">
 <!ENTITY launch    "Main/USBDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -45,6 +45,12 @@ fuse-exfat-1.1.0-x86_64-1_SBo.tgz
 <URL>https://raw.github.com/gfjardim/unRAID-plugins/master/source/packages/fuse-exfat-1.1.0-x86_64-1_SBo.tgz</URL>
 </FILE>
 
+<!--
+hfsprogs-332.25-i486-1sl.txz
+-->
+<FILE Name="/boot/config/plugins/&name;/hfsprogs-332.25-i486-1sl.txz" Run="upgradepkg --install-new">
+<URL>http://slackware.org.uk/slacky/slackware-14.1/system/hfsprogs/332.25/hfsprogs-332.25-i486-1sl.txz</URL>
+</FILE>
 
 <!--
 The 'post-install' script.

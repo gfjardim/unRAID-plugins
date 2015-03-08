@@ -9,7 +9,7 @@ foreach(get_usb_disks() as $drive) {
     $info = get_partition_info($drive);
     debug("Drive found with the following attributes: ".(implode(', ', array_map(function ($v, $k) { return "$k='$v'"; }, $info, array_keys($info)))));
     debug("Adding disk $drive ...");
-    if (do_mount($drive, $info['mountpoint'])) {
+    if (do_mount($drive, $info['mountpoint'], $info['fstype'] )) {
       add_smb_share($info['mountpoint'], $info['label']);
     }
     debug("Disk ${info[label]} shared successfully.");

@@ -59,10 +59,21 @@ function is_shared($name) {
 }
 
 
-function do_mount($dev, $dir) {
+function get_mount_params($fs) {
+  switch ($fs) {
+    case 'hfsplus':
+      return "force,rw,users,async,umask=000";
+      break;
+    default:
+      return "auto,async,nodev,nosuid,umask=000";
+      break;
+  }
+}
+
+function do_mount($dev, $dir, $fs) {
   if (! is_mounted($dev)) {
     @mkdir($dir,0777,TRUE);
-    $cmd = "mount -t auto -o auto,async,nodev,nosuid,umask=000 '${dev}' '${dir}'";
+    $cmd = "mount -t auto -o ".get_mount_params($fs)." '${dev}' '${dir}'";
     debug("Mounting drive with command: $cmd");
     $o = shell_exec($cmd." 2>&1");
     foreach (range(0,5) as $t) {
