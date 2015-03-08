@@ -1,0 +1,19 @@
+#!/usr/bin/php
+<?
+$plugin = "gfjardim.usb.automount";
+require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
+
+$DEVNAME = (isset($_ENV['DEVNAME'])) ? $_ENV['DEVNAME'] : ( isset($argv[1]) ? $argv[1] : NULL );
+foreach(get_usb_disks() as $drive) {
+  if ($DEVNAME == $drive || $DEVNAME  == "all") {
+    $info = get_partition_info($drive);
+    debug("Drive found with the following attributes: ".(implode(', ', array_map(function ($v, $k) { return "$k='$v'"; }, $info, array_keys($info)))));
+    debug("Adding disk $drive ...");
+    if (do_mount($drive, $info['mountpoint'])) {
+      add_smb_share($info['mountpoint'], $info['label']);
+    }
+    debug("Disk ${info[label]} shared successfully.");
+  }
+}
+
+?>

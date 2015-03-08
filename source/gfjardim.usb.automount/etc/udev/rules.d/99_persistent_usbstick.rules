@@ -1,0 +1,1 @@
+ACTION=="add", KERNEL=="sd*", SUBSYSTEMS=="usb", DRIVERS=="usb-storage" RUN+="/usr/local/sbin/usb_mount"
