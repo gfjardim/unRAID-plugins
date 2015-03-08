@@ -1,5 +1,6 @@
 Menu="Main:4"
 Title="USB Devices"
+Cond="( count(preg_grep('/.*(usb).*?-part\d+/i', array_diff(scandir('/dev/disk/by-path'), array('.','..')))) > 1 )"
 ---
 <?PHP
 $plugin = "gfjardim.usb.automount";
