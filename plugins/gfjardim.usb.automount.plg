@@ -2,10 +2,11 @@
 
 <!DOCTYPE PLUGIN [
 <!ENTITY name      "gfjardim.usb.automount">
+<!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
 <!ENTITY version   "2015.03.08a">
 <!ENTITY launch    "Main/USBDevices">
-<!ENTITY pluginURL "https://raw.github.com/gfjardim/unRAID-plugins/plugins/&name;.plg">
+<!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
 
 <PLUGIN name="&name;" author="&author;" launch="&launch;" version="&version;" pluginURL="&pluginURL;">
