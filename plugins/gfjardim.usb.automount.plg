@@ -20,7 +20,7 @@
 The 'source' file.
 -->
 <FILE Name="/boot/config/plugins/&name;/&name;-&version;.txz" Run="upgradepkg --install-new">
-<URL>https://raw.github.com/gfjardim/unRAID-plugins/plugins/archive/&name;-&version;.txz</URL>
+<URL>https://raw.github.com/gfjardim/unRAID-plugins/master/archive/&name;-&version;.txz</URL>
 </FILE>
 
 <!--
