@@ -13,6 +13,9 @@
 <CHANGES>
 ##&name;
 
+###2015.03.08a
+- Remove USB Devices tab when no USB disk is plugged in.
+
 ###2015.03.08
 - initial release.
 </CHANGES>
