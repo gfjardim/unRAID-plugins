@@ -29,7 +29,7 @@ The 'post-install' script.
 <FILE Run="/bin/bash">
 <INLINE>
 chmod +x /usr/local/sbin/usb_mount /usr/local/sbin/usb_umount 
-if [[ $(mdcmd status|grep mdState|cut -d"=" -f2) == STARTED ]]; then
+if [[ $(/root/mdcmd status|grep mdState|cut -d"=" -f2) == STARTED ]]; then
   /usr/local/sbin/usb_mount all
 fi
 
