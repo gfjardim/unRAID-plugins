@@ -22,7 +22,6 @@ function pin_tab(n) {
 
 var tabnum = $('input[name$="tabs"]').length;
 $('#tab'+tabnum).bind({click:function() {pin_tab(tabnum);}});
-
 </script>
 
 <form id="formUsbMount" method="POST" action="/update.php" target="progressFrame">
