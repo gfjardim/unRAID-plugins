@@ -7,7 +7,6 @@ $DEVNAME = (isset($_ENV['DEVNAME'])) ? $_ENV['DEVNAME'] : ( isset($argv[1]) ? $a
 foreach(get_usb_disks() as $drive) {
   if ($DEVNAME == $drive || $DEVNAME  == "all") {
     $info = get_partition_info($drive);
-    $mountpoint = sprintf("%s/%s", $paths['smb_mount_point'], $info['label']);
     debug("Drive found with the following attributes: ".(implode(', ', array_map(function ($v, $k) { return "$k='$v'"; }, $info, array_keys($info)))));
     debug("Removing disk ${info[label]} share ...");
     rm_smb_share($info['mountpoint'], $info['label']);
@@ -16,6 +15,4 @@ foreach(get_usb_disks() as $drive) {
     debug("Disk ${info[label]} removed successfully.");
   }
 }
-
 ?>
-
