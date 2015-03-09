@@ -4,7 +4,7 @@
 <!ENTITY name      "gfjardim.usb.automount">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.03.09b">
+<!ENTITY version   "2015.03.09c">
 <!ENTITY launch    "Main/USBDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -13,6 +13,9 @@
 
 <CHANGES>
 ##&name;
+
+###2015.03.09c
+- FIx some stylesheet
 
 ###2015.03.09b
 - Add automount switch

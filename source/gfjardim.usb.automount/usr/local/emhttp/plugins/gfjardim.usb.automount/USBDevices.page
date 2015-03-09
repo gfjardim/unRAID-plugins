@@ -1,52 +1,70 @@
 Menu="Main:4"
 Title="USB Devices"
 Cond="( count(preg_grep('/.*(usb).*?-part\d+/i', array_diff(scandir('/dev/disk/by-path'), array('.','..')))) > 1 )"
+Markdown="false"
 ---
 <?PHP
 $plugin = "gfjardim.usb.automount";
 require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
-echo "<script type='text/javascript' src='/webGui/scripts/jquery.switchButton.js'></script>";
-echo "<link type='text/css' rel='stylesheet' href='/webGui/styles/jquery.switchButton.css'>";
 ?>
+<link type='text/css' rel='stylesheet' href='/webGui/styles/jquery.switchButton.css'>
+<style>
+  table.usb_disks{border-collapse:collapse;white-space:nowrap;}
+  table.usb_disks td span{margin-left:10px;}
+  table.usb_disks thead tr:first-child td{font-size:13px;background:-webkit-radial-gradient(#E0E0E0,#C0C0C0);background:linear-gradient(#E0E0E0,#C0C0C0);}
+  table.usb_disks tr>td{text-align:center;width:8%;padding-left:12px;padding-right:0;white-space:nowrap;}
+  table.usb_disks tr>td+td{text-align:left;width:auto;}
+  table.usb_disks tr>td+td+td+td{text-align:right;padding-left:0;padding-right:12px;}
+  table.usb_disks tr>td+td+td+td+td+td+td+td+td{text-align:center;padding-left:0;padding-right:12px;}
+  table.usb_disks tr>td+td+td+td+td+td+td+td+td+td{text-align:left;padding-left:0;padding-right:12px;width: 5em;}
+  table.usb_disks tr>td+td+td+td+td+td+td+td+td+td+td{text-align:right;}
+  table.usb_disks tbody tr:nth-child(even){background-color:#F8F8F8;}
+  .switch-button-background {margin: 0px 0px;}
+</style>
+
+<script type='text/javascript' src='/webGui/scripts/jquery.switchButton.js'></script>
+
 <script type="text/javascript">
-$('#usb_table').tablesorter({headers:{0:{sorter:false},5:{sorter:false}}});
-$('#usb_table tr:even').addClass('odd');
+  $('#usb_table').tablesorter({headers:{0:{sorter:false},5:{sorter:false}}});
+  $('#usb_table tr:even').addClass('odd');
 
-function usb_mount(cmd){
-  $("#cmdUsbMount").val(cmd);
-  $("#formUsbMount").submit();
-}
+  function usb_mount(cmd){
+    $("#cmdUsbMount").val(cmd);
+    $("#formUsbMount").submit();
+  }
 
-function pin_tab(n) {
-  $.removeCookie('one',{path:'/'});
-  $.cookie('tab','tab'+n,{path:'/'});
-}
-
-var tabnum = $('input[name$="tabs"]').length;
-$('#tab'+tabnum).bind({click:function() {pin_tab(tabnum);}});
+  function pin_tab(n) {
+    $.removeCookie('one',{path:'/'});
+    $.cookie('tab','tab'+n,{path:'/'});
+  }
+  var tabnum = $('input[name$="tabs"]').length;
+  $('#tab'+tabnum).bind({click:function() {pin_tab(tabnum);}});
 </script>
+
 <form id="formUsbMount" method="POST" action="/update.php" target="progressFrame">
-<input type="hidden" id="cmdUsbMount" name="#command" value="" />
+  <input type="hidden" id="cmdUsbMount" name="#command" value="" />
 </form>
-<table class="tablesorter shift" id="usb_table"><thead><tr><th>Device</th><th>Identification</th><th>Mount point</th><th>Type</th><th>Size</th><th>Used</th><th>Free</th><th>Open files</th><th>Control</th><th>Automount</th><th>View</th></tr></thead>
-<tbody id="">
-<? foreach (get_all_disks_info() as $disk) {?>
-<tr>
-  <td><img src='/webGui/images/<?=(is_shared($disk['label']))?"green-on.png":"red-on.png";?>'> <?=basename($disk['device']);?></td>
-  <td><?=$disk['label'];?></td>
-  <td><?=$disk['target'];?></td>
-  <td><?=$disk['fstype'];?></td>
-  <td><?=$disk['size'];?></td>
-  <td><?=$disk['used'];?></td>
-  <td><?=$disk['avail'];?></td>
-  <td><?=strlen($disk['target']) ? shell_exec("lsof -F N ${disk[target]} 2>/dev/null| wc -l") : "0"; ?>
-  <td><?=strlen($disk['target']) ? "<button onclick=\"usb_mount('/usr/local/sbin/usb_umount ${disk[device]}');\">Unmount</button>" : "<button onclick=\"usb_mount('/usr/local/sbin/usb_mount ${disk[device]}');\">Mount</button>";?></td>
-  <td><input type="checkbox" class="autmount" serial="<?=$disk['serial'];?>" <?echo is_automount($disk['serial']) ? "checked":"";?>></td>
-  <td><?if($disk['target']){?><a href="/Main/Browse?dir=<?=$disk['target'];?>"><img src="/webGui/images/explore.png" title="Browse <?=$disk['target'];?>"><?};?></td>
-</tr>
-<?};?>
-</tbody>
+
+<table class="usb_disks" id="usb_table"><thead><tr><td>Device</td><td>Identification</td><td>Mount point</td><td>FS</td><td>Size</td><td>Used</td><td>Free</td><td>Open files</td><td>Control</td><td>Automount</td><td>View</td></tr></thead>
+  <tbody id="">
+    <? foreach (get_all_disks_info() as $disk) {?>
+    <tr>
+      <td><img src='/webGui/images/<?=(is_shared($disk['label']))?"green-on.png":"red-on.png";?>'> <?=basename($disk['device']);?></td>
+      <td><?=$disk['label'];?></td>
+      <td><?=$disk['target'];?></td>
+      <td><?=$disk['fstype'];?></td>
+      <td><?=$disk['size'];?></td>
+      <td><?=$disk['used'];?></td>
+      <td><?=$disk['avail'];?></td>
+      <td><?=strlen($disk['target']) ? shell_exec("lsof -F N ${disk[target]} 2>/dev/null| wc -l") : "-"; ?></td>
+      <td><?=strlen($disk['target']) ? "<button onclick=\"usb_mount('/usr/local/sbin/usb_umount ${disk[device]}');\">Unmount</button>" : "<button onclick=\"usb_mount('/usr/local/sbin/usb_mount ${disk[device]}');\">Mount</button>";?></td>
+      <td><input type="checkbox" class="autmount" serial="<?=$disk['serial'];?>" <?echo is_automount($disk['serial']) ? "checked":"";?>></td>
+      <td><?if($disk['target']){?><a href="/Main/Browse?dir=<?=$disk['target'];?>"><img src="/webGui/images/explore.png" title="Browse <?=$disk['target'];?>"><?};?></td>
+    </tr>
+    <?};?>
+  </tbody>
 </table>
+
 <script type="text/javascript">
 $('.autmount').each(function(){
   $(this).switchButton({

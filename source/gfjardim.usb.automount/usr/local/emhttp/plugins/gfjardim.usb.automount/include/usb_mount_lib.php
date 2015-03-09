@@ -202,7 +202,7 @@ function get_all_disks_info() {
 
 function get_partition_info($device){
   global $_ENV, $paths;
-  $f_size = function($s) { return (is_numeric(trim($s))) ? formatBytes($s*1024) : "";};
+  $f_size = function($s) { return (is_numeric(trim($s))) ? formatBytes($s*1024) : "-";};
   $disk = array();
   $attrs = (isset($_ENV['DEVTYPE'])) ? $_ENV : parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device )"));
   if ($attrs['DEVTYPE'] == "partition") { 
@@ -304,6 +304,4 @@ function get_android_info($device){
   $disk['avail']  = $f_size(shell_exec("df --output=avail,target ${device}|grep -v 'Mounted\|/dev'|awk '{print $1}'"));
   return $disk;
 }
-
-
 ?>
