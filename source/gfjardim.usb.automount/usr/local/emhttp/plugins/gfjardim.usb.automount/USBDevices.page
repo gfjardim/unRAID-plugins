@@ -5,9 +5,9 @@ Cond="( count(preg_grep('/.*(usb).*?-part\d+/i', array_diff(scandir('/dev/disk/b
 <?PHP
 $plugin = "gfjardim.usb.automount";
 require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
+echo "<script type='text/javascript' src='/webGui/scripts/jquery.switchButton.js'></script>";
+echo "<link type='text/css' rel='stylesheet' href='/webGui/styles/jquery.switchButton.css'>";
 ?>
-<script type="text/javascript" src="/webGui/scripts/jquery.switchButton.js"></script>
-<link type="text/css" rel="stylesheet" href="/webGui/styles/jquery.switchButton.css">
 <script type="text/javascript">
 $('#usb_table').tablesorter({headers:{0:{sorter:false},5:{sorter:false}}});
 $('#usb_table tr:even').addClass('odd');
@@ -25,11 +25,9 @@ function pin_tab(n) {
 var tabnum = $('input[name$="tabs"]').length;
 $('#tab'+tabnum).bind({click:function() {pin_tab(tabnum);}});
 </script>
-
 <form id="formUsbMount" method="POST" action="/update.php" target="progressFrame">
-  <input type="hidden" id="cmdUsbMount" name="#command" value="" />
+<input type="hidden" id="cmdUsbMount" name="#command" value="" />
 </form>
-
 <table class="tablesorter shift" id="usb_table"><thead><tr><th>Device</th><th>Identification</th><th>Mount point</th><th>Type</th><th>Size</th><th>Used</th><th>Free</th><th>Open files</th><th>Control</th><th>Automount</th><th>View</th></tr></thead>
 <tbody id="">
 <? foreach (get_all_disks_info() as $disk) {?>
@@ -50,8 +48,6 @@ $('#tab'+tabnum).bind({click:function() {pin_tab(tabnum);}});
 </tbody>
 </table>
 <script type="text/javascript">
-
-
 $('.autmount').each(function(){
   $(this).switchButton({
     labels_placement: "right", 
