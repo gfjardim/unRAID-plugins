@@ -56,7 +56,7 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
       <td><?=$disk['size'];?></td>
       <td><?=$disk['used'];?></td>
       <td><?=$disk['avail'];?></td>
-      <td><?=strlen($disk['target']) ? shell_exec("lsof -F N ${disk[target]} 2>/dev/null| wc -l") : "-"; ?></td>
+      <td><?=strlen($disk['target']) ? shell_exec("lsof ${disk[target]} 2>/dev/null|grep -c -v COMMAND") : "-"; ?></td>
       <td><?=strlen($disk['target']) ? "<button onclick=\"usb_mount('/usr/local/sbin/usb_umount ${disk[device]}');\">Unmount</button>" : "<button onclick=\"usb_mount('/usr/local/sbin/usb_mount ${disk[device]}');\">Mount</button>";?></td>
       <td><input type="checkbox" class="autmount" serial="<?=$disk['serial'];?>" <?echo is_automount($disk['serial']) ? "checked":"";?>></td>
       <td><?if($disk['target']){?><a href="/Main/Browse?dir=<?=$disk['target'];?>"><img src="/webGui/images/explore.png" title="Browse <?=$disk['target'];?>"><?};?></td>
