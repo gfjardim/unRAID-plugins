@@ -1,16 +1,33 @@
 <?
-$paths = array('smb_conf'        => '/etc/samba/smb.conf',
-               'smb_extra'       => '/boot/config/smb-extra.conf',
-               'smb_usb_shares'  => '/etc/samba/smb-usb-shares',
-               'usb_mount_point' => '/mnt/usb',
-               'log'             => '/var/log/usb_automount.log');
+$plugin = "gfjardim.usb.automount";
+
+$paths = array("smb_extra"       => "/boot/config/smb-extra.conf",
+               "smb_usb_shares"  => "/etc/samba/smb-usb-shares",
+               "usb_mount_point" => "/mnt/usb",
+               "log"             => "/var/log/usb_automount.log",
+               "config_file"     => "/boot/config/plugins/${plugin}/automount.cfg");
 
 $echo = function($m) { echo "<pre>".print_r($m,TRUE)."</pre>";};
 
+
+function save_ini_file($file, $array) {
+  $res = array();
+  foreach($array as $key => $val) {
+    if(is_array($val)) {
+      $res[] = PHP_EOL."[$key]";
+      foreach($val as $skey => $sval) $res[] = "$skey = ".(is_numeric($sval) ? $sval : '"'.$sval.'"');
+    } else {
+      $res[] = "$key = ".(is_numeric($val) ? $val : '"'.$val.'"');
+    }
+  }
+  file_put_contents($file, implode(PHP_EOL, $res));
+}
+
+
 function debug($m){
-  $c = (is_file($GLOBALS['paths']['log'])) ? @file($GLOBALS['paths']['log'],FILE_IGNORE_NEW_LINES) : array();
+  $c = (is_file($GLOBALS["paths"]["log"])) ? @file($GLOBALS["paths"]["log"],FILE_IGNORE_NEW_LINES) : array();
   $c[] = date("D M j G:i:s T Y").": $m";
-  file_put_contents($GLOBALS['paths']['log'], implode(PHP_EOL, $c));
+  file_put_contents($GLOBALS["paths"]["log"], implode(PHP_EOL, $c));
 }
 
 
@@ -64,13 +81,14 @@ function is_shared($name) {
 function get_mount_params($fs) {
   switch ($fs) {
     case 'hfsplus':
-      return "force,rw,users,async,umask=000";
-      break;
+    return "force,rw,users,async,umask=000";
+    break;
     default:
-      return "auto,async,nodev,nosuid,umask=000";
-      break;
+    return "auto,async,nodev,nosuid,umask=000";
+    break;
   }
 }
+
 
 function do_mount($dev, $dir, $fs) {
   if (! is_mounted($dev)) {
@@ -188,7 +206,7 @@ function get_partition_info($device){
   $disk = array();
   $attrs = (isset($_ENV['DEVTYPE'])) ? $_ENV : parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device )"));
   if ($attrs['DEVTYPE'] == "partition") { 
-    $disk['serial'] = safe_name($attrs['ID_SERIAL']);
+    $disk['serial'] = $attrs['ID_SERIAL'];
     $disk['device'] = $device;
     if (isset($attrs['ID_FS_LABEL'])){
       $disk['label'] = safe_name($attrs['ID_FS_LABEL_ENC']);
@@ -207,6 +225,24 @@ function get_partition_info($device){
     $disk['mountpoint'] = preg_replace("%\s+%", "_", sprintf("%s/%s", $paths['usb_mount_point'], $disk['label']));
   }
   return $disk;
+}
+
+
+function is_automount($sn) {
+  $config_file = $GLOBALS["paths"]["config_file"];
+  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
+  if (! isset($config[$sn]["automount"])) return TRUE;
+  return ($config[$sn]["automount"] == "yes") ? TRUE : FALSE;
+}
+
+
+function toggle_automount($sn, $status) {
+  $config_file = $GLOBALS["paths"]["config_file"];
+  if (! is_file($config_file)) @mkdir(dirname($config_file),0777,TRUE);
+  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
+  $config[$sn]["automount"] = ($status == "true") ? "yes" : "no";
+  save_ini_file($config_file, $config);
+  return ($config[$sn]["automount"] == "yes") ? TRUE : FALSE;
 }
 
 ### From this on it's MTP related functions, and it still a WIP.

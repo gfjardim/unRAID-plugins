@@ -6,6 +6,8 @@ Cond="( count(preg_grep('/.*(usb).*?-part\d+/i', array_diff(scandir('/dev/disk/b
 $plugin = "gfjardim.usb.automount";
 require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
 ?>
+<script type="text/javascript" src="/webGui/scripts/jquery.switchButton.js"></script>
+<link type="text/css" rel="stylesheet" href="/webGui/styles/jquery.switchButton.css">
 <script type="text/javascript">
 $('#usb_table').tablesorter({headers:{0:{sorter:false},5:{sorter:false}}});
 $('#usb_table tr:even').addClass('odd');
@@ -28,7 +30,7 @@ $('#tab'+tabnum).bind({click:function() {pin_tab(tabnum);}});
   <input type="hidden" id="cmdUsbMount" name="#command" value="" />
 </form>
 
-<table class="tablesorter shift" id="usb_table"><thead><tr><th>Device</th><th>Identification</th><th>Mount point</th><th>Type</th><th>Size</th><th>Used</th><th>Free</th><th>Open files</th><th>Control</th><th>View</th></tr></thead>
+<table class="tablesorter shift" id="usb_table"><thead><tr><th>Device</th><th>Identification</th><th>Mount point</th><th>Type</th><th>Size</th><th>Used</th><th>Free</th><th>Open files</th><th>Control</th><th>Automount</th><th>View</th></tr></thead>
 <tbody id="">
 <? foreach (get_all_disks_info() as $disk) {?>
 <tr>
@@ -41,17 +43,25 @@ $('#tab'+tabnum).bind({click:function() {pin_tab(tabnum);}});
   <td><?=$disk['avail'];?></td>
   <td><?=strlen($disk['target']) ? shell_exec("lsof -F N ${disk[target]} 2>/dev/null| wc -l") : "0"; ?>
   <td><?=strlen($disk['target']) ? "<button onclick=\"usb_mount('/usr/local/sbin/usb_umount ${disk[device]}');\">Unmount</button>" : "<button onclick=\"usb_mount('/usr/local/sbin/usb_mount ${disk[device]}');\">Mount</button>";?></td>
+  <td><input type="checkbox" class="autmount" serial="<?=$disk['serial'];?>" <?echo is_automount($disk['serial']) ? "checked":"";?>></td>
   <td><?if($disk['target']){?><a href="/Main/Browse?dir=<?=$disk['target'];?>"><img src="/webGui/images/explore.png" title="Browse <?=$disk['target'];?>"><?};?></td>
 </tr>
 <?};?>
 </tbody>
 </table>
-<?
-$smb_extra = @file($paths['smb_extra'],FILE_IGNORE_NEW_LINES);
-$smb_extra_includes = array_unique(preg_grep("/include/i", $smb_extra));
-foreach($smb_extra_includes as $key => $inc) {
-  if( ! is_file(parse_ini_string($inc)['include'])) unset($smb_extra_includes[$key]); 
-}
-$smb_clueanup = array_merge(preg_grep("/include/i", $smb_extra, PREG_GREP_INVERT), $smb_extra_includes);
-$smb_clueanup = preg_replace('/\n\s*\n\s*\n/s', PHP_EOL.PHP_EOL, implode(PHP_EOL, $smb_clueanup));
-?>
+<script type="text/javascript">
+
+
+$('.autmount').each(function(){
+  $(this).switchButton({
+    labels_placement: "right", 
+    checked: $(this).is(":checked")
+  });
+});
+
+$('.autmount').change(function () {
+  $.post( "/plugins/<?=$plugin;?>/update_cfg.php", { action: "automount", serial: $(this).attr('serial'), status: $(this).is(":checked") }, function( data ) {
+    $(this).prop('checked', data.automount );
+  }, "json");
+});
+</script>

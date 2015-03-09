@@ -5,8 +5,14 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
 
 $DEVNAME = (isset($_ENV['DEVNAME'])) ? $_ENV['DEVNAME'] : ( isset($argv[1]) ? $argv[1] : NULL );
 foreach(get_usb_disks() as $drive) {
-  if ($DEVNAME == $drive || $DEVNAME  == "all") {
+  if ( $DEVNAME == $drive || $DEVNAME  == "all" ) {
     $info = get_partition_info($drive);
+    if ( $DEVNAME == "all" || isset($_ENV['DEVNAME']) ) {
+      if (! is_automount($info['serial']) ) {
+        debug("Disk with S.N. '${info[serial]}' auto mount is disabled, aborting.");
+        continue;
+      }
+    }
     debug("Drive found with the following attributes: ".(implode(', ', array_map(function ($v, $k) { return "$k='$v'"; }, $info, array_keys($info)))));
     debug("Adding disk $drive ...");
     if (do_mount($drive, $info['mountpoint'], $info['fstype'] )) {
