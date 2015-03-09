@@ -25,6 +25,7 @@ function listDir($root) {
   return $paths;
 }
 
+
 function formatBytes($size) {
   if ($size == 0){ return "0 B";}
   $base = log($size) / log(1024);
@@ -33,12 +34,13 @@ function formatBytes($size) {
 }
 
 
-function safe_filename($string) {
+function safe_name($string) {
+  $string = str_replace("\\x20", " ", $string);
   $string = htmlentities($string, ENT_QUOTES, 'UTF-8');
   $string = preg_replace('~&([a-z]{1,2})(acute|cedil|circ|grave|lig|orn|ring|slash|th|tilde|uml);~i', '$1', $string);
   $string = html_entity_decode($string, ENT_QUOTES, 'UTF-8');
-  $string = preg_replace(array('~[^0-9a-z]~i', '~[ -]+~'), '_', $string);
-  $string = str_replace("_x20", " ", $string);
+  $string = preg_replace('~[^0-9a-z -_]~i', '', $string);
+  $string = preg_replace('~[-_]~i', ' ', $string);
   return trim($string);
 }
 
@@ -186,12 +188,18 @@ function get_partition_info($device){
   $disk = array();
   $attrs = (isset($_ENV['DEVTYPE'])) ? $_ENV : parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device )"));
   if ($attrs['DEVTYPE'] == "partition") { 
-    $disk['serial'] = safe_filename($attrs['ID_SERIAL']);
-    $disk['device'] = $device; 
-    $disk['label']  = (isset($attrs['ID_FS_LABEL_ENC'])) ? safe_filename($attrs['ID_FS_LABEL_ENC']) : safe_filename($attrs['ID_SERIAL']);
+    $disk['serial'] = safe_name($attrs['ID_SERIAL']);
+    $disk['device'] = $device;
+    if (isset($attrs['ID_FS_LABEL'])){
+      $disk['label'] = safe_name($attrs['ID_FS_LABEL_ENC']);
+    } else if (isset($attrs['ID_VENDOR']) && isset($attrs['ID_MODEL'])){
+      $disk['label'] = sprintf("%s %s", safe_name($attrs['ID_VENDOR']), safe_name($attrs['ID_MODEL']));
+    } else {
+      $disk['label'] = safe_name($attrs['ID_SERIAL']);
+    }
     preg_match_all("#(.*?)(\d+$)#", $device, $matches);
     $disk['label']  = (count(preg_grep("%".$matches[1][0]."%i", get_usb_disks())) > 1) ? $disk['label']."-part".$matches[2][0] : $disk['label'];
-    $disk['fstype'] = safe_filename($attrs['ID_FS_TYPE']);
+    $disk['fstype'] = safe_name($attrs['ID_FS_TYPE']);
     $disk['target'] = trim(shell_exec("df --output=target ${device}|grep -v 'Mounted\|/dev'"));
     $disk['size']   = formatBytes($attrs['ID_PART_ENTRY_SIZE']*512);
     $disk['used']   = $f_size(shell_exec("df --output=used,target ${device}|grep -v 'Mounted\|/dev'|awk '{print $1}'"));
@@ -250,9 +258,9 @@ function get_android_info($device){
   $f_size = function($s) { return (is_numeric(trim($s))) ? formatBytes($s*1024) : "";};
   $disk = array();
   $attrs = (isset($_ENV['DEVTYPE'])) ? $_ENV : parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device )"));
-  $disk['serial'] = safe_filename($attrs['ID_SERIAL_SHORT']);
+  $disk['serial'] = safe_name($attrs['ID_SERIAL_SHORT']);
   $disk['device'] = $device; 
-  $disk['label']  = safe_filename($attrs['ID_SERIAL']);
+  $disk['label']  = safe_name($attrs['ID_SERIAL']);
   $disk['fstype'] = "mtp";
   $disk['target'] = trim(shell_exec("df --output=target ${device}|grep -v 'Mounted\|/dev'"));
   $disk['size']   = formatBytes($attrs['ID_PART_ENTRY_SIZE']*512);
