@@ -99,7 +99,7 @@ removepkg &name;-&version;
 # Remove ntfs-3g and extfs
 removepkg ntfs-3g-2014.2.15-x86_64-1
 removepkg fuse-exfat-1.1.0-x86_64-1_SBo
-
+removepkg hfsprogs-332.25-i486-1sl
 
 </INLINE>
 </FILE>
