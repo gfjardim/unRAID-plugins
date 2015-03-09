@@ -45,7 +45,7 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
   <input type="hidden" id="cmdUsbMount" name="#command" value="" />
 </form>
 
-<table class="usb_disks" id="usb_table"><thead><tr><td>Device</td><td>Identification</td><td>Mount point</td><td>FS</td><td>Size</td><td>Used</td><td>Free</td><td>Open files</td><td>Control</td><td>Automount</td><td>View</td></tr></thead>
+<table class="usb_disks" id="usb_table"><thead><tr><td>Device</td><td>Identification</td><td>Mount point</td><td>FS</td><td>Size</td><td>Used</td><td>Free</td><td>Open files</td><td>Control</td><td>Auto mount</td><td>View</td></tr></thead>
   <tbody id="">
     <? foreach (get_all_disks_info() as $disk) {?>
     <tr>
