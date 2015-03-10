@@ -250,7 +250,7 @@ function get_partition_info($device){
     $disk['target'] = str_replace("\\040", " ", trim(shell_exec("cat /proc/mounts|grep ${disk[device]}|awk '{print $2}'")));
     $disk['used']   = $f_size(shell_exec("df --output=used,source|grep -v 'Filesystem'|grep ${disk[device]}|awk '{print $1}'"));
     $disk['avail']  = $f_size(shell_exec("df --output=avail,target ${disk[device]}|grep -v 'Mounted\|/dev'|awk '{print $1}'"));
-    $disk['mountpoint'] = preg_replace("%\s+%", " ", sprintf("%s/%s", $paths['usb_mount_point'], $disk['label']));
+    $disk['mountpoint'] = preg_replace("%\s+%", "_", sprintf("%s/%s", $paths['usb_mount_point'], $disk['label']));
     $stats[$device] = $disk;
     @mkdir(dirname($paths['stats']), 0755, TRUE);
     file_put_contents($paths['stats'], json_encode($stats, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));

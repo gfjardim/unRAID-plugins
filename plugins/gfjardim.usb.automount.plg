@@ -69,8 +69,13 @@ The 'post-install' script.
 -->
 <FILE Run="/bin/bash">
 <INLINE>
+# fix permissions of executable files
 chmod +x /usr/local/sbin/usb_mount /usr/local/sbin/usb_umount /usr/local/emhttp/plugins/&name;/event/*
 
+# create mount point
+mkdir -p /mnt/usb
+
+# mount disks is array is started
 if [[ $(/root/mdcmd status|grep mdState|cut -d"=" -f2) == STARTED ]]; then
   /usr/local/sbin/usb_mount all
 fi
