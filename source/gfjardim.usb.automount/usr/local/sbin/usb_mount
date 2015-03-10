@@ -5,8 +5,9 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
 
 $DEVNAME = (isset($_ENV['DEVNAME'])) ? $_ENV['DEVNAME'] : ( isset($argv[1]) ? $argv[1] : NULL );
 foreach(get_usb_disks() as $drive) {
-  if ( $DEVNAME == $drive || $DEVNAME  == "all" ) {
+  if ( $DEVNAME == realpath($drive) || $DEVNAME  == "all" ) {
     $info = get_partition_info($drive);
+    $drive = realpath($drive);
     if ( $DEVNAME == "all" || isset($_ENV['DEVNAME']) ) {
       if (! is_automount($info['serial']) ) {
         debug("Disk with S.N. '${info[serial]}' auto mount is disabled, aborting.");
@@ -17,6 +18,7 @@ foreach(get_usb_disks() as $drive) {
     debug("Adding disk $drive ...");
     if (do_mount($drive, $info['mountpoint'], $info['fstype'] )) {
       add_smb_share($info['mountpoint'], $info['label']);
+      execute_script($info, "ADD");
     }
     debug("Disk ${info[label]} shared successfully.");
   }

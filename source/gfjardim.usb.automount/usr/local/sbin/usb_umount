@@ -5,10 +5,12 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
 
 $DEVNAME = (isset($_ENV['DEVNAME'])) ? $_ENV['DEVNAME'] : ( isset($argv[1]) ? $argv[1] : NULL );
 foreach(get_usb_disks() as $drive) {
+  $drive = realpath($drive);
   if ($DEVNAME == $drive || $DEVNAME  == "all") {
     $info = get_partition_info($drive);
     debug("Drive found with the following attributes: ".(implode(', ', array_map(function ($v, $k) { return "$k='$v'"; }, $info, array_keys($info)))));
     debug("Removing disk ${info[label]} share ...");
+    execute_script($info, "REMOVE");
     rm_smb_share($info['mountpoint'], $info['label']);
     debug("Unmounting disk ${info[label]} ..");
     do_unmount($drive, $info['mountpoint']) ;
