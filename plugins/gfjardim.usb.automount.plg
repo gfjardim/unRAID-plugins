@@ -4,7 +4,7 @@
 <!ENTITY name      "gfjardim.usb.automount">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.03.10">
+<!ENTITY version   "2015.03.10a">
 <!ENTITY launch    "Main/USBDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -77,6 +77,9 @@ fi
 
 # Update file access mode
 chmod 644 $(awk '/\.(htm|php|js|page|css|png|plg|gif|cfg|md)$/ {print "/"$0}' /var/log/packages/&name;-&version;)
+
+# Cleaning old source files
+find /boot/config/plugins/&name;/ -type f -iname "&name;*.txz" ! -iname "*&version;*" -delete
 
 echo ""
 echo "-----------------------------------------------------------"

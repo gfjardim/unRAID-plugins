@@ -120,7 +120,7 @@ function get_mount_params($fs) {
 
 
 function do_mount($dev, $dir, $fs) {
-  if (! is_mounted($dev)) {
+  if (! is_mounted($dev) || is_mounted($dir)) {
     @mkdir($dir,0777,TRUE);
     $cmd = "mount -t auto -o ".get_mount_params($fs)." '${dev}' '${dir}'";
     debug("Mounting drive with command: $cmd");
@@ -139,7 +139,7 @@ function do_unmount($dev, $dir) {
   if (shell_exec("mount 2>&1|grep -c '${dev} '") != 0){
     @mkdir($dir,0777,TRUE);
     debug("Unmounting ${dev}...");
-    shell_exec("umount '${dev}'");
+    $o = shell_exec("umount '${dev}' 2>&1");
     for ($i=0; $i < 10; $i++) {
       if (! is_mounted($dev)){
         rmdir($dir);
@@ -232,39 +232,30 @@ function get_partition_info($device){
   $f_size = function($s) { return (is_numeric(trim($s))) ? formatBytes($s*1024) : "-";};
   global $_ENV, $paths;
   $disk = array();
-  if(isset($_ENV['DEVTYPE'])) {
-    $attrs = $_ENV;
-  } else {
-    $stats = (is_file($paths['stats'])) ? json_decode(file_get_contents($paths['stats']), TRUE) : array();
-    if (isset($stats[$device])) {
-      $disk = $stats[$device];
+  $attrs = (isset($_ENV['DEVTYPE'])) ? $_ENV : parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device )"));
+  if ($attrs['DEVTYPE'] == "partition") { 
+    $disk['serial'] = $attrs['ID_SERIAL'];
+    $disk['device'] = realpath($device);
+    if (isset($attrs['ID_FS_LABEL'])){
+      $disk['label'] = safe_name($attrs['ID_FS_LABEL_ENC']);
+    } else if (isset($attrs['ID_VENDOR']) && isset($attrs['ID_MODEL'])){
+      $disk['label'] = sprintf("%s %s", safe_name($attrs['ID_VENDOR']), safe_name($attrs['ID_MODEL']));
     } else {
-      $attrs = parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device )"));
-      if ($attrs['DEVTYPE'] == "partition") { 
-        $disk['serial'] = $attrs['ID_SERIAL'];
-        $disk['device'] = realpath($device);
-        if (isset($attrs['ID_FS_LABEL'])){
-          $disk['label'] = safe_name($attrs['ID_FS_LABEL_ENC']);
-        } else if (isset($attrs['ID_VENDOR']) && isset($attrs['ID_MODEL'])){
-          $disk['label'] = sprintf("%s %s", safe_name($attrs['ID_VENDOR']), safe_name($attrs['ID_MODEL']));
-        } else {
-          $disk['label'] = safe_name($attrs['ID_SERIAL']);
-        }
-        $disk['fstype'] = safe_name($attrs['ID_FS_TYPE']);
-        $disk['size']   = formatBytes($attrs['ID_PART_ENTRY_SIZE']*512);
-      }
+      $disk['label'] = safe_name($attrs['ID_SERIAL']);
     }
+    $disk['fstype'] = safe_name($attrs['ID_FS_TYPE']);
+    $disk['size']   = formatBytes($attrs['ID_PART_ENTRY_SIZE']*512);
+    preg_match_all("#(.*?)(\d+$)#", $disk['device'], $matches);
+    $disk['label']  = (count(preg_grep("%".$matches[1][0]."%i", get_usb_disks())) > 1) ? $disk['label']."-part".$matches[2][0] : $disk['label'];
+    $disk['target'] = str_replace("\\040", " ", trim(shell_exec("cat /proc/mounts|grep ${disk[device]}|awk '{print $2}'")));
+    $disk['used']   = $f_size(shell_exec("df --output=used,source|grep -v 'Filesystem'|grep ${disk[device]}|awk '{print $1}'"));
+    $disk['avail']  = $f_size(shell_exec("df --output=avail,target ${disk[device]}|grep -v 'Mounted\|/dev'|awk '{print $1}'"));
+    $disk['mountpoint'] = preg_replace("%\s+%", " ", sprintf("%s/%s", $paths['usb_mount_point'], $disk['label']));
+    $stats[$device] = $disk;
+    @mkdir(dirname($paths['stats']), 0755, TRUE);
+    file_put_contents($paths['stats'], json_encode($stats, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+    return $disk;
   }
-  preg_match_all("#(.*?)(\d+$)#", $disk['device'], $matches);
-  $disk['label']  = (count(preg_grep("%".$matches[1][0]."%i", get_usb_disks())) > 1) ? $disk['label']."-part".$matches[2][0] : $disk['label'];
-  $disk['target'] = trim(shell_exec("df --output=target ${disk[device]}|grep -v 'Mounted\|/dev'"));
-  $disk['used']   = $f_size(shell_exec("df --output=used,target ${disk[device]}|grep -v 'Mounted\|/dev'|awk '{print $1}'"));
-  $disk['avail']  = $f_size(shell_exec("df --output=avail,target ${disk[device]}|grep -v 'Mounted\|/dev'|awk '{print $1}'"));
-  $disk['mountpoint'] = preg_replace("%\s+%", "_", sprintf("%s/%s", $paths['usb_mount_point'], $disk['label']));
-  $stats[$device] = $disk;
-  @mkdir(dirname($paths['stats']), 0755, TRUE);
-  file_put_contents($paths['stats'], json_encode($stats, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-  return $disk;
 }
 
 
