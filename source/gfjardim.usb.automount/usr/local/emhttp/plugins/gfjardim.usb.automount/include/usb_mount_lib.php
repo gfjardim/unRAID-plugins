@@ -10,34 +10,6 @@ $paths = array("smb_extra"       => "/boot/config/smb-extra.conf",
 
 $echo = function($m) { echo "<pre>".print_r($m,TRUE)."</pre>";}; 
 
-function execute_script($info, $action) { 
-  $out = ''; 
-  $error = '';
-  putenv("ACTION=${action}");
-  foreach ($info as $key => $value) putenv(strtoupper($key)."=${value}");
-  $cmd = get_command($info['serial']);
-  if (! $cmd) {debug("Command not available, skipping."); return FALSE;}
-  debug("Running command '${cmd}' with action '${action}'.");
-  @chmod($cmd, 0777);
-  exec("$cmd > /tmp/${info[serial]}.log 2>&1");
-}
-
-
-function set_command($sn, $cmd) {
-  $config_file = $GLOBALS["paths"]["config_file"];
-  if (! is_file($config_file)) @mkdir(dirname($config_file),0666,TRUE);
-  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
-  $config[$sn]["command"] = htmlentities($cmd, ENT_COMPAT);
-  save_ini_file($config_file, $config);
-  return (isset($config[$sn]["command"])) ? TRUE : FALSE;
-}
-
-function get_command($sn) {
-  $config_file = $GLOBALS["paths"]["config_file"];
-  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
-  return (isset($config[$sn]["command"])) ? $config[$sn]["command"] : NULL;
-}
-
 
 function save_ini_file($file, $array) {
   $res = array();
@@ -92,8 +64,53 @@ function safe_name($string) {
 
 
 function exist_in_file($file, $val) {
-  foreach (@file($file) as $line) if (preg_match("%${val}%i", $line)) return true;
-  return false;
+  return (preg_grep("%${val}%", @file($file))) ? TRUE : FALSE;
+}
+
+function execute_script($info, $action) { 
+  $out = ''; 
+  $error = '';
+  putenv("ACTION=${action}");
+  foreach ($info as $key => $value) putenv(strtoupper($key)."=${value}");
+  $cmd = get_command($info['serial']);
+  if (! $cmd) {debug("Command not available, skipping."); return FALSE;}
+  debug("Running command '${cmd}' with action '${action}'.");
+  @chmod($cmd, 0777);
+  exec("$cmd > /tmp/${info[serial]}.log 2>&1");
+}
+
+
+function set_command($sn, $cmd) {
+  $config_file = $GLOBALS["paths"]["config_file"];
+  if (! is_file($config_file)) @mkdir(dirname($config_file),0666,TRUE);
+  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
+  $config[$sn]["command"] = htmlentities($cmd, ENT_COMPAT);
+  save_ini_file($config_file, $config);
+  return (isset($config[$sn]["command"])) ? TRUE : FALSE;
+}
+
+
+function get_command($sn) {
+  $config_file = $GLOBALS["paths"]["config_file"];
+  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
+  return (isset($config[$sn]["command"])) ? $config[$sn]["command"] : NULL;
+}
+
+
+function get_config($sn, $val) {
+  $config_file = $GLOBALS["paths"]["config_file"];
+  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
+  return (isset($config[$sn][$val])) ? $config[$sn][$val] : NULL;
+}
+
+
+function remove_config_disk($sn) {
+  $config_file = $GLOBALS["paths"]["config_file"];
+  if (! is_file($config_file)) @mkdir(dirname($config_file),0666,TRUE);
+  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
+  unset($config[$sn]);
+  save_ini_file($config_file, $config);
+  return (isset($config[$sn])) ? TRUE : FALSE;
 }
 
 
@@ -153,9 +170,9 @@ function do_unmount($dev, $dir) {
 
 function add_smb_share($dir, $share_name) {
   global $paths;
+  if(!is_dir($paths['smb_usb_shares'])) @mkdir($paths['smb_usb_shares'],0755,TRUE);
   $share_conf = preg_replace("#\s+#", "_", realpath($paths['smb_usb_shares'])."/".$share_name.".conf");
   $share_cont = sprintf("[%s]\npath = %s\nread only = No\nguest ok = Yes\ncreate mode = 0644\ndirectory mode = 0755 ", $share_name, $dir);
-  @mkdir($paths['smb_usb_shares'],0755,TRUE);
   debug("Defining share '$share_name' on file '$share_conf' .");
   file_put_contents($share_conf, $share_cont);
   if (! exist_in_file($paths['smb_extra'], $share_name)) {
@@ -170,8 +187,8 @@ function add_smb_share($dir, $share_name) {
     file_put_contents($paths['smb_extra'], $c);
   }
   debug("Reloading Samba configuration. ");
-  shell_exec("killall -s 1 smbd;killall -s 1 nmbd");
-  shell_exec("/usr/bin/smbcontrol $(cat /var/run/smbd.pid) reload-config");
+  shell_exec("killall -s 1 smbd 2>/dev/null && killall -s 1 nmbd 2>/dev/null");
+  shell_exec("/usr/bin/smbcontrol $(cat /var/run/smbd.pid 2>/dev/null) reload-config 2>&1");
   if(is_shared($share_name)) {
     debug("Directory '${dir}' shared successfully."); return TRUE;
   } else {
@@ -196,8 +213,8 @@ function rm_smb_share($dir, $share_name) {
     file_put_contents($paths['smb_extra'], $c);
   }
   debug("Reloading Samba configuration. ");
-  shell_exec("/usr/bin/smbcontrol $(cat /var/run/smbd.pid) close-share '${share_name}'");
-  shell_exec("/usr/bin/smbcontrol $(cat /var/run/smbd.pid) reload-config");
+  shell_exec("/usr/bin/smbcontrol $(cat /var/run/smbd.pid 2>/dev/null) close-share '${share_name}' 2>&1");
+  shell_exec("/usr/bin/smbcontrol $(cat /var/run/smbd.pid 2>/dev/null) reload-config 2>&1");
   if(! is_shared($share_name)) {
     debug("Successfully removed share '${share_name}'."); return TRUE;
   } else {
@@ -210,7 +227,8 @@ function get_usb_disks() {
   $disks = array();
   foreach (listDir("/dev/disk/by-path") as $d) {
     if (preg_match("/.*(usb).*?-part\d+/i", $d)){
-      if (realpath($d) != realpath("/dev/disk/by-label/UNRAID")) {
+      $d = realpath($d);
+      if ($d != realpath("/dev/disk/by-label/UNRAID")) {
         $disks[] = $d;
       }
     }
@@ -232,10 +250,13 @@ function get_partition_info($device){
   $f_size = function($s) { return (is_numeric(trim($s))) ? formatBytes($s*1024) : "-";};
   global $_ENV, $paths;
   $disk = array();
-  $attrs = (isset($_ENV['DEVTYPE'])) ? $_ENV : parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device )"));
-  if ($attrs['DEVTYPE'] == "partition") { 
-    $disk['serial'] = $attrs['ID_SERIAL'];
-    $disk['device'] = realpath($device);
+  $attrs = (isset($_ENV['DEVTYPE'])) ? $_ENV : parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device ) 2>/dev/null"));
+
+  // $GLOBALS['echo']($attrs);
+  if ($attrs['DEVTYPE'] == "partition") {
+    $disk['serial']       = $attrs['ID_SERIAL'];
+    $disk['serial_short'] = $attrs['ID_SERIAL_SHORT'];
+    $disk['device']       = $device;
     if (isset($attrs['ID_FS_LABEL'])){
       $disk['label'] = safe_name($attrs['ID_FS_LABEL_ENC']);
     } else if (isset($attrs['ID_VENDOR']) && isset($attrs['ID_MODEL'])){
@@ -243,18 +264,20 @@ function get_partition_info($device){
     } else {
       $disk['label'] = safe_name($attrs['ID_SERIAL']);
     }
-    $disk['fstype'] = safe_name($attrs['ID_FS_TYPE']);
-    $disk['size']   = formatBytes($attrs['ID_PART_ENTRY_SIZE']*512);
-    preg_match_all("#(.*?)(\d+$)#", $disk['device'], $matches);
+    // Append partition number do muti-partitioned disks
+    preg_match_all("#(.*?)(\d+$)#", $device, $matches);
     $disk['label']  = (count(preg_grep("%".$matches[1][0]."%i", get_usb_disks())) > 1) ? $disk['label']."-part".$matches[2][0] : $disk['label'];
-    $disk['target'] = str_replace("\\040", " ", trim(shell_exec("cat /proc/mounts|grep ${disk[device]}|awk '{print $2}'")));
-    $disk['used']   = $f_size(shell_exec("df --output=used,source|grep -v 'Filesystem'|grep ${disk[device]}|awk '{print $1}'"));
-    $disk['avail']  = $f_size(shell_exec("df --output=avail,target ${disk[device]}|grep -v 'Mounted\|/dev'|awk '{print $1}'"));
+
+    $disk['fstype'] = safe_name($attrs['ID_FS_TYPE']);
+    $disk['target'] = str_replace("\\040", " ", trim(shell_exec("cat /proc/mounts 2>&1|grep ${device}|awk '{print $2}'")));
+    $size           = trim(shell_exec("blockdev --getsize64 ${device} 2>/dev/null"));
+    $disk['size']   = is_numeric($size) ? formatBytes($size) : "-";
+    $used           = trim(shell_exec("df --output=used,source 2>/dev/null|grep -v 'Filesystem'|grep ${device}|awk '{print $1}'"));
+    $disk['used']   = is_numeric($used) ? formatBytes($used*1024): "-";
+    $disk['avail']  = $f_size(($used) ? (intval($size) - intval($used)*1024) : "");
     $disk['mountpoint'] = preg_replace("%\s+%", "_", sprintf("%s/%s", $paths['usb_mount_point'], $disk['label']));
-    $stats[$device] = $disk;
-    @mkdir(dirname($paths['stats']), 0755, TRUE);
-    file_put_contents($paths['stats'], json_encode($stats, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-    return $disk;
+    $disk['owner'] = (isset($_ENV['DEVTYPE'])) ? "udev" : "user";
+  return $disk;
   }
 }
 

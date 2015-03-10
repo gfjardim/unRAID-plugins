@@ -22,6 +22,7 @@ PATH=/usr/local/sbin:/usr/sbin:/sbin:/usr/local/bin:/usr/bin:/bin
 # FSTYPE     : partition filesystem
 # LABEL      : partition label
 # DEVICE     : partition device, e.g /dev/sda1
+# OWNER      : "udev" if executed by UDEV, otherwise "user"
 
 case \$ACTION in
   'ADD' )
@@ -44,7 +45,7 @@ EOT;
 
 Script content:
 
-: <textarea spellcheck="false" cols="80" rows="22" maxlength="2048" name="text" style="font-family:bitstream;width:66%"><?=$text;?></textarea>
+: <textarea spellcheck="false" cols="80" rows="22" name="text" style="font-family:bitstream;width:66%"><?=$text;?></textarea>
 
 
 > Click the **Apply** button to commit the current edits.  Click **Reset** to

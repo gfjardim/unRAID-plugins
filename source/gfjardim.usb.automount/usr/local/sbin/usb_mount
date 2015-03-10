@@ -23,5 +23,5 @@ foreach(get_usb_disks() as $drive) {
     debug("Disk ${info[label]} shared successfully.");
   }
 }
-
+touch("/var/state/${plugin}");
 ?>
