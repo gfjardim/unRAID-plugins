@@ -33,7 +33,7 @@ switch ($_POST['action']) {
     $ct = "";
     foreach ($config as $serial => $value) {
       if (! preg_grep("#${serial}#", $disks_serials)){
-        $ct .= "<tr><td><img src='/webGui/images/green-blink.png'> absent</td><td>$serial</td><td><input type='checkbox' class='autmount' serial='${serial}' ".( (get_config($serial, "automount") == "yes") ? "checked":"")."></td><td>${value[command]}</td><td colspan='7'><span style='cursor:pointer;' onclick='remove_disk_config(\"${serial}\")'>Remove</a></td></tr>";
+        $ct .= "<tr><td><img src='/webGui/images/green-blink.png'> absent</td><td>$serial</td><td><input type='checkbox' class='autmount' serial='${serial}' ".( (get_config($serial, "automount") == "yes") ? "checked":"")."></td><td><a href='/Main/EditScript?serial=${serial}'>${value[command]}</a></td><td colspan='7'><span style='cursor:pointer;' onclick='remove_disk_config(\"${serial}\")'>Remove</a></td></tr>";
       }
     }
     if (strlen($ct)) echo "<table class='usb_absent'><thead><tr><td>Device</td><td>Serial Number</td><td>Auto mount</td><td>Script</td><td colspan='7'>Remove config</td></tr></thead><tbody>${ct}</tbody></table>";
