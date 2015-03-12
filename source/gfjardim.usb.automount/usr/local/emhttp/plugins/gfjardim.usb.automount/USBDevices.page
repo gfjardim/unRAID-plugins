@@ -33,9 +33,16 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
 <script type="text/javascript" src="/webGui/scripts/jquery.switchButton.js"></script>
 <script type="text/javascript" src="/plugins/<?=$plugin;?>/assets/waitMe.min.js"></script>
 <script type="text/javascript">
+  var URL = '/plugins/<?=$plugin;?>/USBDevicesList.php';
+  var tab_usbdisks = $('input[name$="tabs"]').length;
+  $('#tab'+tab_usbdisks).bind({click:function() {pin_tab(tab_usbdisks); usb_disks(tab_usbdisks);}});
+  $(function(){usb_disks(tab_usbdisks);});
+
   function usb_mount(cmd){
-    $('#usb_devices_list').waitMe({effect:'ios',text:' ',bg:'rgba(255,255,255,0.7)',color:'#000',sizeW:'',sizeH:'',source:''});
+    el = $('#usb_devices_list table tbody');
+    el.waitMe({effect:'ios',text:' ',bg:'rgba(255,255,255,0.7)',color:'#000',sizeW:'',sizeH:'',source:''});
     $.post('/update.php',{'#command':cmd});
+    timers.usbdisks = setTimeout('$('+el+').waitMe("hide")',10000);
   }
 
   function pin_tab(n) {
@@ -45,10 +52,8 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
 
   function usb_disks(tabnum) {
     if ($('#tab'+tabnum).is(':checked') && ! detect_usb_disk_change(tabnum)) {
-      $('#usb_devices_list').waitMe({effect:'ios',text:' ',bg:'rgba(255,255,255,0.7)',color:'#000',sizeW:'',sizeH:'',source:''});
-      $.post('/plugins/<?=$plugin;?>/USBDevicesList.php',{action:"get_content"},function(data) {
-        if (data) $('#usb_devices_list').html(data);
-      });
+      $('#usb_devices_list table tbody').waitMe({effect:'ios',text:' ',bg:'rgba(255,255,255,0.7)',color:'#000',sizeW:'',sizeH:'',source:''});
+      $.post(URL,{action:"get_content"},function(data) {if (data) $('#usb_devices_list').html(data);});
     }
   }
 
@@ -56,9 +61,7 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
     if ($('#tab'+tabnum).is(':checked')) {
       clearTimeout(timers.usbdisks);
       timers.usbdisks = setTimeout('detect_usb_disk_change('+tabnum+')',2000);
-      $.post('/plugins/<?=$plugin;?>/USBDevicesList.php',{action:"detect"},function(data) {
-        if(data.reload){usb_disks(tabnum);return true;}
-      },"json");
+      $.post(URL,{action:"detect"},function(data) { if(data.reload){usb_disks(tabnum);$.post(URL,{action:"remove_hook"});}},"json");
     } else {
       clearTimeout(timers.usbdisks);
     }
@@ -93,21 +96,19 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
     $(".ui-dialog .ui-dialog-content").css('padding-top','15px').css('font-weight','bold');
     $(".ui-button-text").css('padding','0px 5px');
   }
-  
-  tab_usbdisks = $('input[name$="tabs"]').length;
-  $('#tab'+tab_usbdisks).bind({click:function() {pin_tab(tab_usbdisks); usb_disks(tab_usbdisks);}});
-  $(function(){usb_disks(tab_usbdisks);});
-
 </script>
  
 <form id="formUsbMount" method="POST" action="/update.php" target="progressFrame">
   <input type="hidden" id="cmdUsbMount" name="#command" value="" />
 </form>
 
-<div id="dialog-confirm" style="display:none;" title="Dialog Title">
-  <input type="text" id="input_command_field"> 
-</div>
+<div id="dialog-confirm" style="display:none;" title="Dialog Title"></div>
 
-<div id="usb_devices_list" style="height:auto;min-height:200px;"></div>
+<div id="usb_devices_list" style="height:auto;min-height:100px;">
+  <table class='usb_disks' id='usb_table'>
+  <thead><tr><td>Device</td><td>Identification</td><td>Mount point</td><td>FS</td><td>Size</td><td>Used</td><td>Free</td><td>Open files</td><td>Control</td><td>Auto mount</td><td>Script</td></tr></thead>
+  <tbody><tr><td colspan='12' style='text-align:center;font-weight:bold;'></td></tr></tbody>
+  </table>
+</div>
 
 

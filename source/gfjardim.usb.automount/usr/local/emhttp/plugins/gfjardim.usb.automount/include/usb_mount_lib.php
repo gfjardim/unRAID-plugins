@@ -5,8 +5,8 @@ $paths = array("smb_extra"       => "/boot/config/smb-extra.conf",
                "smb_usb_shares"  => "/etc/samba/smb-usb-shares",
                "usb_mount_point" => "/mnt/usb",
                "log"             => "/var/log/usb_automount.log",
-               "config_file"     => "/boot/config/plugins/${plugin}/automount.cfg",
-               "stats"           => "/var/local/emhttp/plugins/${plugin}/stats.json");
+               "config_file"     => "/boot/config/plugins/${plugin}/automount.cfg"
+               );
 
 
 #########################################################
@@ -145,34 +145,22 @@ function get_mount_params($fs) {
 }
 
 function do_mount($dev, $dir, $fs) {
-  if (! is_mounted($dev) || is_mounted($dir)) {
-    @mkdir($dir,0777,TRUE);
-    $cmd = "mount -t auto -o ".get_mount_params($fs)." '${dev}' '${dir}'";
-    debug("Mounting drive with command: $cmd");
-    $o = shell_exec($cmd." 2>&1");
-    foreach (range(0,5) as $t) {
-      if (is_mounted($dev)) {
-        debug("Successfully mounted '${dev}' on '${dir}'"); return TRUE;
-      } else { sleep(0.5);}
-    }
-    debug("Mount of ${dev} failed. Error message: $o"); return FALSE;
+  if ( file_exists($dev) ) {
+    return do_mount_disk($dev, $dir, $fs);
+  } else {
+    return do_mount_mtp($dev, $dir);
   }
 }
 
 function do_unmount($dev, $dir) {
-  if (shell_exec("mount 2>&1|grep -c '${dev} '") != 0){
-    @mkdir($dir,0777,TRUE);
-    debug("Unmounting ${dev}...");
-    $o = shell_exec("umount '${dev}' 2>&1");
-    for ($i=0; $i < 10; $i++) {
-      if (! is_mounted($dev)){
-        rmdir($dir);
-        debug("Successfully unmounted '$dev'"); return TRUE;
-      } else { sleep(0.5);}
-    }
-    debug("Unmount of ${dev} failed. Error message: $o"); return FALSE;
+  if ( file_exists($dev) ) {
+    return do_umount_disk($dev, $dir, $fs);
+  } else {
+    return do_umount_mtp($dev, $dir);
   }
 }
+
+
 
 
 #########################################################
@@ -215,7 +203,10 @@ function rm_smb_share($dir, $share_name) {
   global $paths;
   $share_conf = preg_replace("#\s+#", "_", realpath($paths['smb_usb_shares'])."/".$share_name.".conf");
   debug("Removing share definitions from '$share_conf'.");
-  @unlink($share_conf);
+  if (is_file($share_conf)) {
+    @unlink($share_conf);
+    debug("Removing share definitions from '$share_conf'.");
+  }
   if (exist_in_file($paths['smb_extra'], $share_conf)) {
     debug("Removing share definitions from ".$paths['smb_extra']);
     $c = (is_file($paths['smb_extra'])) ? @file($paths['smb_extra'],FILE_IGNORE_NEW_LINES) : array();
@@ -240,6 +231,35 @@ function rm_smb_share($dir, $share_name) {
 #########################################################
 ############         DISK FUNCTIONS         #############
 #########################################################
+
+function do_mount_disk($dev, $dir, $fs) {
+  if (! is_mounted($dev) || is_mounted($dir)) {
+    @mkdir($dir,0777,TRUE);
+    $cmd = "mount -t auto -o ".get_mount_params($fs)." '${dev}' '${dir}'";
+    debug("Mounting drive with command: $cmd");
+    $o = shell_exec($cmd." 2>&1");
+    foreach (range(0,5) as $t) {
+      if (is_mounted($dev)) {
+        debug("Successfully mounted '${dev}' on '${dir}'"); return TRUE;
+      } else { sleep(0.5);}
+    }
+    debug("Mount of ${dev} failed. Error message: $o"); return FALSE;
+  }
+}
+
+function do_umount_disk($dev, $dir) {
+  if (is_mounted($dev) != 0){
+    debug("Unmounting ${dev}...");
+    $o = shell_exec("umount '${dev}' 2>&1");
+    for ($i=0; $i < 10; $i++) {
+      if (! is_mounted($dev)){
+        rmdir($dir);
+        debug("Successfully unmounted '$dev'"); return TRUE;
+      } else { sleep(0.5);}
+    }
+    debug("Unmount of ${dev} failed. Error message: $o"); return FALSE;
+  }
+}
 
 function get_usb_disks() {
   $disks = array();
@@ -297,67 +317,3 @@ function get_partition_info($device){
   }
 }
 
-
-
-
-
-
-
-
-### From this on it's MTP related functions, and it still a WIP.
-
-function do_mount_mtp($dev, $dir) {
-  if (! is_mounted($dir)) {
-    @mkdir($dir,0777,TRUE);
-    $cmd = "go-mtpfs -dev='${dev}' -allow-other=true '${dir}' 2>&1";
-    debug("Mounting drive with command: $cmd");
-    $o = shell_exec($cmd);
-    foreach (range(0,5) as $t) {
-      if ( is_mounted($dev) && count(array_diff(scandir($dir), array('.', '..'))) ) {
-        debug("Successfully mounted '${dev}'' on '${dir}'"); return TRUE;
-      } else { sleep(0.5);}
-    }
-    debug("Mount of ${dev} failed. Error message: $o"); return FALSE;
-  }
-}
-
-
-
-function get_mtp_devices() {
-  $mtp = array();
-  $devices = array();
-  preg_match_all("#:\s(.*?\s(\w+))$#i", shell_exec("/usr/sbin/go-mtpfs -list 2>/dev/null"), $matches);
-  for ($i=0; $i < count($matches[0]); $i++) { 
-    $devices[$matches[2][$i]] = $matches[1][$i];
-  }
-  if (!count($devices)) return NULL;
-  foreach (listDir(realpath('/dev/bus/usb')) as $block) {
-    $info = parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n ${block} )"));
-    if ( array_key_exists($info['ID_SERIAL_SHORT'], $devices) ) {
-      $mtp[] = get_android_info($block, $info);
-    }
-  }
-  natcasesort($mtp);
-  return $mtp;
-}
-
-
-function get_android_info($device, $info=FALSE){
-  global $_ENV;
-  $f_size = function($s) { return (is_numeric(trim($s))) ? formatBytes($s*1024) : "";};
-  $disk = array();
-  $attrs = (isset($_ENV['DEVTYPE'])) ? $_ENV : ( ($info) ? $info : parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device )")));
-  $GLOBALS['echo']($attrs);
-  $disk['serial'] = safe_name($attrs['ID_SERIAL_SHORT']);
-  $disk['device'] = $device; 
-  $disk['label']  = safe_name($attrs['ID_SERIAL']);
-  $disk['fstype'] = "mtp";
-  $disk['target'] = trim(shell_exec("df --output=target ${device}|grep -v 'Mounted\|/dev'"));
-  $disk['size']   = formatBytes($attrs['ID_PART_ENTRY_SIZE']*512);
-  $disk['used']   = $f_size(shell_exec("df --output=used,target ${device}|grep -v 'Mounted\|/dev'|awk '{print $1}'"));
-  $disk['avail']  = $f_size(shell_exec("df --output=avail,target ${device}|grep -v 'Mounted\|/dev'|awk '{print $1}'"));
-  $disk['mountpoint'] = preg_replace("%\s+%", "_", sprintf("%s/%s", $GLOBALS['paths']['usb_mount_point'], $disk['label']));
-  $disk['owner'] = (isset($_ENV['DEVTYPE'])) ? "udev" : "user";
-  return $disk;
-}
-?>

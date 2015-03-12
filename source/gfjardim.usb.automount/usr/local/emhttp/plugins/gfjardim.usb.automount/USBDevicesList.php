@@ -4,8 +4,6 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
 switch ($_POST['action']) {
   case 'get_content':
     $disks = get_all_disks_info();
-    $config_file = $GLOBALS["paths"]["config_file"];
-    $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
     echo "<table class='usb_disks' id='usb_table'>";
     echo "<thead><tr><td>Device</td><td>Identification</td><td>Mount point</td><td>FS</td><td>Size</td><td>Used</td><td>Free</td><td>Open files</td><td>Control</td><td>Auto mount</td><td>Script</td></tr></thead>";
     echo "<tbody>";
@@ -22,7 +20,7 @@ switch ($_POST['action']) {
         echo "<td>".(strlen($disk['target']) ? shell_exec("lsof '${disk[target]}' 2>/dev/null|grep -c -v COMMAND") : "-")."</td>";
         echo "<td>".(strlen($disk['target']) ? "<button onclick=\"usb_mount('/usr/local/sbin/usb_umount ${disk[device]}');\">Unmount</button>" : "<button onclick=\"usb_mount('/usr/local/sbin/usb_mount ${disk[device]}');\">Mount</button>")."</td>";
         echo "<td><input type='checkbox' class='autmount' serial='".$disk['serial']."' ".(is_automount($disk['serial']) ? 'checked':'')."></td>";
-        echo "<td><a href='/Main/EditScript?serial=".htmlentities($disk['serial'])."'><img src='/webGui/images/default.png' style='cursor:pointer;width:16px;".( (get_config($disk['serial'],"command")) ? "":"opacity: 0.4;" )."'></a></td>";
+        echo "<td><a href='/Main/EditScript?serial=".urlencode($disk['serial'])."&label=".urlencode($disk['label'])."'><img src='/webGui/images/default.png' style='cursor:pointer;width:16px;".( (get_config($disk['serial'],"command")) ? "":"opacity: 0.4;" )."'></a></td>";
         echo "</tr>";
       }
     } else {
@@ -30,6 +28,8 @@ switch ($_POST['action']) {
     }
     echo "</tbody></table><br><br>";
 
+    $config_file = $GLOBALS["paths"]["config_file"];
+    $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
     $disks_serials = array();
     foreach ($disks as $disk) $disks_serials[] = $disk['serial'];
     $ct = "";
@@ -48,12 +48,13 @@ switch ($_POST['action']) {
 
   case 'detect':
     if (is_file("/var/state/${plugin}")) {
-      echo '{"reload":true}';
-      unlink("/var/state/${plugin}");
+      echo json_encode(array("reload" => true));
     } else {
-      echo '{"reload":false}';
+      echo json_encode(array("reload" => false));
     }
     break;
+  case 'remove_hook':
+    @unlink("/var/state/${plugin}");
+    break;
 }
-// $GLOBALS['echo'](get_mtp_devices());
 ?>
