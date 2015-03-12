@@ -1,0 +1,126 @@
+Title="Edit Script"
+---
+<?PHP
+$plugin = "gfjardim.usb.automount";
+require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
+
+$serial = $_GET['serial'];
+$file = get_config($serial,"command");
+if (! $file ) $file = "/boot/config/plugins/${plugin}/";
+
+$text = @file_get_contents($file);
+$default_text = <<<EOT
+#!/bin/bash
+PATH=/usr/local/sbin:/usr/sbin:/sbin:/usr/local/bin:/usr/bin:/bin
+## Available variables: 
+# AVAIL      : available space
+# USED       : used space
+# SIZE       : partition size
+# SERIAL     : disk serial number
+# ACTION     : if mounting, ADD; if unmounting, REMOVE
+# MOUNTPOINT : where the partition is mounted
+# FSTYPE     : partition filesystem
+# LABEL      : partition label
+# DEVICE     : partition device, e.g /dev/sda1
+# OWNER      : "udev" if executed by UDEV, otherwise "user"
+
+case \$ACTION in
+  'ADD' )
+    // do your stuff here
+    echo "Added"
+  ;;
+  'REMOVE' )
+    // do your stuff here
+    echo "Removed"
+  ;;
+esac
+EOT;
+
+?>
+<link type="text/css" rel="stylesheet" href="/webGui/styles/jqueryFileTree.css" >
+<style type="text/css">
+  .fileTree {
+    width: 242px;
+    height: 150px;
+    border: solid 1px #BBB;
+    background: #FFF;
+    overflow: scroll;
+    padding: 5px;
+    position:absolute;
+    z-index:100;
+    display:none;
+  }
+</style>
+
+<form markdown="1" method="POST" action="/update.php" target="progressFrame">
+<input type="hidden" name="#include" value="update.file.php">
+
+&nbsp;
+: <input type="text" id="hostPath1" name="#file" onclick="toggleBrowser(1);" value="<?=$file;?>"><span id="fileTree1" class="fileTree"></span><input type="submit" value="Save"/><button type="button" onclick="load(this.form)">Load</button><input type="reset"/><button type="button" onclick="setDefault(this.form)">Default Script</button><button type="button" onclick="done('/')">Done</button>
+
+&nbsp;
+
+
+Script content:
+
+: <textarea spellcheck="false" cols="80" rows="22" name="text" style="font-family:bitstream;width:66%"><?=$text;?></textarea>
+
+
+> Click the **Apply** button to commit the current edits.  Click **Reset** to
+> undo any changes you make (before Saving). Click **Done** to exit this page.
+>
+> Click the **Default** button to initialize the edit box with the
+> factory-default contents.  You still need to click **Apply** in order to
+>commit the change.
+
+</form>
+
+<script type="text/javascript" src="/webGui/scripts/jqueryFileTree.js"></script>
+<script>
+  $( "form" ).submit(function( event ) {
+    $.post("/plugins/<?=$plugin;?>/update_cfg.php",{action:"set_command",serial:"<?=$serial;?>",command:$("input[name='#file']").val()},function(data){event.preventDefault();},"json");
+  });
+  function setDefault(form) {
+    form.elements['text'].value = <?=json_encode($default_text);?>;
+  }
+  function load(form) {
+    $.get($("input[name='#file']").val(),function(data){ form.elements['text'].value = data;});
+  }
+  function hideBrowser(N) {
+    $("#fileTree" + N).slideUp('fast', function () {
+      $(this).html("");
+    });
+  }
+  function toggleBrowser(N) {
+    var el = $('#fileTree' + N);
+    var p = $("#hostPath" + N);
+    if (el.is(':visible')) {
+      hideBrowser(N);
+    } else {
+      $( el ).fileTree({
+        root: "/boot/config/plugins/<?=$plugin;?>/",
+        filter: 'sh'
+      },
+      function(file) { p.val(file); },
+      function(folder) {});
+
+      var position = p.position();
+      $( el ).position({ top: position.top, left: position.left });
+      $( el ).css({left:x,top:y});
+
+      $( el ).slideDown('fast');
+    }
+  }
+  $(function() {
+    $(document).mouseup(function (e) {
+      var container = $(".fileTree");
+      if (!container.is(e.target) && container.has(e.target).length === 0) {
+        container.slideUp('fast', function () {
+          $(this).html("");
+        });
+      }
+    });
+  });
+
+
+</script>

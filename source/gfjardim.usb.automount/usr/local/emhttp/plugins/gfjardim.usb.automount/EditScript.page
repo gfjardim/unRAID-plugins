@@ -37,11 +37,26 @@ esac
 EOT;
 
 ?>
+<link type="text/css" rel="stylesheet" href="/webGui/styles/jqueryFileTree.css" >
+<style type="text/css">
+  .fileTree {
+    width: 242px;
+    height: 150px;
+    border: solid 1px #BBB;
+    background: #FFF;
+    overflow: scroll;
+    padding: 5px;
+    position:absolute;
+    z-index:100;
+    display:none;
+  }
+</style>
+
 <form markdown="1" method="POST" action="/update.php" target="progressFrame">
 <input type="hidden" name="#include" value="update.file.php">
 
 &nbsp;
-: <input type="text" name="#file" value="<?=$file;?>"><input type="submit" value="Save"/><button type="button" onclick="load(this.form)">Load</button><input type="reset"/><button type="button" onclick="setDefault(this.form)">Default Script</button><button type="button" onclick="done('/')">Done</button>
+: <input type="text" name="#file" onclick="openBrowser(this);" autocomplete="off" value="<?=$file;?>"><input type="submit" value="Save"/><input type="reset"/><button type="button" onclick="setDefault(this.form)">Default Script</button><button type="button" onclick="done('/')">Done</button>
 
 Script content:
 
@@ -57,15 +72,55 @@ Script content:
 
 </form>
 
+<script type="text/javascript" src="/webGui/scripts/jqueryFileTree.js"></script>
 <script>
-$( "form" ).submit(function( event ) {
-  $.post("/plugins/<?=$plugin;?>/update_cfg.php",{action:"set_command",serial:"<?=$serial;?>",command:$("input[name='#file']").val()},function(data){event.preventDefault();},"json");
-});
-function setDefault(form) {
-  form.elements['text'].value = <?=json_encode($default_text);?>;
-}
-function load(form) {
-  $.get($("input[name='#file']").val(),function(data){ form.elements['text'].value = data;});
-}
+  $( "form" ).submit(function( event ) {
+    $.post("/plugins/<?=$plugin;?>/update_cfg.php",{action:"set_command",serial:"<?=$serial;?>",command:$("input[name='#file']").val()},function(data){event.preventDefault();},"json");
+  });
+
+  function setDefault(form) {
+    form.elements['text'].value = <?=json_encode($default_text);?>;
+  }
+
+  function load(el) {
+    $.get($( el ).val(),function(data){ $( 'textarea' ).val(data);});
+  }
+
+  function openBrowser(parent) {
+    p = $(parent);
+    // Skip is fileTree is already open
+    if ( p.next().hasClass('fileTree') ){return null;}
+
+    // create a random id
+    var r = Math.floor((Math.random()*1000)+1);
+
+    // Add a new span and load fileTree
+    p.after("<span id='fileTree"+r+"' class='fileTree'></span>");
+    var el = $('#fileTree'+r);
+    el.fileTree({
+      root: "/boot/config/plugins/<?=$plugin;?>/",
+      filter: 'sh'
+    },
+    function(file) { p.val(file); removeBrowser(el); load(p)},
+    function(folder) {});
+
+    // Format fileTree according to parent position, height and width
+    el.css({'left':p.position().left, 'top':( p.position().top + p.outerHeight() ), 'width':(p.width()+2) });
+
+    // close if click elsewhere
+    $(document).mouseup(function (e) { if (!el.is(e.target) && el.has(e.target).length === 0) { removeBrowser(el); }});
+
+    // Open fileTree
+    el.slideDown('fast');
+  }
+
+  function removeBrowser(el) {
+    $( el ).slideUp('fast', function () {
+      $(this).remove();
+    });
+  }
+
+
+
 
 </script>
