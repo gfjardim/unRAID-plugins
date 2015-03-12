@@ -1,6 +1,5 @@
 Menu="Main:4"
 Title="USB Devices"
-Cond="( count(preg_grep('/.*(usb).*?-part\d+/i', array_diff(scandir('/dev/disk/by-path'), array('.','..')))) > 1 )"
 Markdown="false"
 ---
 <?PHP
@@ -38,10 +37,12 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
     $('#usb_devices_list').waitMe({effect:'ios',text:' ',bg:'rgba(255,255,255,0.7)',color:'#000',sizeW:'',sizeH:'',source:''});
     $.post('/update.php',{'#command':cmd});
   }
+
   function pin_tab(n) {
     $.removeCookie('one',{path:'/'});
     $.cookie('tab','tab'+n,{path:'/'});
   }
+
   function usb_disks(tabnum) {
     if ($('#tab'+tabnum).is(':checked') && ! detect_usb_disk_change(tabnum)) {
       $('#usb_devices_list').waitMe({effect:'ios',text:' ',bg:'rgba(255,255,255,0.7)',color:'#000',sizeW:'',sizeH:'',source:''});
@@ -50,21 +51,47 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
       });
     }
   }
-  function detect_usb_disk_change() {
-    if ($('#tab'+tab_usbdisks).is(':checked')) {
+
+  function detect_usb_disk_change(tabnum) {
+    if ($('#tab'+tabnum).is(':checked')) {
       clearTimeout(timers.usbdisks);
-      timers.usbdisks = setTimeout(detect_usb_disk_change,2000);
+      timers.usbdisks = setTimeout('detect_usb_disk_change('+tabnum+')',2000);
       $.post('/plugins/<?=$plugin;?>/USBDevicesList.php',{action:"detect"},function(data) {
-        if(data.reload){usb_disks(tab_usbdisks);return true;}
+        if(data.reload){usb_disks(tabnum);return true;}
       },"json");
     } else {
       clearTimeout(timers.usbdisks);
     }
     return false;
   }
-  function remove_disk_config(serial) {
-    $.post("/plugins/<?=$plugin;?>/update_cfg.php",{action:"remove_config",serial:serial},"json");
-    usb_disks(tab_usbdisks);
+
+  function remove_disk_config(serial){
+    var title = 'Removing config';
+    $( "#dialog-confirm" ).html(serial);
+    $( "#dialog-confirm" ).append( "<br><br><span style='color: #E80000;'>Are you sure?</span>" );
+    $( "#dialog-confirm" ).dialog({
+      title: title,
+      resizable: false,
+      width: 500,
+      modal: true,
+      show : {effect: 'fade' , duration: 250},
+      hide : {effect: 'fade' , duration: 250},
+      buttons: {
+        "Yes": function() {
+          $( this ).dialog( "close" );
+          $.post("/plugins/<?=$plugin;?>/update_cfg.php",{action:"remove_config",serial:serial},"json");
+          usb_disks(tab_usbdisks);
+        },
+        Cancel: function() {
+          $( this ).dialog( "close" );
+          $( this ).html("");
+        }
+      }
+    });
+    $(".ui-dialog .ui-dialog-titlebar").addClass('menu');
+    $(".ui-dialog .ui-dialog-title").css('text-align','center').css( 'width', "100%");
+    $(".ui-dialog .ui-dialog-content").css('padding-top','15px').css('font-weight','bold');
+    $(".ui-button-text").css('padding','0px 5px');
   }
   
   tab_usbdisks = $('input[name$="tabs"]').length;

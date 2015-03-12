@@ -22,10 +22,12 @@ switch ($_POST['action']) {
         echo "<td>".(strlen($disk['target']) ? shell_exec("lsof '${disk[target]}' 2>/dev/null|grep -c -v COMMAND") : "-")."</td>";
         echo "<td>".(strlen($disk['target']) ? "<button onclick=\"usb_mount('/usr/local/sbin/usb_umount ${disk[device]}');\">Unmount</button>" : "<button onclick=\"usb_mount('/usr/local/sbin/usb_mount ${disk[device]}');\">Mount</button>")."</td>";
         echo "<td><input type='checkbox' class='autmount' serial='".$disk['serial']."' ".(is_automount($disk['serial']) ? 'checked':'')."></td>";
-        echo "<td><a href='/Main/EditScript?serial=".htmlentities($disk['serial'])."'><img src='/webGui/images/default.png' style='cursor:pointer;width:16px;".( (get_command($disk['serial'])) ? "":"opacity: 0.4;" )."'></a></td>";
+        echo "<td><a href='/Main/EditScript?serial=".htmlentities($disk['serial'])."'><img src='/webGui/images/default.png' style='cursor:pointer;width:16px;".( (get_config($disk['serial'],"command")) ? "":"opacity: 0.4;" )."'></a></td>";
         echo "</tr>";
       }
-    };
+    } else {
+      echo "<tr><td colspan='12' style='text-align:center;font-weight:bold;'>No usb disks present.</td></tr>";
+    }
     echo "</tbody></table><br><br>";
 
     $disks_serials = array();
@@ -33,7 +35,7 @@ switch ($_POST['action']) {
     $ct = "";
     foreach ($config as $serial => $value) {
       if (! preg_grep("#${serial}#", $disks_serials)){
-        $ct .= "<tr><td><img src='/webGui/images/green-blink.png'> absent</td><td>$serial</td><td><input type='checkbox' class='autmount' serial='${serial}' ".( (get_config($serial, "automount") == "yes") ? "checked":"")."></td><td><a href='/Main/EditScript?serial=${serial}'>${value[command]}</a></td><td colspan='7'><span style='cursor:pointer;' onclick='remove_disk_config(\"${serial}\")'>Remove</a></td></tr>";
+        $ct .= "<tr><td><img src='/webGui/images/green-blink.png'> missing</td><td>$serial</td><td><input type='checkbox' class='autmount' serial='${serial}' ".( is_automount($serial) ? 'checked':'' )."></td><td><a href='/Main/EditScript?serial=${serial}'>${value[command]}</a></td><td colspan='7'><span style='cursor:pointer;' onclick='remove_disk_config(\"${serial}\")'>Remove</a></td></tr>";
       }
     }
     if (strlen($ct)) echo "<table class='usb_absent'><thead><tr><td>Device</td><td>Serial Number</td><td>Auto mount</td><td>Script</td><td colspan='7'>Remove config</td></tr></thead><tbody>${ct}</tbody></table>";
@@ -46,8 +48,12 @@ switch ($_POST['action']) {
 
   case 'detect':
     if (is_file("/var/state/${plugin}")) {
-      echo '{"reload":"true"}';
+      echo '{"reload":true}';
       unlink("/var/state/${plugin}");
+    } else {
+      echo '{"reload":false}';
     }
     break;
 }
+// $GLOBALS['echo'](get_mtp_devices());
+?>

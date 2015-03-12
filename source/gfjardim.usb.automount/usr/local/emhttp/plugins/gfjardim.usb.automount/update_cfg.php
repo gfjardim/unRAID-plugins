@@ -10,7 +10,7 @@ switch ($_POST['action']) {
   break;
   case 'get_command':
     $serial = urldecode(($_POST['serial']));
-    echo json_encode(array( 'command' => get_command($serial)));
+    echo json_encode(array( 'command' => get_config($serial, "command")));
   break;
   case 'set_command':
     $serial = urldecode(($_POST['serial']));

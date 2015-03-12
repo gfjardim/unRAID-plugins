@@ -8,8 +8,12 @@ $paths = array("smb_extra"       => "/boot/config/smb-extra.conf",
                "config_file"     => "/boot/config/plugins/${plugin}/automount.cfg",
                "stats"           => "/var/local/emhttp/plugins/${plugin}/stats.json");
 
-$echo = function($m) { echo "<pre>".print_r($m,TRUE)."</pre>";}; 
 
+#########################################################
+#############        MISC FUNCTIONS        ##############
+#########################################################
+
+$echo = function($m) { echo "<pre>".print_r($m,TRUE)."</pre>";}; 
 
 function save_ini_file($file, $array) {
   $res = array();
@@ -24,18 +28,18 @@ function save_ini_file($file, $array) {
   file_put_contents($file, implode(PHP_EOL, $res));
 }
 
-
 function debug($m){
   $c = (is_file($GLOBALS["paths"]["log"])) ? @file($GLOBALS["paths"]["log"],FILE_IGNORE_NEW_LINES) : array();
   $c[] = date("D M j G:i:s T Y").": $m";
   file_put_contents($GLOBALS["paths"]["log"], implode(PHP_EOL, $c));
 }
 
-
 function listDir($root) {
-  $iter = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, RecursiveDirectoryIterator::SKIP_DOTS),
-                                        RecursiveIteratorIterator::SELF_FIRST,
-                                        RecursiveIteratorIterator::CATCH_GET_CHILD);
+  $iter = new RecursiveIteratorIterator(
+          new RecursiveDirectoryIterator($root, 
+          RecursiveDirectoryIterator::SKIP_DOTS),
+          RecursiveIteratorIterator::SELF_FIRST,
+          RecursiveIteratorIterator::CATCH_GET_CHILD);
   $paths = array();
   foreach ($iter as $path => $fileinfo) {
     if (! $fileinfo->isDir()) $paths[] = $path;
@@ -43,14 +47,12 @@ function listDir($root) {
   return $paths;
 }
 
-
 function formatBytes($size) {
   if ($size == 0){ return "0 B";}
   $base = log($size) / log(1024);
   $suffix = array('B', 'kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB');
   return round(pow(1024, $base - floor($base)), 1) ." ". $suffix[floor($base)];
 }
-
 
 function safe_name($string) {
   $string = str_replace("\\x20", " ", $string);
@@ -62,9 +64,34 @@ function safe_name($string) {
   return trim($string);
 }
 
-
 function exist_in_file($file, $val) {
   return (preg_grep("%${val}%", @file($file))) ? TRUE : FALSE;
+}
+
+
+#########################################################
+############        CONFIG FUNCTIONS        #############
+#########################################################
+
+function get_config($sn, $val) {
+  $config_file = $GLOBALS["paths"]["config_file"];
+  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
+  return (isset($config[$sn][$val])) ? $config[$sn][$val] : NULL;
+}
+
+function is_automount($sn) {
+  $auto = get_config($sn, "automount");
+  return ( ($auto) ? ( ($auto == "yes") ? TRUE : FALSE ) : TRUE);
+}
+
+
+function toggle_automount($sn, $status) {
+  $config_file = $GLOBALS["paths"]["config_file"];
+  if (! is_file($config_file)) @mkdir(dirname($config_file),0777,TRUE);
+  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
+  $config[$sn]["automount"] = ($status == "true") ? "yes" : "no";
+  save_ini_file($config_file, $config);
+  return ($config[$sn]["automount"] == "yes") ? TRUE : FALSE;
 }
 
 function execute_script($info, $action) { 
@@ -72,13 +99,12 @@ function execute_script($info, $action) {
   $error = '';
   putenv("ACTION=${action}");
   foreach ($info as $key => $value) putenv(strtoupper($key)."=${value}");
-  $cmd = get_command($info['serial']);
+  $cmd = get_config($info['serial'], "command");
   if (! $cmd) {debug("Command not available, skipping."); return FALSE;}
   debug("Running command '${cmd}' with action '${action}'.");
   @chmod($cmd, 0777);
   exec("$cmd > /tmp/${info[serial]}.log 2>&1");
 }
-
 
 function set_command($sn, $cmd) {
   $config_file = $GLOBALS["paths"]["config_file"];
@@ -88,21 +114,6 @@ function set_command($sn, $cmd) {
   save_ini_file($config_file, $config);
   return (isset($config[$sn]["command"])) ? TRUE : FALSE;
 }
-
-
-function get_command($sn) {
-  $config_file = $GLOBALS["paths"]["config_file"];
-  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
-  return (isset($config[$sn]["command"])) ? $config[$sn]["command"] : NULL;
-}
-
-
-function get_config($sn, $val) {
-  $config_file = $GLOBALS["paths"]["config_file"];
-  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
-  return (isset($config[$sn][$val])) ? $config[$sn][$val] : NULL;
-}
-
 
 function remove_config_disk($sn) {
   $config_file = $GLOBALS["paths"]["config_file"];
@@ -114,15 +125,13 @@ function remove_config_disk($sn) {
 }
 
 
+#########################################################
+############        MOUNT FUNCTIONS        ##############
+#########################################################
+
 function is_mounted($dev) {
   return (shell_exec("mount 2>&1|grep -c '${dev} '") == 0) ? FALSE : TRUE;
 }
-
-
-function is_shared($name) {
-  return ( shell_exec("smbclient -g -L localhost -U% 2>&1|awk -F'|' '/Disk/{print $2}'|grep -c '${name}'") == 0 ) ? FALSE : TRUE;
-}
-
 
 function get_mount_params($fs) {
   switch ($fs) {
@@ -134,7 +143,6 @@ function get_mount_params($fs) {
     break;
   }
 }
-
 
 function do_mount($dev, $dir, $fs) {
   if (! is_mounted($dev) || is_mounted($dir)) {
@@ -151,7 +159,6 @@ function do_mount($dev, $dir, $fs) {
   }
 }
 
-
 function do_unmount($dev, $dir) {
   if (shell_exec("mount 2>&1|grep -c '${dev} '") != 0){
     @mkdir($dir,0777,TRUE);
@@ -167,6 +174,14 @@ function do_unmount($dev, $dir) {
   }
 }
 
+
+#########################################################
+############        SHARE FUNCTIONS         #############
+#########################################################
+
+function is_shared($name) {
+  return ( shell_exec("smbclient -g -L localhost -U% 2>&1|awk -F'|' '/Disk/{print $2}'|grep -c '${name}'") == 0 ) ? FALSE : TRUE;
+}
 
 function add_smb_share($dir, $share_name) {
   global $paths;
@@ -196,7 +211,6 @@ function add_smb_share($dir, $share_name) {
   }
 }
 
-
 function rm_smb_share($dir, $share_name) {
   global $paths;
   $share_conf = preg_replace("#\s+#", "_", realpath($paths['smb_usb_shares'])."/".$share_name.".conf");
@@ -223,6 +237,10 @@ function rm_smb_share($dir, $share_name) {
 }
 
 
+#########################################################
+############         DISK FUNCTIONS         #############
+#########################################################
+
 function get_usb_disks() {
   $disks = array();
   foreach (listDir("/dev/disk/by-path") as $d) {
@@ -236,7 +254,6 @@ function get_usb_disks() {
   return $disks;
 }
 
-
 function get_all_disks_info() {
   $o = array();
   foreach(get_usb_disks() as $d){
@@ -244,7 +261,6 @@ function get_all_disks_info() {
   }
   return $o;
 }
-
 
 function get_partition_info($device){
   $f_size = function($s) { return (is_numeric(trim($s))) ? formatBytes($s*1024) : "-";};
@@ -277,27 +293,12 @@ function get_partition_info($device){
     $disk['avail']  = $f_size(($used) ? (intval($size) - intval($used)*1024) : "");
     $disk['mountpoint'] = preg_replace("%\s+%", "_", sprintf("%s/%s", $paths['usb_mount_point'], $disk['label']));
     $disk['owner'] = (isset($_ENV['DEVTYPE'])) ? "udev" : "user";
-  return $disk;
+    return $disk;
   }
 }
 
 
-function is_automount($sn) {
-  $config_file = $GLOBALS["paths"]["config_file"];
-  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
-  if (! isset($config[$sn]["automount"])) return TRUE;
-  return ($config[$sn]["automount"] == "yes") ? TRUE : FALSE;
-}
 
-
-function toggle_automount($sn, $status) {
-  $config_file = $GLOBALS["paths"]["config_file"];
-  if (! is_file($config_file)) @mkdir(dirname($config_file),0777,TRUE);
-  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
-  $config[$sn]["automount"] = ($status == "true") ? "yes" : "no";
-  save_ini_file($config_file, $config);
-  return ($config[$sn]["automount"] == "yes") ? TRUE : FALSE;
-}
 
 
 
@@ -308,11 +309,11 @@ function toggle_automount($sn, $status) {
 function do_mount_mtp($dev, $dir) {
   if (! is_mounted($dir)) {
     @mkdir($dir,0777,TRUE);
-    $cmd = "/usr/sbin/go-mtpfs -allow-other='true' -dev='${dev}' '${dir}' >/dev/null 2>&1 &";
+    $cmd = "go-mtpfs -dev='${dev}' -allow-other=true '${dir}' 2>&1";
     debug("Mounting drive with command: $cmd");
     $o = shell_exec($cmd);
     foreach (range(0,5) as $t) {
-      if (is_mounted($dev)) {
+      if ( is_mounted($dev) && count(array_diff(scandir($dir), array('.', '..'))) ) {
         debug("Successfully mounted '${dev}'' on '${dir}'"); return TRUE;
       } else { sleep(0.5);}
     }
@@ -321,24 +322,19 @@ function do_mount_mtp($dev, $dir) {
 }
 
 
-function get_all_android_info() {
-  $disks = array();
-  foreach(get_mtp_devices() as $d){
-    $disks[] = get_android_info($d);
-  }
-  return $disks;
-}
-
 
 function get_mtp_devices() {
   $mtp = array();
+  $devices = array();
+  preg_match_all("#:\s(.*?\s(\w+))$#i", shell_exec("/usr/sbin/go-mtpfs -list 2>/dev/null"), $matches);
+  for ($i=0; $i < count($matches[0]); $i++) { 
+    $devices[$matches[2][$i]] = $matches[1][$i];
+  }
+  if (!count($devices)) return NULL;
   foreach (listDir(realpath('/dev/bus/usb')) as $block) {
     $info = parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n ${block} )"));
-    if ($info['ID_SERIAL_SHORT']) {
-      $r = shell_exec("/usr/sbin/go-mtpfs -dev='${info[ID_SERIAL_SHORT]}' /bogus/test/dir 2>&1 | grep -c mount");
-      if ($r > 0) {
-        $mtp[] = $block;
-      }
+    if ( array_key_exists($info['ID_SERIAL_SHORT'], $devices) ) {
+      $mtp[] = get_android_info($block, $info);
     }
   }
   natcasesort($mtp);
@@ -346,12 +342,12 @@ function get_mtp_devices() {
 }
 
 
-function get_android_info($device){
-  echo $device;
+function get_android_info($device, $info=FALSE){
   global $_ENV;
   $f_size = function($s) { return (is_numeric(trim($s))) ? formatBytes($s*1024) : "";};
   $disk = array();
-  $attrs = (isset($_ENV['DEVTYPE'])) ? $_ENV : parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device )"));
+  $attrs = (isset($_ENV['DEVTYPE'])) ? $_ENV : ( ($info) ? $info : parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device )")));
+  $GLOBALS['echo']($attrs);
   $disk['serial'] = safe_name($attrs['ID_SERIAL_SHORT']);
   $disk['device'] = $device; 
   $disk['label']  = safe_name($attrs['ID_SERIAL']);
@@ -360,6 +356,8 @@ function get_android_info($device){
   $disk['size']   = formatBytes($attrs['ID_PART_ENTRY_SIZE']*512);
   $disk['used']   = $f_size(shell_exec("df --output=used,target ${device}|grep -v 'Mounted\|/dev'|awk '{print $1}'"));
   $disk['avail']  = $f_size(shell_exec("df --output=avail,target ${device}|grep -v 'Mounted\|/dev'|awk '{print $1}'"));
+  $disk['mountpoint'] = preg_replace("%\s+%", "_", sprintf("%s/%s", $GLOBALS['paths']['usb_mount_point'], $disk['label']));
+  $disk['owner'] = (isset($_ENV['DEVTYPE'])) ? "udev" : "user";
   return $disk;
 }
 ?>

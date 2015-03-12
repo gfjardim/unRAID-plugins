@@ -5,7 +5,7 @@ $plugin = "gfjardim.usb.automount";
 require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
 
 $serial = $_GET['serial'];
-$file = get_command($serial);
+$file = get_config($serial,"command");
 if (! $file ) $file = "/boot/config/plugins/${plugin}/";
 
 $text = @file_get_contents($file);
