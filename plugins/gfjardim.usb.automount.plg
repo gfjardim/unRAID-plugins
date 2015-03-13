@@ -4,7 +4,7 @@
 <!ENTITY name      "gfjardim.usb.automount">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.03.12c">
+<!ENTITY version   "2015.03.13">
 <!ENTITY launch    "Main/USBDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -13,6 +13,9 @@
 
 <CHANGES>
 ##&name;
+
+###2015.03.13
+- Change hfsprogs from 32 to 64 bits (my bad).
 
 ###2015.03.12b
 - Feature freeze
@@ -72,8 +75,8 @@ fuse-exfat-1.1.0-x86_64-1_SBo.tgz
 <!--
 hfsprogs-332.25-i486-1sl.txz
 -->
-<FILE Name="/boot/config/plugins/&name;/hfsprogs-332.25-i486-1sl.txz" Run="upgradepkg --install-new">
-<URL>http://slackware.org.uk/slacky/slackware-14.1/system/hfsprogs/332.25/hfsprogs-332.25-i486-1sl.txz</URL>
+<FILE Name="/boot/config/plugins/&name;/hfsprogs-332.25-x86_64-2sl.txz" Run="upgradepkg --install-new">
+<URL>http://slackware.org.uk/slacky/slackware64-14.1/system/hfsprogs/332.25/hfsprogs-332.25-x86_64-2sl.txz</URL>
 </FILE>
 
 <!--
@@ -120,7 +123,7 @@ The 'remove' script.
 <INLINE>
 
 # Remove plugin related files
-rm -rf /boot/config/plugins/&name;
+# rm -rf /boot/config/plugins/&name;
 rm -f /tmp/plugins/&name;.plg
 
 # umount usb disks
@@ -132,7 +135,7 @@ removepkg &name;-&version;
 # Remove ntfs-3g and extfs
 removepkg ntfs-3g-2014.2.15-x86_64-1
 removepkg fuse-exfat-1.1.0-x86_64-1_SBo
-removepkg hfsprogs-332.25-i486-1sl
+removepkg hfsprogs-332.25-x86_64-2sl
 
 </INLINE>
 </FILE>

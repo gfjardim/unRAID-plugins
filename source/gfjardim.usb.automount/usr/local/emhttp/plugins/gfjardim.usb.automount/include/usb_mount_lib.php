@@ -317,3 +317,15 @@ function get_partition_info($device){
   }
 }
 
+function get_fsck_commands($fs) {
+  switch ($fs) {
+    case 'vfat':
+      return array('ro'=>'/sbin/fsck -n %s','rw'=>'/sbin/fsck -a %s');
+      break;
+    case 'ntfs':
+      return array('ro'=>'/bin/ntfsfix -n %s','rw'=>'/bin/ntfsfix -a %s');
+      
+
+  }
+}
+
