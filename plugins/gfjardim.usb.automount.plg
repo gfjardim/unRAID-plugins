@@ -4,7 +4,7 @@
 <!ENTITY name      "gfjardim.usb.automount">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.03.13">
+<!ENTITY version   "2015.03.13a">
 <!ENTITY launch    "Main/USBDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -14,7 +14,7 @@
 <CHANGES>
 ##&name;
 
-###2015.03.13
+###2015.03.13a
 - Change hfsprogs from 32 to 64 bits (my bad).
 
 ###2015.03.12b
