@@ -324,8 +324,13 @@ function get_fsck_commands($fs) {
       break;
     case 'ntfs':
       return array('ro'=>'/bin/ntfsfix -n %s','rw'=>'/bin/ntfsfix -a %s');
-      
-
+      break;
+    case 'exfat':
+      return array('ro'=>'/sbin/exfatfsck %s','rw'=>false);
+      break;
+    case 'hfsplus';
+      return array('ro'=>'/usr/sbin/fsck.hfsplus -l %s','rw'=>'/usr/sbin/fsck.hfsplus -y %s');
+      break;
   }
 }
 

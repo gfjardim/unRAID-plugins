@@ -10,7 +10,9 @@ switch ($_POST['action']) {
     if ( count($disks) ) {
       foreach ($disks as $disk) {
         echo "<tr>";
-        echo "<td><img src='/webGui/images/".(is_shared($disk['label']) ? "green-on.png":"red-on.png")."'> ".basename($disk['device'])."</td>";
+        $fscheck = sprintf(get_fsck_commands($disk['fstype'])['ro'], $disk['device'] );
+        $dev = sprintf( "<img src='/webGui/images/%s'> %s", ( is_shared($disk['label']) ? "green-on.png":"red-on.png" ), basename($disk['device']) );
+        echo "<td>".(! $disk['target']  ? "<a style='cursor:pointer;' onclick='openWindow(\"".$fscheck."\",\"Cheching fs\",600,900)'>".$dev."</a>" : $dev )."</td>";
         echo "<td>".$disk['label']."</td>";
         echo "<td><a href='/Shares/Browse?dir=".$disk['target']."' target='_blank' title='Browse ".$disk['target']."'>".$disk['target']."</a></td>";
         echo "<td>".$disk['fstype']."</td>";
@@ -45,7 +47,6 @@ switch ($_POST['action']) {
     echo '$(".autmount").change(function(){$.post("/plugins/'.$plugin.'/update_cfg.php",{action:"automount",serial:$(this).attr("serial"),status:$(this).is(":checked")},function(data){$(this).prop("checked",data.automount);},"json");});';
     echo '</script>';
     break;
-
   case 'detect':
     if (is_file("/var/state/${plugin}")) {
       echo json_encode(array("reload" => true));

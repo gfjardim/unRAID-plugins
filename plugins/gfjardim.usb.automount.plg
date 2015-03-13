@@ -4,7 +4,7 @@
 <!ENTITY name      "gfjardim.usb.automount">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.03.13a">
+<!ENTITY version   "2015.03.14">
 <!ENTITY launch    "Main/USBDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -13,6 +13,9 @@
 
 <CHANGES>
 ##&name;
+
+###2015.03.14
+- Add libbsd, required by hfsprogs
 
 ###2015.03.13a
 - Change hfsprogs from 32 to 64 bits (my bad).
@@ -80,6 +83,13 @@ hfsprogs-332.25-i486-1sl.txz
 </FILE>
 
 <!--
+libbsd-0.6.0-x86_64-1sl.txz
+-->
+<FILE Name="/boot/config/plugins/&name;/libbsd-0.6.0-x86_64-1sl.txz" Run="upgradepkg --install-new">
+<URL>http://slackware.org.uk/slacky/slackware64-14.1/libraries/libbsd/0.6.0/libbsd-0.6.0-x86_64-1sl.txz</URL>
+</FILE>
+
+<!--
 The 'post-install' script.
 -->
 <FILE Run="/bin/bash">
@@ -136,6 +146,7 @@ removepkg &name;-&version;
 removepkg ntfs-3g-2014.2.15-x86_64-1
 removepkg fuse-exfat-1.1.0-x86_64-1_SBo
 removepkg hfsprogs-332.25-x86_64-2sl
+removepkg libbsd-0.6.0-x86_64-1sl
 
 </INLINE>
 </FILE>

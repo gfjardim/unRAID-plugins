@@ -5,7 +5,7 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
 
 $DEVNAME = (isset($_ENV['DEVNAME'])) ? $_ENV['DEVNAME'] : ( isset($argv[1]) ? $argv[1] : NULL );
 foreach(get_usb_disks() as $disk) {
-  if ( $DEVNAME == realpath($disk) ) {
+  if ( $DEVNAME == realpath($disk) || $DEVNAME == "all" ) {
     $info = get_partition_info($disk);
     if (! is_automount($info['serial']) && isset($_ENV['DEVNAME']) ) {
       debug("Disk with serial '${info[serial]}' auto mount is disabled, aborting.");
