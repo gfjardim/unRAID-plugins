@@ -39,7 +39,7 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
   $(function(){usb_disks(tab_usbdisks);});
 
   function usb_mount(cmd){
-    el = $('#usb_devices_list table tbody');
+    el = $('#usb_devices_list');
     el.waitMe({effect:'ios',text:' ',bg:'rgba(255,255,255,0.7)',color:'#000',sizeW:'',sizeH:'',source:''});
     $.post('/update.php',{'#command':cmd});
     timers.usbdisks = setTimeout('$('+el+').waitMe("hide")',10000);
@@ -52,7 +52,7 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
 
   function usb_disks(tabnum) {
     if ($('#tab'+tabnum).is(':checked') && ! detect_usb_disk_change(tabnum)) {
-      $('#usb_devices_list table tbody').waitMe({effect:'ios',text:' ',bg:'rgba(255,255,255,0.7)',color:'#000',sizeW:'',sizeH:'',source:''});
+      $('#usb_devices_list').waitMe({effect:'ios',text:' ',bg:'rgba(255,255,255,0.7)',color:'#000',sizeW:'',sizeH:'',source:''});
       $.post(URL,{action:"get_content"},function(data) {if (data) $('#usb_devices_list').html(data);});
     }
   }
@@ -104,7 +104,7 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
 
 <div id="dialog-confirm" style="display:none;" title="Dialog Title"></div>
 
-<div id="usb_devices_list" style="height:auto;min-height:100px;">
+<div id="usb_devices_list" style="height:auto;min-height:150px;">
   <table class='usb_disks' id='usb_table'>
   <thead><tr><td>Device</td><td>Identification</td><td>Mount point</td><td>FS</td><td>Size</td><td>Used</td><td>Free</td><td>Open files</td><td>Control</td><td>Auto mount</td><td>Script</td></tr></thead>
   <tbody><tr><td colspan='12' style='text-align:center;font-weight:bold;'></td></tr></tbody>

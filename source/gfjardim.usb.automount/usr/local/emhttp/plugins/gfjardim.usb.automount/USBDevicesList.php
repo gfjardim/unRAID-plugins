@@ -4,7 +4,7 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
 switch ($_POST['action']) {
   case 'get_content':
     $disks = get_all_disks_info();
-    echo "<table class='usb_disks' id='usb_table'>";
+    echo "<table class='usb_disks'>";
     echo "<thead><tr><td>Device</td><td>Identification</td><td>Mount point</td><td>FS</td><td>Size</td><td>Used</td><td>Free</td><td>Open files</td><td>Control</td><td>Auto mount</td><td>Script</td></tr></thead>";
     echo "<tbody>";
     if ( count($disks) ) {
@@ -37,7 +37,7 @@ switch ($_POST['action']) {
     $ct = "";
     foreach ($config as $serial => $value) {
       if (! preg_grep("#${serial}#", $disks_serials)){
-        $ct .= "<tr><td><img src='/webGui/images/green-blink.png'> missing</td><td>$serial</td><td><input type='checkbox' class='autmount' serial='${serial}' ".( is_automount($serial) ? 'checked':'' )."></td><td><a href='/Main/EditScript?serial=${serial}'>${value[command]}</a></td><td colspan='7'><span style='cursor:pointer;' onclick='remove_disk_config(\"${serial}\")'>Remove</a></td></tr>";
+        $ct .= "<tr><td><img src='/webGui/images/green-blink.png'> missing</td><td>$serial</td><td><input type='checkbox' class='autmount' serial='${serial}' ".( is_automount($serial) ? 'checked':'' )."></td><td><a href='/Main/EditScript?serial=${serial}'>".basename($value['command'])."</a></td><td colspan='7'><span style='cursor:pointer;' onclick='remove_disk_config(\"${serial}\")'>Remove</a></td></tr>";
       }
     }
     if (strlen($ct)) echo "<table class='usb_absent'><thead><tr><td>Device</td><td>Serial Number</td><td>Auto mount</td><td>Script</td><td colspan='7'>Remove config</td></tr></thead><tbody>${ct}</tbody></table>";
