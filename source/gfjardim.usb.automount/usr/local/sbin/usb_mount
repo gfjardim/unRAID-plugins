@@ -7,7 +7,7 @@ $DEVNAME = (isset($_ENV['DEVNAME'])) ? $_ENV['DEVNAME'] : ( isset($argv[1]) ? $a
 foreach(get_usb_disks() as $disk) {
   if ( $DEVNAME == realpath($disk) || $DEVNAME == "all" ) {
     $info = get_partition_info($disk);
-    if (! is_automount($info['serial']) && isset($_ENV['DEVNAME']) ) {
+    if (! is_automount($info['serial']) && ( $DEVNAME == "all" || isset($_ENV['DEVNAME']) )) {
       debug("Disk with serial '${info[serial]}' auto mount is disabled, aborting.");
       continue;
     }
@@ -21,5 +21,4 @@ foreach(get_usb_disks() as $disk) {
   }
 }
 touch("/var/state/${plugin}");
-
 ?>

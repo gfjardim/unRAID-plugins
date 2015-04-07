@@ -2,9 +2,11 @@
 <?
 $plugin = "gfjardim.usb.automount";
 require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
+$PRESENT=array();
 
 $DEVNAME = (isset($_ENV['DEVNAME'])) ? $_ENV['DEVNAME'] : ( isset($argv[1]) ? $argv[1] : NULL );
 foreach(get_usb_disks() as $disk) {
+  $PRESENT[$disk] = $disk;
   if ( $DEVNAME == realpath($disk) || $DEVNAME == "all" ) {
     $info = get_partition_info($disk);
     debug("Drive found with the following attributes: ".(implode(', ', array_map(function ($v, $k) { return "$k='$v'"; }, $info, array_keys($info)))));
@@ -18,6 +20,14 @@ foreach(get_usb_disks() as $disk) {
         }
       }
     }
+  }
+}
+
+# Unmount not connected devices
+exec("cat /proc/mounts|grep ${paths[usb_mount_point]}|awk '{print $1}'", $mounted_usb_disks);
+foreach ($mounted_usb_disks as $disk) {
+  if (!array_key_exists($disk, $PRESENT)) {
+    do_unmount($disk, "");
   }
 }
 touch("/var/state/${plugin}");

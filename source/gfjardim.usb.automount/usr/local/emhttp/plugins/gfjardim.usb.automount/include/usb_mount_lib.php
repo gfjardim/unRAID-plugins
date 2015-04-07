@@ -3,7 +3,7 @@ $plugin = "gfjardim.usb.automount";
 
 $paths = array("smb_extra"       => "/boot/config/smb-extra.conf",
                "smb_usb_shares"  => "/etc/samba/smb-usb-shares",
-               "usb_mount_point" => "/mnt/usb",
+               "usb_mountpoint" => "/mnt/usb",
                "log"             => "/var/log/usb_automount.log",
                "config_file"     => "/boot/config/plugins/${plugin}/automount.cfg"
                );
@@ -145,19 +145,11 @@ function get_mount_params($fs) {
 }
 
 function do_mount($dev, $dir, $fs) {
-  if ( file_exists($dev) ) {
-    return do_mount_disk($dev, $dir, $fs);
-  } else {
-    return do_mount_mtp($dev, $dir);
-  }
+  return do_mount_disk($dev, $dir, $fs);
 }
 
 function do_unmount($dev, $dir) {
-  if ( file_exists($dev) ) {
-    return do_umount_disk($dev, $dir, $fs);
-  } else {
-    return do_umount_mtp($dev, $dir);
-  }
+  return do_umount_disk($dev, $dir, $fs);
 }
 
 
@@ -253,7 +245,7 @@ function do_umount_disk($dev, $dir) {
     $o = shell_exec("umount '${dev}' 2>&1");
     for ($i=0; $i < 10; $i++) {
       if (! is_mounted($dev)){
-        rmdir($dir);
+        if (is_dir($dir)) rmdir($dir);
         debug("Successfully unmounted '$dev'"); return TRUE;
       } else { sleep(0.5);}
     }
@@ -288,7 +280,7 @@ function get_partition_info($device){
   $disk = array();
   $attrs = (isset($_ENV['DEVTYPE'])) ? $_ENV : parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device ) 2>/dev/null"));
 
-  // $GLOBALS['echo']($attrs);
+  // $GLOBALS['echo']($device);
   if ($attrs['DEVTYPE'] == "partition") {
     $disk['serial']       = $attrs['ID_SERIAL'];
     $disk['serial_short'] = $attrs['ID_SERIAL_SHORT'];
@@ -310,8 +302,8 @@ function get_partition_info($device){
     $disk['size']   = is_numeric($size) ? formatBytes($size) : "-";
     $used           = trim(shell_exec("df --output=used,source 2>/dev/null|grep -v 'Filesystem'|grep ${device}|awk '{print $1}'"));
     $disk['used']   = is_numeric($used) ? formatBytes($used*1024): "-";
-    $disk['avail']  = $f_size(($used) ? (intval($size) - intval($used)*1024) : "");
-    $disk['mountpoint'] = preg_replace("%\s+%", "_", sprintf("%s/%s", $paths['usb_mount_point'], $disk['label']));
+    $disk['avail']  = is_numeric($used) ? formatBytes(intval($size) - intval($used*1024)) : "-";
+    $disk['mountpoint'] = preg_replace("%\s+%", "_", sprintf("%s/%s", $paths['usb_mountpoint'], $disk['label']));
     $disk['owner'] = (isset($_ENV['DEVTYPE'])) ? "udev" : "user";
     return $disk;
   }
