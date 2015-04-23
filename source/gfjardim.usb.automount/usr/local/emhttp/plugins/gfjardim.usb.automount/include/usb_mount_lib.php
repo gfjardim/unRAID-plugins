@@ -3,9 +3,10 @@ $plugin = "gfjardim.usb.automount";
 
 $paths = array("smb_extra"       => "/boot/config/smb-extra.conf",
                "smb_usb_shares"  => "/etc/samba/smb-usb-shares",
-               "usb_mountpoint" => "/mnt/usb",
+               "usb_mountpoint"  => "/mnt/usb",
                "log"             => "/var/log/usb_automount.log",
-               "config_file"     => "/boot/config/plugins/${plugin}/automount.cfg"
+               "config_file"     => "/boot/config/plugins/${plugin}/automount.cfg",
+               "state"           => "/var/state/${plugin}.ini"
                );
 
 
@@ -32,6 +33,7 @@ function debug($m){
   $c = (is_file($GLOBALS["paths"]["log"])) ? @file($GLOBALS["paths"]["log"],FILE_IGNORE_NEW_LINES) : array();
   $c[] = date("D M j G:i:s T Y").": $m";
   file_put_contents($GLOBALS["paths"]["log"], implode(PHP_EOL, $c));
+  // echo print_r($m,true)."\n";
 }
 
 function listDir($root) {
@@ -68,22 +70,42 @@ function exist_in_file($file, $val) {
   return (preg_grep("%${val}%", @file($file))) ? TRUE : FALSE;
 }
 
+function get_temp($dev) {
+  $state = shell_exec("hdparm -C $dev 2>/dev/null| grep -c standby");
+  if ($state == 0) {
+    return shell_exec("smartctl -A -d sat,12 $dev 2>/dev/null| grep -m 1 -i Temperature_Celsius | awk '{print $10}'");
+  }
+}
+
 
 #########################################################
 ############        CONFIG FUNCTIONS        #############
 #########################################################
 
-function get_config($sn, $val) {
+function get_config($sn, $var) {
   $config_file = $GLOBALS["paths"]["config_file"];
   $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
-  return (isset($config[$sn][$val])) ? $config[$sn][$val] : NULL;
+  return (isset($config[$sn][$var])) ? html_entity_decode($config[$sn][$var]) : FALSE;
 }
 
-function is_automount($sn) {
+function set_config($sn, $var, $val) {
+  $config_file = $GLOBALS["paths"]["config_file"];
+  if (! is_file($config_file)) @mkdir(dirname($config_file),0666,TRUE);
+  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
+  $config[$sn][$var] = htmlentities($val, ENT_COMPAT);
+  save_ini_file($config_file, $config);
+  return (isset($config[$sn][$var])) ? $config[$sn][$var] : FALSE;
+}
+
+function is_automount($sn, $usb=true) {
   $auto = get_config($sn, "automount");
   return ( ($auto) ? ( ($auto == "yes") ? TRUE : FALSE ) : TRUE);
 }
 
+function is_automount_2($sn, $usb=FALSE) {
+  $auto = get_config($sn, "automount");
+  return ($auto == "yes" || ( ! $auto && $usb !== FALSE ) ) ? TRUE : FALSE; 
+}
 
 function toggle_automount($sn, $status) {
   $config_file = $GLOBALS["paths"]["config_file"];
@@ -136,24 +158,47 @@ function is_mounted($dev) {
 function get_mount_params($fs) {
   switch ($fs) {
     case 'hfsplus':
-    return "force,rw,users,async,umask=000";
-    break;
+      return "force,rw,users,async,umask=000";
+      break;
+    case 'xfs':
+      return 'rw,noatime,nodiratime,attr2,inode64,noquota';
+      break;
     default:
-    return "auto,async,nodev,nosuid,umask=000";
-    break;
+      return "auto,async,nodev,nosuid,umask=000";
+      break;
   }
 }
 
 function do_mount($dev, $dir, $fs) {
-  return do_mount_disk($dev, $dir, $fs);
+  if (! is_mounted($dev) || ! is_mounted($dir)) {
+    @mkdir($dir,0777,TRUE);
+    $cmd = "mount -t auto -o ".get_mount_params($fs)." '${dev}' '${dir}'";
+    debug("Mounting drive with command: $cmd");
+    $o = shell_exec($cmd." 2>&1");
+    foreach (range(0,5) as $t) {
+      if (is_mounted($dev)) {
+        debug("Successfully mounted '${dev}' on '${dir}'"); return TRUE;
+      } else { sleep(0.5);}
+    }
+    debug("Mount of ${dev} failed. Error message: $o"); return FALSE;
+  } else {
+    debug("Drive '$dev' already mounted");
+  }
 }
 
 function do_unmount($dev, $dir) {
-  return do_umount_disk($dev, $dir, $fs);
+  if (is_mounted($dev) != 0){
+    debug("Unmounting ${dev}...");
+    $o = shell_exec("umount '${dev}' 2>&1");
+    for ($i=0; $i < 10; $i++) {
+      if (! is_mounted($dev)){
+        if (is_dir($dir)) rmdir($dir);
+        debug("Successfully unmounted '$dev'"); return TRUE;
+      } else { sleep(0.5);}
+    }
+    debug("Unmount of ${dev} failed. Error message: $o"); return FALSE;
+  }
 }
-
-
-
 
 #########################################################
 ############        SHARE FUNCTIONS         #############
@@ -224,78 +269,83 @@ function rm_smb_share($dir, $share_name) {
 ############         DISK FUNCTIONS         #############
 #########################################################
 
-function do_mount_disk($dev, $dir, $fs) {
-  if (! is_mounted($dev) || is_mounted($dir)) {
-    @mkdir($dir,0777,TRUE);
-    $cmd = "mount -t auto -o ".get_mount_params($fs)." '${dev}' '${dir}'";
-    debug("Mounting drive with command: $cmd");
-    $o = shell_exec($cmd." 2>&1");
-    foreach (range(0,5) as $t) {
-      if (is_mounted($dev)) {
-        debug("Successfully mounted '${dev}' on '${dir}'"); return TRUE;
-      } else { sleep(0.5);}
-    }
-    debug("Mount of ${dev} failed. Error message: $o"); return FALSE;
-  }
-}
 
-function do_umount_disk($dev, $dir) {
-  if (is_mounted($dev) != 0){
-    debug("Unmounting ${dev}...");
-    $o = shell_exec("umount '${dev}' 2>&1");
-    for ($i=0; $i < 10; $i++) {
-      if (! is_mounted($dev)){
-        if (is_dir($dir)) rmdir($dir);
-        debug("Successfully unmounted '$dev'"); return TRUE;
-      } else { sleep(0.5);}
-    }
-    debug("Unmount of ${dev} failed. Error message: $o"); return FALSE;
-  }
-}
-
-function get_usb_disks() {
-  $disks = array();
-  foreach (listDir("/dev/disk/by-path") as $d) {
-    if (preg_match("/.*(usb).*?-part\d+/i", $d)){
-      $d = realpath($d);
-      if ($d != realpath("/dev/disk/by-label/UNRAID")) {
-        $disks[] = $d;
+function get_unasigned_disks() {
+  $paths=listDir("/dev/disk/by-id");
+  $usb_disks = array();
+  foreach (listDir("/dev/disk/by-path") as $v) if (preg_match("#usb#", $v)) $usb_disks[] = realpath($v);
+  $unraid_disks = explode(PHP_EOL, shell_exec('/root/mdcmd status 2>/dev/null| for i in $(grep -Po "rdevName[0-9.]*=\K.*"); do echo /dev/$i; done'));
+  $unraid_flash = realpath("/dev/disk/by-label/UNRAID");
+  $unraid_cache = trim(shell_exec("/usr/bin/cat /proc/mounts 2>&1|grep '/mnt/cache'|awk '{print $1}'"));
+  foreach ($paths as $d) {
+    $path = realpath($d);
+    if (preg_match("/ata|usb(?:(?!part).)*$/i", $d) && ! in_array($path, $unraid_disks)){
+      if ($m = array_values(preg_grep("#$d.*-part\d+#", $paths))) {
+        natsort($m);
+        foreach ($m as $k => $v) $m_real[$k] = realpath($v);
+        if (! preg_match("#ata#", $d) === FALSE && ! in_array($unraid_cache, $m_real) && ! in_array($path, $usb_disks)) {
+          $disks[$d] = array('device'=>$path,'type'=>'ata','partitions'=>$m);
+        } else if ( in_array($path, $usb_disks) && ! in_array($unraid_flash, $m_real)) {
+          $disks[$d] = array('device'=>$path,'type'=>'usb','partitions'=>$m);
+        }
       }
     }
   }
   return $disks;
 }
 
-function get_all_disks_info() {
-  $o = array();
-  foreach(get_usb_disks() as $d){
-    $o[] = get_partition_info($d);
+function get_all_disks_info($bus="all") {
+  $disks = get_unasigned_disks();
+  foreach ($disks as $key => $disk) {
+    if ($disk['type'] != $bus && $bus != "all") continue;
+    $disk['temperature'] = get_temp($key);
+    foreach ($disk['partitions'] as $k => $p) {
+      $disk['partitions'][$k] = get_partition_info($p);
+    }
+    $disks[$key] = $disk;
   }
-  return $o;
+  return $disks;
+}
+
+function get_udev_info($device) {
+  global $paths;
+  $state = is_file($paths['state']) ? @parse_ini_file($paths['state'], true) : array();
+  if (array_key_exists($device, $state)) {
+    // debug("Using udev cache for '$device'.");
+    return $state[$device];
+  } else {
+    $state[$device] = parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device ) 2>/dev/null"));
+    save_ini_file($paths['state'], $state);
+    // debug("Not using udev cache for '$device'.");
+    return $state[$device];
+  }
 }
 
 function get_partition_info($device){
-  $f_size = function($s) { return (is_numeric(trim($s))) ? formatBytes($s*1024) : "-";};
   global $_ENV, $paths;
+  $f_size = function($s) { return (is_numeric(trim($s))) ? formatBytes($s*1024) : "-";};
   $disk = array();
-  $attrs = (isset($_ENV['DEVTYPE'])) ? $_ENV : parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device ) 2>/dev/null"));
+  $attrs = (isset($_ENV['DEVTYPE'])) ? $_ENV : get_udev_info($device);
+  $device = realpath($device);
 
-  // $GLOBALS['echo']($device);
   if ($attrs['DEVTYPE'] == "partition") {
     $disk['serial']       = $attrs['ID_SERIAL'];
     $disk['serial_short'] = $attrs['ID_SERIAL_SHORT'];
     $disk['device']       = $device;
+    // Grab partition number
+    preg_match_all("#(.*?)(\d+$)#", $device, $matches);
+    $disk['part']   =  $matches[2][0];
     if (isset($attrs['ID_FS_LABEL'])){
       $disk['label'] = safe_name($attrs['ID_FS_LABEL_ENC']);
-    } else if (isset($attrs['ID_VENDOR']) && isset($attrs['ID_MODEL'])){
-      $disk['label'] = sprintf("%s %s", safe_name($attrs['ID_VENDOR']), safe_name($attrs['ID_MODEL']));
     } else {
-      $disk['label'] = safe_name($attrs['ID_SERIAL']);
+      if (isset($attrs['ID_VENDOR']) && isset($attrs['ID_MODEL'])){
+        $disk['label'] = sprintf("%s %s", safe_name($attrs['ID_VENDOR']), safe_name($attrs['ID_MODEL']));
+      } else {
+        $disk['label'] = safe_name($attrs['ID_SERIAL']);
+      }
+      $all_disks = array_unique(array_map(function($ar){return realpath($ar);},listDir("/dev/disk/by-id")));
+      $disk['label']  = (count(preg_grep("%".$matches[1][0]."%i", $all_disks)) > 2) ? $disk['label']."-part".$matches[2][0] : $disk['label'];
     }
-    // Append partition number do muti-partitioned disks
-    preg_match_all("#(.*?)(\d+$)#", $device, $matches);
-    $disk['label']  = (count(preg_grep("%".$matches[1][0]."%i", get_usb_disks())) > 1) ? $disk['label']."-part".$matches[2][0] : $disk['label'];
-
     $disk['fstype'] = safe_name($attrs['ID_FS_TYPE']);
     $disk['target'] = str_replace("\\040", " ", trim(shell_exec("cat /proc/mounts 2>&1|grep ${device}|awk '{print $2}'")));
     $size           = trim(shell_exec("blockdev --getsize64 ${device} 2>/dev/null"));
@@ -303,8 +353,13 @@ function get_partition_info($device){
     $used           = trim(shell_exec("df --output=used,source 2>/dev/null|grep -v 'Filesystem'|grep ${device}|awk '{print $1}'"));
     $disk['used']   = is_numeric($used) ? formatBytes($used*1024): "-";
     $disk['avail']  = is_numeric($used) ? formatBytes(intval($size) - intval($used*1024)) : "-";
-    $disk['mountpoint'] = preg_replace("%\s+%", "_", sprintf("%s/%s", $paths['usb_mountpoint'], $disk['label']));
+    if ( $mountpoint = get_config($disk['serial'], "mountpoint-part{$disk[part]}") ) {
+      list(, $disk['mountpoint']) = explode("|",$mountpoint,2);
+    } else {
+      $disk['mountpoint'] = $disk['target'] ? $disk['target'] : preg_replace("%\s+%", "_", sprintf("%s/%s", $paths['usb_mountpoint'], $disk['label']));
+    }
     $disk['owner'] = (isset($_ENV['DEVTYPE'])) ? "udev" : "user";
+    $disk['automount'] = is_automount_2($disk['serial'],strpos($attrs['DEVPATH'],"usb"));
     return $disk;
   }
 }
@@ -312,17 +367,17 @@ function get_partition_info($device){
 function get_fsck_commands($fs) {
   switch ($fs) {
     case 'vfat':
-      return array('ro'=>'/sbin/fsck -n %s','rw'=>'/sbin/fsck -a %s');
-      break;
+    return array('ro'=>'/sbin/fsck -n %s','rw'=>'/sbin/fsck -a %s');
+    break;
     case 'ntfs':
-      return array('ro'=>'/bin/ntfsfix -n %s','rw'=>'/bin/ntfsfix -a %s');
-      break;
+    return array('ro'=>'/bin/ntfsfix %s','rw'=>'/bin/ntfsfix -a %s');
+    break;
     case 'exfat':
-      return array('ro'=>'/sbin/exfatfsck %s','rw'=>false);
-      break;
+    return array('ro'=>'/sbin/exfatfsck %s','rw'=>false);
+    break;
     case 'hfsplus';
-      return array('ro'=>'/usr/sbin/fsck.hfsplus -l %s','rw'=>'/usr/sbin/fsck.hfsplus -y %s');
-      break;
+    return array('ro'=>'/usr/sbin/fsck.hfsplus -l %s','rw'=>'/usr/sbin/fsck.hfsplus -y %s');
+    break;
   }
 }
 

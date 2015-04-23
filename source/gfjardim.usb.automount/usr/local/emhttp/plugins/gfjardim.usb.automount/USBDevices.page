@@ -5,22 +5,28 @@ Markdown="false"
 <?PHP
 $plugin = "gfjardim.usb.automount";
 require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
+// echo "<pre>".print_r($display, true)."</pre>";
 ?>
 <link type='text/css' rel='stylesheet' href='/webGui/styles/jquery.switchButton.css'>
 <link type="text/css" rel="stylesheet" href="/webGui/styles/jquery-ui.min.css">
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/waitMe.min.css">
+<link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/automount.css">
 <style>
-table.usb_disks{padding-top:0px;margin-top:0px;margin-top:-21px;}
-  table.usb_disks{border-collapse:collapse;white-space:nowrap;}
-  table.usb_disks tr>td{text-align:center;width:8%;padding-left:12px;padding-right:0;white-space:nowrap;}
+  <?if ($display['theme'] == 'white'):?>
+  table.usb_disks thead tr td{font-size:13px;font-weight:normal;background:-webkit-radial-gradient(#E0E0E0,#C0C0C0);background:linear-gradient(#E0E0E0,#C0C0C0);padding:5px 20px 5px 6px;white-space:nowrap;text-align:left;}
+  table.usb_disks tbody tr.even{background-color:#F8F8F8;}
+  <?else:?>
+  table.usb_disks thead tr td{font-size:13px;font-weight:normal;background:-webkit-radial-gradient(#101010,#202020);background:linear-gradient(#101010,#202020);padding:5px 20px 5px 6px;white-space:nowrap;text-align:left;}
+  table.usb_disks tbody tr.even{background-color: #0C0C0C;}
+  <?endif;?>
+  table.usb_disks {padding:0px;margin:-21px 0px 22px 0px;border-collapse:collapse;white-space:nowrap;}
+  table.usb_disks tr>td{text-align:left;width:8%;padding-left:12px;padding-right:0;white-space:nowrap;}
   table.usb_disks tr>td+td{text-align:left;width:auto;}
   table.usb_disks tr>td+td+td+td{text-align:right;padding-left:0;padding-right:12px;}
-  table.usb_disks tr>td+td+td+td+td+td+td+td+td{text-align:center;padding-left:0;padding-right:12px;}
-  table.usb_disks tr>td+td+td+td+td+td+td+td+td+td{text-align:left;padding-left:0;padding-right:12px;width: 5em;}
-  table.usb_disks tr>td+td+td+td+td+td+td+td+td+td+td{text-align:right;}
+  table.usb_disks tr>td+td+td+td+td+td+td+td+td{text-align:left;padding:0px 0px 0px 15px;}
+  table.usb_disks tr>td+td+td+td+td+td+td+td+td+td{text-align:right;padding-left:0;padding-right:12px;}
 
-  table.usb_absent{border-collapse:collapse;white-space:nowrap;}
-  table.usb_absent tr>td{text-align:center;width:8%;padding-left:12px;padding-right:0;white-space:nowrap;}
+  table.usb_absent tr>td{text-align:left;width:8%;padding-left:12px;padding-right:0;white-space:nowrap;}
   table.usb_absent tr>td+td{text-align:left;width:auto;}
   table.usb_absent tr>td+td+td+td+td{text-align:right;padding-left:0;padding-right:12px;width: 5em;}
   .switch-button-background {margin: 0px 0px;}
@@ -29,6 +35,8 @@ table.usb_disks{padding-top:0px;margin-top:0px;margin-top:-21px;}
 <script type="text/javascript" src="/plugins/<?=$plugin;?>/assets/waitMe.min.js"></script>
 <script type="text/javascript">
   var URL = '/plugins/<?=$plugin;?>/USBDevicesList.php';
+  var unit ="<?=$display['unit']?>";
+  var dot = "<?=$display['number'][0]?>";
   var tab_usbdisks = $('input[name$="tabs"]').length;
   $('#tab'+tab_usbdisks).bind({click:function() {pin_tab(tab_usbdisks); usb_disks(tab_usbdisks);}});
   $(function(){usb_disks(tab_usbdisks);});
@@ -53,7 +61,7 @@ table.usb_disks{padding-top:0px;margin-top:0px;margin-top:-21px;}
   function usb_disks(tabnum) {
     if ($('#tab'+tabnum).is(':checked') && ! detect_usb_disk_change(tabnum)) {
       startWaitMe('#usb_devices_list');
-      $.post(URL,{action:"get_content"},function(data) {if (data) $('#usb_devices_list').html(data);});
+      $.post(URL,{action:"get_content",unit:unit,dot:dot},function(data) {if (data) $('#usb_devices_list').html(data);});
     }
   }
   function detect_usb_disk_change(tabnum) {
@@ -95,18 +103,31 @@ table.usb_disks{padding-top:0px;margin-top:0px;margin-top:-21px;}
     $(".ui-button-text").css('padding','0px 5px');
   }
 </script>
-
 <form id="formUsbMount" method="POST" action="/update.php" target="progressFrame">
   <input type="hidden" id="cmdUsbMount" name="#command" value="" />
 </form>
-
 <div id="dialog-confirm" style="display:none;" title="Dialog Title"></div>
-
-<div id="usb_devices_list" style="height:auto;min-height:150px;">
+<div id="usb_devices_list">
   <table class='usb_disks' id='usb_table'>
     <thead><tr><td>Device</td><td>Identification</td><td>Mount point</td><td>FS</td><td>Size</td><td>Used</td><td>Free</td><td>Open files</td><td>Control</td><td>Auto mount</td><td>Script</td></tr></thead>
     <tbody><tr><td colspan='12' style='text-align:center;font-weight:bold;'></td></tr></tbody>
   </table>
 </div>
+<script type="text/javascript">
+
+function showInput(){
+    $(this).off('click');
+    $(this).siblings('input').each(function(){$(this).show();});
+    $(this).siblings('input').focus();
+    $(this).hide();
+}
+
+function hideInput(){
+    $(this).hide();
+    $(this).siblings('span').show();
+    $(this).siblings('span').click(showInput);
+}
+
+</script>
 
 
