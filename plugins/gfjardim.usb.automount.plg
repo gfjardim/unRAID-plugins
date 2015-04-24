@@ -116,7 +116,7 @@ chmod +x /usr/local/sbin/usb_mount /usr/local/sbin/usb_umount /usr/local/emhttp/
 mkdir -p /mnt/usb
 
 # mount disks if array is started
-if [[ -e /proc/mdcmd ]]: then
+if [[ -e /proc/mdcmd ]]; then
   if [[ $(cat /proc/mdcmd|grep mdState|cut -d"=" -f2) == STARTED ]]; then
     /usr/local/sbin/usb_mount all
   fi
