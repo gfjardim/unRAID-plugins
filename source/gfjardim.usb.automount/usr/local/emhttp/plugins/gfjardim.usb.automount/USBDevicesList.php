@@ -17,7 +17,10 @@ switch ($_POST['action']) {
       echo "<tr class='$odd'>";
       $dev = sprintf( "<img src='/webGui/images/%s'> %s", ( is_shared($disk['label']) ? "green-on.png":"red-on.png" ), basename($disk['device']) );
       echo "<td>$dev</td>";
-      echo "<td>".$disk['partitions'][0]['serial']."</td>";
+      $disk_mounted = false;
+      foreach ($disk['partitions'] as $p) if (is_mounted($p['device'])) $disk_mounted = TRUE;
+      $m_button = "<span style='width:auto;text-align:right;'>&nbsp;&nbsp;&nbsp;".($disk_mounted ? "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/usr/local/sbin/usb_umount {$disk[device]}');\"><i class='glyphicon glyphicon-export'></i> Unmount</button>" : "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/usr/local/sbin/usb_mount {$disk[device]}');\"><i class='glyphicon glyphicon-import'></i>  Mount</button>")."</span>&nbsp;&nbsp;&nbsp;";
+      echo "<td><i class='glyphicon glyphicon-hdd'></i>&nbsp;&nbsp;".$disk['partitions'][0]['serial'].$m_button."</td>";
       $temp = my_temp($disk['temperature'], $_POST['unit'], $_POST['dot']);
       echo "<td >{$temp}</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>";
       echo "<td><input type='checkbox' class='automount' serial='".$disk['partitions'][0]['serial']."' ".(($disk['partitions'][0]['automount']) ? 'checked':'')."></td><td>-</td></tr>";
@@ -25,8 +28,9 @@ switch ($_POST['action']) {
         $mounted = is_mounted($partition['device']);
         echo "<tr class='$odd'><td></td><td><div>";
         $fscheck = sprintf(get_fsck_commands($partition['fstype'])['ro'], $partition['device'] );
-        $fscheck = (! $mounted) ? "<span class='exec' onclick='openWindow(\"{$fscheck}\",\"Check filesystem\",600,900);'>" : "<span>";
-        echo "<i class='glyphicon glyphicon-hdd'></i>&nbsp;&nbsp;<b>{$fscheck}Partition {$partition[part]}</b></span>&nbsp;&nbsp;<i class='glyphicon glyphicon-arrow-right'></i>&nbsp;&nbsp;";
+        $icon = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i class='glyphicon glyphicon-th-large'></i>&nbsp;&nbsp;";
+        $fscheck = ((! $mounted) ? "<a class='exec' onclick='openWindow(\"{$fscheck}\",\"Check filesystem\",600,900);'>${icon}{$partition[part]}</a>" : "${icon}{$partition[part]}");
+        echo "{$fscheck}&nbsp;&nbsp;<i class='glyphicon glyphicon-arrow-right'></i>&nbsp;&nbsp;";
         if ($mounted) {
           echo $partition['mountpoint'];
         } else {
@@ -67,6 +71,7 @@ switch ($_POST['action']) {
   echo '$(".automount").change(function(){$.post("/plugins/'.$plugin.'/update_cfg.php",{action:"automount",serial:$(this).attr("serial"),status:$(this).is(":checked")},function(data){$(this).prop("checked",data.automount);},"json");});';
   echo "$('.text').click(showInput);$('.input').blur(hideInput)";
   echo '</script>';
+  @unlink("/var/state/${plugin}");
   break;
   case 'detect':
   if (is_file("/var/state/${plugin}")) {

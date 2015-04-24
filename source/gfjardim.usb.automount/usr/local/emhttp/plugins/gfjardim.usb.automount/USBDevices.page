@@ -30,6 +30,7 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
   table.usb_absent tr>td+td{text-align:left;width:auto;}
   table.usb_absent tr>td+td+td+td+td{text-align:right;padding-left:0;padding-right:12px;width: 5em;}
   .switch-button-background {margin: 0px 0px;}
+  .exec{cursor: pointer;}
 </style>
 <script type="text/javascript" src="/webGui/scripts/jquery.switchButton.js"></script>
 <script type="text/javascript" src="/plugins/<?=$plugin;?>/assets/waitMe.min.js"></script>
@@ -67,8 +68,7 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
   function detect_usb_disk_change(tabnum) {
     if ($('#tab'+tabnum).is(':checked')) {
       clearTimeout(timers.usbdisks);
-      timers.usbdisks = setTimeout('detect_usb_disk_change('+tabnum+')',2000);
-      $.post(URL,{action:"detect"},function(data) { if(data.reload){usb_disks(tabnum);$.post(URL,{action:"remove_hook"});}},"json");
+      $.post(URL,{action:"detect"},function(data){timers.usbdisks=setTimeout('detect_usb_disk_change('+tabnum+')',2000); if(data.reload){usb_disks(tabnum);$.post(URL,{action:"remove_hook"});}},"json");
     } else {
       clearTimeout(timers.usbdisks);
     }

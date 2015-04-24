@@ -4,7 +4,7 @@
 <!ENTITY name      "gfjardim.usb.automount">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.04.23">
+<!ENTITY version   "2015.04.23a">
 <!ENTITY launch    "Main/USBDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -14,7 +14,7 @@
 <CHANGES>
 ##&name;
 
-###2015.04.23
+###2015.04.23a
 - Major revamp, will work with SATA/USB disks. It will presume autostart for USB disks, and not for SATA ones.
 
 ###2015.04.13

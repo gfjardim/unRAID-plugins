@@ -276,7 +276,8 @@ function get_unasigned_disks() {
   foreach (listDir("/dev/disk/by-path") as $v) if (preg_match("#usb#", $v)) $usb_disks[] = realpath($v);
   $unraid_disks = explode(PHP_EOL, shell_exec('/root/mdcmd status 2>/dev/null| for i in $(grep -Po "rdevName[0-9.]*=\K.*"); do echo /dev/$i; done'));
   $unraid_flash = realpath("/dev/disk/by-label/UNRAID");
-  $unraid_cache = trim(shell_exec("/usr/bin/cat /proc/mounts 2>&1|grep '/mnt/cache'|awk '{print $1}'"));
+  $unraid_cache = parse_ini_file("/boot/config/disk.cfg");
+  $unraid_cache = realpath(array_values(preg_grep("#{$unraid_cache[cacheId]}#i", $paths))[0]);
   foreach ($paths as $d) {
     $path = realpath($d);
     if (preg_match("/ata|usb(?:(?!part).)*$/i", $d) && ! in_array($path, $unraid_disks)){
@@ -377,6 +378,9 @@ function get_fsck_commands($fs) {
     break;
     case 'hfsplus';
     return array('ro'=>'/usr/sbin/fsck.hfsplus -l %s','rw'=>'/usr/sbin/fsck.hfsplus -y %s');
+    break;
+    case 'xfs':
+    return array('ro'=>'/sbin/xfs_repair -n %s','rw'=>'/sbin/xfs_repair %s');
     break;
   }
 }

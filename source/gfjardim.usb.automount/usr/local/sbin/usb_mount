@@ -7,7 +7,7 @@ $DEVNAME = (isset($_ENV['DEVNAME'])) ? $_ENV['DEVNAME'] : ( isset($argv[1]) ? $a
 foreach(get_unasigned_disks() as $name => $disk) {
   $device = $disk['device'];
   foreach ($disk['partitions'] as $partition) {
-    if ( $DEVNAME == realpath($partition) || $DEVNAME == "all" ) {
+    if ( preg_match("#".$DEVNAME."#i", realpath($partition)) || $DEVNAME == "all" ) {
       $info = get_partition_info($partition);
       if (! $info['automount'] && ( $DEVNAME == "all" || isset($_ENV['DEVNAME']) )) {
         debug("Disk with serial '${info[serial]}' auto mount is disabled, aborting.");
