@@ -15,7 +15,9 @@
 ##&name;
 
 ###2015.04.24a
--Minor bugfixes
+- Fix webGui being hammered with update requests
+- Fix mounting all disks if no devide was supplied
+- Set sleep time (15 minutes) to mounted disks
 
 ###2015.04.24
 - Fix some css quirks
