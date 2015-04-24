@@ -15,7 +15,7 @@ switch ($_POST['action']) {
   case 'set_command':
     $serial = urldecode(($_POST['serial']));
     $cmd = urldecode(($_POST['command']));
-    echo json_encode(array( 'result' => set_command($serial,$cmd)));
+    echo json_encode(array( 'result' => set_config($serial, "command", $cmd)));
   break;
   case 'remove_config':
     $serial = urldecode(($_POST['serial']));

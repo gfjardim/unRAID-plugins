@@ -212,7 +212,7 @@ function add_smb_share($dir, $share_name) {
   global $paths;
   if(!is_dir($paths['smb_usb_shares'])) @mkdir($paths['smb_usb_shares'],0755,TRUE);
   $share_conf = preg_replace("#\s+#", "_", realpath($paths['smb_usb_shares'])."/".$share_name.".conf");
-  $share_cont = sprintf("[%s]\npath = %s\nread only = No\nguest ok = Yes\ncreate mode = 0644\ndirectory mode = 0755 ", $share_name, $dir);
+  $share_cont = sprintf("[%s]\npath = %s\nread only = No\nguest ok = Yes ", $share_name, $dir);
   debug("Defining share '$share_name' on file '$share_conf' .");
   file_put_contents($share_conf, $share_cont);
   if (! exist_in_file($paths['smb_extra'], $share_name)) {
@@ -356,7 +356,9 @@ function get_partition_info($device){
     $disk['avail']  = is_numeric($used) ? formatBytes(intval($size) - intval($used*1024)) : "-";
     if ( $mountpoint = get_config($disk['serial'], "mountpoint-part{$disk[part]}") ) {
       list(, $disk['mountpoint']) = explode("|",$mountpoint,2);
+      if (! $disk['mountpoint']) goto empty_mountpoint;
     } else {
+      empty_mountpoint:
       $disk['mountpoint'] = $disk['target'] ? $disk['target'] : preg_replace("%\s+%", "_", sprintf("%s/%s", $paths['usb_mountpoint'], $disk['label']));
     }
     $disk['owner'] = (isset($_ENV['DEVTYPE'])) ? "udev" : "user";

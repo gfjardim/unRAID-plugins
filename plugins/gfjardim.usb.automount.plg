@@ -4,7 +4,7 @@
 <!ENTITY name      "gfjardim.usb.automount">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.04.23a">
+<!ENTITY version   "2015.04.24">
 <!ENTITY launch    "Main/USBDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -13,6 +13,9 @@
 
 <CHANGES>
 ##&name;
+
+###2015.04.24
+- Fix some css quirks
 
 ###2015.04.23a
 - Major revamp, will work with SATA/USB disks. It will presume autostart for USB disks, and not for SATA ones.
@@ -112,9 +115,11 @@ chmod +x /usr/local/sbin/usb_mount /usr/local/sbin/usb_umount /usr/local/emhttp/
 # create mount point
 mkdir -p /mnt/usb
 
-# mount disks is array is started
-if [[ $(/root/mdcmd status|grep mdState|cut -d"=" -f2) == STARTED ]]; then
-  /usr/local/sbin/usb_mount all
+# mount disks if array is started
+if [[ -e /proc/mdcmd ]]: then
+  if [[ $(cat /proc/mdcmd|grep mdState|cut -d"=" -f2) == STARTED ]]; then
+    /usr/local/sbin/usb_mount all
+  fi
 fi
 
 # Update file access mode
