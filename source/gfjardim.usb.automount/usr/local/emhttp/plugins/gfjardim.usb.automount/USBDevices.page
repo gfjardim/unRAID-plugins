@@ -33,7 +33,7 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
   button[type=button] {margin:0px 14px 0 14px;}
   i.glyphicon{margin:0px 5px 0 5px;}
   i.hdd{margin-left: 0px;}
-  i.partition{margin-left: 18px;}
+  i.partition{margin-left: 20px;}
   .exec{cursor: pointer;}
 </style>
 <script type="text/javascript" src="/webGui/scripts/jquery.switchButton.js"></script>
@@ -43,8 +43,8 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
   var unit ="<?=$display['unit']?>";
   var dot = "<?=$display['number'][0]?>";
   var tab_usbdisks = $('input[name$="tabs"]').length;
-  $('#tab'+tab_usbdisks).bind({click:function() {pin_tab(tab_usbdisks); usb_disks(tab_usbdisks);}});
-  $(function(){usb_disks(tab_usbdisks);});
+  $('#tab'+tab_usbdisks).bind({click:function() {pin_tab(tab_usbdisks); usb_disks(tab_usbdisks);detect_usb_disk_change(tab_usbdisks); }});
+  $(function(){usb_disks(tab_usbdisks);detect_usb_disk_change(tab_usbdisks);});
   function startWaitMe(el) {
     <?if ($display['theme'] == 'white'):?>
     $(el).waitMe({effect:'ios',text:' ',bg:'rgba(255,255,255,0.9)',color:'#000',sizeW:'',sizeH:'',source:''});
@@ -64,7 +64,7 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
     $.cookie('tab','tab'+n,{path:'/'});
   }
   function usb_disks(tabnum) {
-    if ($('#tab'+tabnum).is(':checked') && ! detect_usb_disk_change(tabnum)) {
+    if ($('#tab'+tabnum).is(':checked')) {
       startWaitMe('#usb_devices_list');
       $.post(URL,{action:"get_content",unit:unit,dot:dot},function(data) {if (data) $('#usb_devices_list').html(data);});
     }
@@ -72,7 +72,7 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
   function detect_usb_disk_change(tabnum) {
     if ($('#tab'+tabnum).is(':checked')) {
       clearTimeout(timers.usbdisks);
-      $.post(URL,{action:"detect"},function(data){timers.usbdisks=setTimeout('detect_usb_disk_change('+tabnum+')',2000); if(data.reload){usb_disks(tabnum);$.post(URL,{action:"remove_hook"});}},"json");
+      $.post(URL,{action:"detect"},function(data){if(data.reload){usb_disks(tabnum);$.post(URL,{action:"remove_hook"});}},"json").always(function(){timers.usbdisks=setTimeout('detect_usb_disk_change('+tabnum+')',5000);});
     } else {
       clearTimeout(timers.usbdisks);
     }

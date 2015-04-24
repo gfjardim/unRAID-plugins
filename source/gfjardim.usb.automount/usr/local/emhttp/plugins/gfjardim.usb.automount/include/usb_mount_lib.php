@@ -30,9 +30,8 @@ function save_ini_file($file, $array) {
 }
 
 function debug($m){
-  $c = (is_file($GLOBALS["paths"]["log"])) ? @file($GLOBALS["paths"]["log"],FILE_IGNORE_NEW_LINES) : array();
-  $c[] = date("D M j G:i:s T Y").": $m";
-  file_put_contents($GLOBALS["paths"]["log"], implode(PHP_EOL, $c));
+  $m = "\n".date("D M j G:i:s T Y").": $m";
+  file_put_contents($GLOBALS["paths"]["log"], $m, FILE_APPEND);
   // echo print_r($m,true)."\n";
 }
 
@@ -387,3 +386,7 @@ function get_fsck_commands($fs) {
   }
 }
 
+function setSleepTime($device) {
+  $device = preg_replace("/\d+$/", "", $device);
+  shell_exec("hdparm -S180 $device 2>&1");
+}
