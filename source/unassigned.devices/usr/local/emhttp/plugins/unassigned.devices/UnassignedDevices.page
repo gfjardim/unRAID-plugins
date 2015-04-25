@@ -1,10 +1,12 @@
 Menu="Main:4"
-Title="USB Devices"
+Title="Unassigned Devices"
 Markdown="false"
 ---
 <?PHP
-$plugin = "gfjardim.usb.automount";
-require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
+$plugin = "unassigned.devices";
+require_once("plugins/${plugin}/include/lib.php");
+@unlink("plugins/dynamix/OpenDevices.page");
+
 // echo "<pre>".print_r($display, true)."</pre>";
 ?>
 <link type='text/css' rel='stylesheet' href='/webGui/styles/jquery.switchButton.css'>
@@ -40,7 +42,7 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
 <script type="text/javascript" src="/webGui/scripts/jquery.switchButton.js"></script>
 <script type="text/javascript" src="/plugins/<?=$plugin;?>/assets/waitMe.min.js"></script>
 <script type="text/javascript">
-  var URL = '/plugins/<?=$plugin;?>/USBDevicesList.php';
+  var URL = '/plugins/<?=$plugin;?>/UnassignedDevices.php';
   var display = <?=json_encode($display);?>;
   var tab_usbdisks = $('input[name$="tabs"]').length;
   $('#tab'+tab_usbdisks).bind({click:function() {pin_tab(tab_usbdisks); usb_disks(tab_usbdisks);detect_usb_disk_change(tab_usbdisks); }});

@@ -1,8 +1,8 @@
 Title="Edit Script"
 ---
 <?PHP
-$plugin = "gfjardim.usb.automount";
-require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
+$plugin = "unassigned.devices";
+require_once("/usr/local/emhttp/plugins/${plugin}/include/lib.php");
 
 $serial = $_GET['s'];
 $partition = $_GET['p'];
@@ -74,7 +74,7 @@ Script content:
 <script type="text/javascript" src="/webGui/scripts/jqueryFileTree.js"></script>
 <script>
   $( "form" ).submit(function( event ) {
-    $.post("/plugins/<?=$plugin;?>/update_cfg.php",{action:"set_command",serial:"<?=$serial;?>",command:$("input[name='#file']").val(),part:"<?=$partition;?>"},function(data){event.preventDefault();},"json");
+    $.post("/plugins/<?=$plugin;?>/UnassignedDevices.php",{action:"set_command",serial:"<?=$serial;?>",command:$("input[name='#file']").val(),part:"<?=$partition;?>"},function(data){event.preventDefault();},"json");
   });
 
   function setDefault(form) {

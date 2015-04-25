@@ -1,0 +1,31 @@
+#!/usr/bin/php
+<?
+$plugin = "unassigned.devices";
+require_once("/usr/local/emhttp/plugins/${plugin}/include/lib.php");
+
+$DEVNAME = (isset($_ENV['DEVNAME'])) ? $_ENV['DEVNAME'] : ( isset($argv[1]) ? $argv[1] : NULL );
+if (! $DEVNAME) die("Fail: disk device not informed.\n");
+foreach(get_unasigned_disks() as $name => $disk) {
+  $device = $disk['device'];
+  foreach ($disk['partitions'] as $partition) {
+    if ( preg_match("#".$DEVNAME."#i", realpath($partition)) || $DEVNAME == "all" ) {
+      debug("");
+      $info = get_partition_info($partition);
+      if (! $info['automount'] && ( $DEVNAME == "all" || isset($_ENV['DEVNAME']) )) {
+        debug("Disk with serial '${info[serial]}' auto mount is disabled, aborting.");
+        continue;
+      }
+      debug("Drive found with the following attributes: ".(implode(', ', array_map(function ($v, $k) { return "$k='$v'"; }, $info, array_keys($info)))));
+      debug("Adding disk $drive ...");
+      if (do_mount($info['device'], $info['mountpoint'], $info['fstype'] )) {
+        add_smb_share($info['mountpoint'], $info['label']);
+        execute_script($info, "ADD");
+        setSleepTime($device);
+      }
+      debug("Disk ${info[label]} shared successfully.");
+    }
+  }
+}
+touch("/var/state/${plugin}");
+
+?>

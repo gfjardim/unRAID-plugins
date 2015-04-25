@@ -1,11 +1,11 @@
 <?
-$plugin = "gfjardim.usb.automount";
+$plugin = "unassigned.devices";
 
 $paths = array("smb_extra"       => "/boot/config/smb-extra.conf",
-               "smb_usb_shares"  => "/etc/samba/smb-usb-shares",
-               "usb_mountpoint"  => "/mnt/usb",
-               "log"             => "/var/log/usb_automount.log",
-               "config_file"     => "/boot/config/plugins/${plugin}/automount.cfg",
+               "smb_usb_shares"  => "/etc/samba/unassigned-shares",
+               "usb_mountpoint"  => "/mnt/disks",
+               "log"             => "/var/log/{$plugin}.log",
+               "config_file"     => "/boot/config/plugins/{$plugin}/{$plugin}.cfg",
                "state"           => "/var/state/${plugin}.ini"
                );
 
