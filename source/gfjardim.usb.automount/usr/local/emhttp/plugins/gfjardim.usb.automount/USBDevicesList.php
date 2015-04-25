@@ -1,9 +1,25 @@
 <?PHP
 $plugin = "gfjardim.usb.automount";
 require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
+require_once ("/usr/local/emhttp/webGui/include/Helpers.php");
 
-function my_temp($val, $unit, $dot) {
-  return ($val>0 ? str_replace('.',$dot,$unit=='C' ? $val : round(9/5*$val+32))."&deg;$unit" : '*');
+if (isset($_POST['display'])) $display = $_POST['display'];
+
+function render_used_and_free($partition) {
+  global $display;
+  if (strlen($partition['target'])) {
+    if (!$display['text']) {
+      echo "<td>".my_scale($partition['used'], $unit)." $unit</td>";
+      echo "<td>".my_scale($partition['avail'], $unit)." $unit</td>";
+    } else {
+      $free = round(100*$partition['avail']/$partition['size']);
+      $used = 100-$free;
+      echo "<td><div class='usage-disk'><span style='margin:0;width:{$used}%' class='".usage_color($used,false)."'><span>".my_scale($partition['used'], $unit)." $unit</span></span></div></td>";
+      echo "<td><div class='usage-disk'><span style='margin:0;width:{$free}%' class='".usage_color($free,true)."'><span>".my_scale($partition['avail'], $unit)." $unit</span></span></div></td>";
+    }
+  } else {
+    echo "<td>-</td><td>-</td>";
+  }
 }
 
 switch ($_POST['action']) {
@@ -15,12 +31,12 @@ switch ($_POST['action']) {
       $odd="odd";
       foreach ($disks as $disk) {
         echo "<tr class='$odd'>";
-        printf( "<td><img src='/webGui/images/%s'> %s</td>", ( is_shared($disk['label']) ? "green-on.png":"red-on.png" ), basename($disk['device']) );
+        printf( "<td><img src='/webGui/images/%s'> %s</td>", ( is_disk_running($disk['device']) ? "green-on.png":"green-blink.png" ), basename($disk['device']) );
         $disk_mounted = false;
         foreach ($disk['partitions'] as $p) if (is_mounted($p['device'])) $disk_mounted = TRUE;
         $m_button = "<span style='width:auto;text-align:right;'>".($disk_mounted ? "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/usr/local/sbin/usb_umount {$disk[device]}');\"><i class='glyphicon glyphicon-export'></i> Unmount</button>" : "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/usr/local/sbin/usb_mount {$disk[device]}');\"><i class='glyphicon glyphicon-import'></i>  Mount</button>")."</span>";
         echo "<td><i class='glyphicon glyphicon-hdd hdd'></i>".$disk['partitions'][0]['serial'].$m_button."</td>";
-        $temp = my_temp($disk['temperature'], $_POST['unit'], $_POST['dot']);
+        $temp = my_temp($disk['temperature']);
         echo "<td >{$temp}</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>";
         echo "<td><input type='checkbox' class='automount' serial='".$disk['partitions'][0]['serial']."' ".(($disk['partitions'][0]['automount']) ? 'checked':'')."></td><td>-</td></tr>";
         foreach ($disk['partitions'] as $partition) {
@@ -40,9 +56,8 @@ switch ($_POST['action']) {
           echo "<span style='width:auto;text-align:right;'>".($mounted ? "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/usr/local/sbin/usb_umount ${partition[device]}');\"><i class='glyphicon glyphicon-export'></i> Unmount</button>" : "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/usr/local/sbin/usb_mount ${partition[device]}');\"><i class='glyphicon glyphicon-import'></i>  Mount</button>")."</span>";
           echo "</div></td><td>-</td>";
           echo "<td >".$partition['fstype']."</td>";
-          echo "<td>".$partition['size']."</td>";
-          echo "<td>".$partition['used']."</td>";
-          echo "<td>".$partition['avail']."</td>";
+          echo "<td><span>".my_scale($partition['size'], $unit)." $unit</span></td>";
+          render_used_and_free($partition);
           echo "<td>".(strlen($partition['target']) ? shell_exec("lsof '${partition[target]}' 2>/dev/null|grep -c -v COMMAND") : "-")."</td><td>-</td>";
           echo "<td><a href='/Main/EditScript?serial=".urlencode($partition['serial'])."&label=".urlencode($partition['label'])."'><img src='/webGui/images/default.png' style='cursor:pointer;width:16px;".( (get_config($partition['serial'],"command")) ? "":"opacity: 0.4;" )."'></a></td>";
         }
@@ -61,7 +76,7 @@ switch ($_POST['action']) {
     $ct = "";
     foreach ($config as $serial => $value) {
       if (! preg_grep("#${serial}#", $disks_serials)){
-        $ct .= "<tr><td><img src='/webGui/images/green-blink.png'> missing</td><td>$serial</td><td><input type='checkbox' class='automount' serial='${serial}' ".( is_automount($serial) ? 'checked':'' )."></td><td><a href='/Main/EditScript?serial=${serial}'>".basename($value['command'])."</a></td><td colspan='7'><span style='cursor:pointer;' onclick='remove_disk_config(\"${serial}\")'>Remove</a></td></tr>";
+        $ct .= "<tr><td><img src='/webGui/images/green-blink.png'> missing</td><td>$serial</td><td><input type='checkbox' class='automount' serial='${serial}' ".( is_automount($serial) ? 'checked':'' )."></td><td><a href='/Main/EditScript?serial=${serial}'>".basename($value['command'])."</a></td><td colspan='7'><a style='cursor:pointer;' onclick='remove_disk_config(\"${serial}\")'>Remove</a></td></tr>";
       }
     }
     if (strlen($ct)) echo "<table class='tablesorter usb_absent'><thead><tr><th>Device</th><th>Serial Number</th><th>Auto mount</th><th>Script</th><th colspan='7'>Remove config</th></tr></thead><tbody>${ct}</tbody></table>";
@@ -70,7 +85,6 @@ switch ($_POST['action']) {
     echo '$(".automount").change(function(){$.post("/plugins/'.$plugin.'/update_cfg.php",{action:"automount",serial:$(this).attr("serial"),status:$(this).is(":checked")},function(data){$(this).prop("checked",data.automount);},"json");});';
     echo "$('.text').click(showInput);$('.input').blur(hideInput)";
     echo '</script>';
-    @unlink("/var/state/${plugin}");
     break;
   case 'detect':
     if (is_file("/var/state/${plugin}")) {

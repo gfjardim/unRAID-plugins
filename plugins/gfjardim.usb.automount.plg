@@ -4,7 +4,7 @@
 <!ENTITY name      "gfjardim.usb.automount">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.04.24a">
+<!ENTITY version   "2015.04.24b">
 <!ENTITY launch    "Main/USBDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -13,6 +13,10 @@
 
 <CHANGES>
 ##&name;
+
+###2015.04.24b
+- Show used and free space as bars
+- Fix multiple cache disks support
 
 ###2015.04.24a
 - Fix webGui being hammered with update requests

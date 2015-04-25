@@ -69,10 +69,15 @@ function exist_in_file($file, $val) {
   return (preg_grep("%${val}%", @file($file))) ? TRUE : FALSE;
 }
 
+function is_disk_running($dev) {
+  $state = trim(shell_exec("hdparm -C $dev 2>/dev/null| grep -c standby"));
+  return ($state == 0) ? TRUE : FALSE;
+}
+
 function get_temp($dev) {
-  $state = shell_exec("hdparm -C $dev 2>/dev/null| grep -c standby");
-  if ($state == 0) {
-    return shell_exec("smartctl -A -d sat,12 $dev 2>/dev/null| grep -m 1 -i Temperature_Celsius | awk '{print $10}'");
+  if (is_disk_running($dev)) {
+    $temp = trim(shell_exec("smartctl -A -d sat,12 $dev 2>/dev/null| grep -m 1 -i Temperature_Celsius | awk '{print $10}'"));
+    return (is_numeric($temp)) ? $temp : "*";
   }
 }
 
@@ -270,20 +275,29 @@ function rm_smb_share($dir, $share_name) {
 
 
 function get_unasigned_disks() {
+  $disks = array();
   $paths=listDir("/dev/disk/by-id");
+  natsort($paths);
   $usb_disks = array();
   foreach (listDir("/dev/disk/by-path") as $v) if (preg_match("#usb#", $v)) $usb_disks[] = realpath($v);
   $unraid_disks = explode(PHP_EOL, shell_exec('/root/mdcmd status 2>/dev/null| for i in $(grep -Po "rdevName[0-9.]*=\K.*"); do echo /dev/$i; done'));
   $unraid_flash = realpath("/dev/disk/by-label/UNRAID");
   $unraid_cache = parse_ini_file("/boot/config/disk.cfg");
-  $unraid_cache = realpath(array_values(preg_grep("#{$unraid_cache[cacheId]}#i", $paths))[0]);
+  $unraid_cache = array();
+  foreach (parse_ini_file("/boot/config/disk.cfg") as $k => $v) {
+    if (strpos($k, "cacheId") !== FALSE) {
+      foreach ( preg_grep("#".$v."#i", $paths) as $c) $unraid_cache[] = realpath($c);
+    }
+  }
+  // $unraid_cache = parse_ini_file("/boot/config/disk.cfg");
+  // $unraid_cache = realpath(array_values(preg_grep("#{$unraid_cache[cacheId]}#i", $paths))[0]);
   foreach ($paths as $d) {
     $path = realpath($d);
     if (preg_match("/ata|usb(?:(?!part).)*$/i", $d) && ! in_array($path, $unraid_disks)){
       if ($m = array_values(preg_grep("#$d.*-part\d+#", $paths))) {
         natsort($m);
         foreach ($m as $k => $v) $m_real[$k] = realpath($v);
-        if (! preg_match("#ata#", $d) === FALSE && ! in_array($unraid_cache, $m_real) && ! in_array($path, $usb_disks)) {
+        if (! preg_match("#ata#", $d) === FALSE && ! count(array_intersect($unraid_cache, $m_real)) && ! in_array($path, $usb_disks)) {
           $disks[$d] = array('device'=>$path,'type'=>'ata','partitions'=>$m);
         } else if ( in_array($path, $usb_disks) && ! in_array($unraid_flash, $m_real)) {
           $disks[$d] = array('device'=>$path,'type'=>'usb','partitions'=>$m);
@@ -348,11 +362,9 @@ function get_partition_info($device){
     }
     $disk['fstype'] = safe_name($attrs['ID_FS_TYPE']);
     $disk['target'] = str_replace("\\040", " ", trim(shell_exec("cat /proc/mounts 2>&1|grep ${device}|awk '{print $2}'")));
-    $size           = trim(shell_exec("blockdev --getsize64 ${device} 2>/dev/null"));
-    $disk['size']   = is_numeric($size) ? formatBytes($size) : "-";
-    $used           = trim(shell_exec("df --output=used,source 2>/dev/null|grep -v 'Filesystem'|grep ${device}|awk '{print $1}'"));
-    $disk['used']   = is_numeric($used) ? formatBytes($used*1024): "-";
-    $disk['avail']  = is_numeric($used) ? formatBytes(intval($size) - intval($used*1024)) : "-";
+    $disk['size']   = intval(trim(shell_exec("blockdev --getsize64 ${device} 2>/dev/null")));
+    $disk['used']   = intval(trim(shell_exec("df --output=used,source 2>/dev/null|grep -v 'Filesystem'|grep ${device}|awk '{print $1}'")))*1024;
+    $disk['avail']  = $disk['size'] - $disk['used'];
     if ( $mountpoint = get_config($disk['serial'], "mountpoint-part{$disk[part]}") ) {
       list(, $disk['mountpoint']) = explode("|",$mountpoint,2);
       if (! $disk['mountpoint']) goto empty_mountpoint;

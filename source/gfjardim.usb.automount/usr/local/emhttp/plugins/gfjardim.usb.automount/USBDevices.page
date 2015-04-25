@@ -40,8 +40,7 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
 <script type="text/javascript" src="/plugins/<?=$plugin;?>/assets/waitMe.min.js"></script>
 <script type="text/javascript">
   var URL = '/plugins/<?=$plugin;?>/USBDevicesList.php';
-  var unit ="<?=$display['unit']?>";
-  var dot = "<?=$display['number'][0]?>";
+  var display = <?=json_encode($display);?>;
   var tab_usbdisks = $('input[name$="tabs"]').length;
   $('#tab'+tab_usbdisks).bind({click:function() {pin_tab(tab_usbdisks); usb_disks(tab_usbdisks);detect_usb_disk_change(tab_usbdisks); }});
   $(function(){usb_disks(tab_usbdisks);detect_usb_disk_change(tab_usbdisks);});
@@ -66,7 +65,7 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
   function usb_disks(tabnum) {
     if ($('#tab'+tabnum).is(':checked')) {
       startWaitMe('#usb_devices_list');
-      $.post(URL,{action:"get_content",unit:unit,dot:dot},function(data) {if (data) $('#usb_devices_list').html(data);});
+      $.post(URL,{action:"get_content",display:display},function(data) {if (data) $('#usb_devices_list').html(data);});
     }
   }
   function detect_usb_disk_change(tabnum) {
