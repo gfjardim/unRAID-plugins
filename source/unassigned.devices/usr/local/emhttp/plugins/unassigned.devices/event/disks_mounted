@@ -1,2 +1,2 @@
 #!/bin/bash
-/usr/local/sbin/usb_mount all
+/usr/local/sbin/unassigned_mount all
