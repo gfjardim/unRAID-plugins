@@ -7,7 +7,7 @@ $plugin = "unassigned.devices";
 require_once("plugins/${plugin}/include/lib.php");
 @unlink("plugins/dynamix/OpenDevices.page");
 
-// echo "<pre>".print_r($display, true)."</pre>";
+// echo "<pre>".print_r(get_all_disks_info(), true)."</pre>";
 ?>
 <link type='text/css' rel='stylesheet' href='/webGui/styles/jquery.switchButton.css'>
 <link type="text/css" rel="stylesheet" href="/webGui/styles/jquery-ui.min.css">
@@ -23,7 +23,6 @@ require_once("plugins/${plugin}/include/lib.php");
   <?endif;?>
   table.usb_disks {padding:0px;margin:-21px 0px 22px 0px;border-collapse:collapse;white-space:nowrap;}
   table.usb_disks tr>td{text-align:left;width:8%;padding-left:12px;padding-right:0;white-space:nowrap;}
-  table.usb_disks tr>td+td{text-align:left;width:;}
   table.usb_disks tr>td+td+td+td{text-align:center;padding-left:0;padding-right:12px;width:auto;}
   table.usb_disks tr>td+td+td+td+td+td{text-align:right;padding-left:0;padding-right:12px;width:auto;}
   table.usb_disks tr>td+td+td+td+td+td+td+td+td+td{text-align:left;padding:0px 0px 0px 12px;width: 75px;}
@@ -35,9 +34,10 @@ require_once("plugins/${plugin}/include/lib.php");
 
   button[type=button] {margin:0px 14px 0 14px;}
   i.glyphicon{margin:0px 5px 0 5px;}
-  i.hdd{margin-left: 0px;}
-  i.partition{margin-left: 20px;}
+  i.hdd{margin:0px; 0px;font-size: 1.1em}
+  i.partition{margin-left: 18px;}
   .exec{cursor: pointer;}
+  i.glyphicon-append{margin:0px;font-size: 0.8em;position: relative; left:-0.3em;top:0.7em;}
 </style>
 <script type="text/javascript" src="/webGui/scripts/jquery.switchButton.js"></script>
 <script type="text/javascript" src="/plugins/<?=$plugin;?>/assets/waitMe.min.js"></script>
@@ -45,8 +45,15 @@ require_once("plugins/${plugin}/include/lib.php");
   var URL = '/plugins/<?=$plugin;?>/UnassignedDevices.php';
   var display = <?=json_encode($display);?>;
   var tab_usbdisks = $('input[name$="tabs"]').length;
-  $('#tab'+tab_usbdisks).bind({click:function() {pin_tab(tab_usbdisks); usb_disks(tab_usbdisks);detect_usb_disk_change(tab_usbdisks); }});
+  $('#tab'+tab_usbdisks).bind({click:function() {pin_tab(tab_usbdisks); detect_usb_disk_change(tab_usbdisks);}});
   $(function(){usb_disks(tab_usbdisks);detect_usb_disk_change(tab_usbdisks);});
+
+  $.fn.textWidth = function(text, font) {
+    if (!$.fn.textWidth.fakeEl) $.fn.textWidth.fakeEl = $('<span>').hide().appendTo(document.body);
+    $.fn.textWidth.fakeEl.text(text || this.val() || this.text()).css('font', font || this.css('font'));
+    return $.fn.textWidth.fakeEl.width();
+  };
+
   function startWaitMe(el) {
     <?if ($display['theme'] == 'white'):?>
     $(el).waitMe({effect:'ios',text:' ',bg:'rgba(255,255,255,0.9)',color:'#000',sizeW:'',sizeH:'',source:''});
@@ -66,10 +73,8 @@ require_once("plugins/${plugin}/include/lib.php");
     $.cookie('tab','tab'+n,{path:'/'});
   }
   function usb_disks(tabnum) {
-    if ($('#tab'+tabnum).is(':checked')) {
-      startWaitMe('#usb_devices_list');
-      $.post(URL,{action:"get_content",display:display},function(data) {if (data) $('#usb_devices_list').html(data);});
-    }
+    startWaitMe('#usb_devices_list');
+    $.post(URL,{action:"get_content",display:display},function(data) {if (data) $('#usb_devices_list').html(data);});
   }
   function detect_usb_disk_change(tabnum) {
     if ($('#tab'+tabnum).is(':checked')) {
@@ -115,7 +120,7 @@ require_once("plugins/${plugin}/include/lib.php");
 <div id="dialog-confirm" style="display:none;" title="Dialog Title"></div>
 <div id="usb_devices_list">
   <table class='usb_disks' id='usb_table'>
-    <thead><tr><td>Device</td><td>Identification</td><td>Mount point</td><td>FS</td><td>Size</td><td>Used</td><td>Free</td><td>Open files</td><td>Control</td><td>Auto mount</td><td>Script</td></tr></thead>
+    <thead><tr><td>Device</td><td>Identification</td><td></td><td>Temp</td><td>FS</td><td>Size</td><td>Used</td><td>Free</td><td>Open files</td><td>Auto mount</td><td>Script</td></tr></thead>
     <tbody><tr><td colspan='12' style='text-align:center;font-weight:bold;'></td></tr></tbody>
   </table>
 </div>

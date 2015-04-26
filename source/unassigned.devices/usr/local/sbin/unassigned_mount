@@ -10,7 +10,7 @@ foreach(get_unasigned_disks() as $name => $disk) {
   foreach ($disk['partitions'] as $partition) {
     if ( preg_match("#".$DEVNAME."#i", realpath($partition)) || $DEVNAME == "all" ) {
       debug("");
-      $info = get_partition_info($partition);
+      $info = get_partition_info($partition,true);
       if (! $info['automount'] && ( $DEVNAME == "all" || isset($_ENV['DEVNAME']) )) {
         debug("Disk with serial '${info[serial]}' auto mount is disabled, aborting.");
         continue;
@@ -18,7 +18,11 @@ foreach(get_unasigned_disks() as $name => $disk) {
       debug("Drive found with the following attributes: ".(implode(', ', array_map(function ($v, $k) { return "$k='$v'"; }, $info, array_keys($info)))));
       debug("Adding disk $drive ...");
       if (do_mount($info['device'], $info['mountpoint'], $info['fstype'] )) {
-        add_smb_share($info['mountpoint'], $info['label']);
+        if (config_shared( $info['serial'],  $info['part'])) {
+          add_smb_share($info['mountpoint'], $info['label']);
+        } else {
+          debug("Partition '{$info[label]}' marked as not sharable, skipping.");
+        }
         execute_script($info, "ADD");
         setSleepTime($device);
       }
@@ -27,5 +31,4 @@ foreach(get_unasigned_disks() as $name => $disk) {
   }
 }
 touch("/var/state/${plugin}");
-
 ?>

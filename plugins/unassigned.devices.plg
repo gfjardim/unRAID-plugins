@@ -4,7 +4,7 @@
 <!ENTITY name      "unassigned.devices">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.04.25">
+<!ENTITY version   "2015.04.26">
 <!ENTITY launch    "Main/UnassignedDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -14,8 +14,9 @@
 <CHANGES>
 ##&name;
 
-###2015.04.25
+###2015.04.26
 - Renamed to Unassigned Devices
+- Add switch do disable SAMBA sharing
 
 ###2015.04.24b
 - Show used and free space as bars

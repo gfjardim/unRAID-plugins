@@ -72,6 +72,7 @@ function get_temp($dev) {
     $temp = trim(shell_exec("smartctl -A -d sat,12 $dev 2>/dev/null| grep -m 1 -i Temperature_Celsius | awk '{print $10}'"));
     return (is_numeric($temp)) ? $temp : "*";
   }
+  return "*";
 }
 
 #########################################################
@@ -156,7 +157,7 @@ function get_mount_params($fs) {
       return "force,rw,users,async,umask=000";
       break;
     case 'xfs':
-      return 'rw,noatime,nodiratime,attr2,inode64,noquota';
+      return 'rw,noatime,nodiratime';
       break;
     default:
       return "auto,async,nodev,nosuid,umask=000";
@@ -166,16 +167,20 @@ function get_mount_params($fs) {
 
 function do_mount($dev, $dir, $fs) {
   if (! is_mounted($dev) || ! is_mounted($dir)) {
-    @mkdir($dir,0777,TRUE);
-    $cmd = "mount -t auto -o ".get_mount_params($fs)." '${dev}' '${dir}'";
-    debug("Mounting drive with command: $cmd");
-    $o = shell_exec($cmd." 2>&1");
-    foreach (range(0,5) as $t) {
-      if (is_mounted($dev)) {
-        debug("Successfully mounted '${dev}' on '${dir}'"); return TRUE;
-      } else { sleep(0.5);}
+    if ($fs){
+      @mkdir($dir,0777,TRUE);
+      $cmd = "mount -t auto -o ".get_mount_params($fs)." '${dev}' '${dir}'";
+      debug("Mounting drive with command: $cmd");
+      $o = shell_exec($cmd." 2>&1");
+      foreach (range(0,5) as $t) {
+        if (is_mounted($dev)) {
+          debug("Successfully mounted '${dev}' on '${dir}'"); return TRUE;
+        } else { sleep(0.5);}
+      }
+      debug("Mount of ${dev} failed. Error message: $o"); return FALSE;
+    }else {
+      debug("No filesystem detected, aborting.");
     }
-    debug("Mount of ${dev} failed. Error message: $o"); return FALSE;
   } else {
     debug("Drive '$dev' already mounted");
   }
@@ -201,6 +206,17 @@ function do_unmount($dev, $dir) {
 
 function is_shared($name) {
   return ( shell_exec("smbclient -g -L localhost -U% 2>&1|awk -F'|' '/Disk/{print $2}'|grep -c '${name}'") == 0 ) ? FALSE : TRUE;
+}
+
+function config_shared($sn, $part) {
+  $share = get_config($sn, "share.{$part}");
+  return ($share == "yes" || ! $share) ? TRUE : FALSE; 
+}
+
+function toggle_share($serial, $part, $status) {
+  $new = ($status == "true") ? "yes" : "no";
+  set_config($serial, "share.{$part}", $new);
+  return ($new == 'yes') ? TRUE:FALSE;
 }
 
 function add_smb_share($dir, $share_name) {
@@ -313,17 +329,18 @@ function get_all_disks_info($bus="all") {
     $disks[$key] = $disk;
   }
   // debug("get_all_disks_info: ".(time() - $d1));
+  usort($disks, create_function('$a, $b','if ($a["device"] == $b["device"]) return 0; return ($a["device"] < $b["device"]) ? -1 : 1;'));
   return $disks;
 }
 
-function get_udev_info($device, $udev=NULL) {
+function get_udev_info($device, $udev=NULL, $reload) {
   global $paths;
   $state = is_file($paths['state']) ? @parse_ini_file($paths['state'], true) : array();
   if ($udev) {
     $state[$device] = $udev;
     save_ini_file($paths['state'], $state);
     return $udev;
-  } else if (array_key_exists($device, $state)) {
+  } else if (array_key_exists($device, $state) && ! $reload) {
     // debug("Using udev cache for '$device'.");
     return $state[$device];
   } else {
@@ -334,10 +351,10 @@ function get_udev_info($device, $udev=NULL) {
   }
 }
 
-function get_partition_info($device){
+function get_partition_info($device, $reload=FALSE){
   global $_ENV, $paths;
   $disk = array();
-  $attrs = (isset($_ENV['DEVTYPE'])) ? get_udev_info($device, $_ENV) : get_udev_info($device);
+  $attrs = (isset($_ENV['DEVTYPE'])) ? get_udev_info($device, $_ENV, $reload) : get_udev_info($device, NULL, $reload);
   $device = realpath($device);
   if ($attrs['DEVTYPE'] == "partition") {
     $disk['serial']       = $attrs['ID_SERIAL'];
@@ -370,6 +387,7 @@ function get_partition_info($device){
     }
     $disk['owner'] = (isset($_ENV['DEVTYPE'])) ? "udev" : "user";
     $disk['automount'] = is_automount_2($disk['serial'],strpos($attrs['DEVPATH'],"usb"));
+    $disk['shared'] = config_shared($disk['serial'], $disk['part']);
     return $disk;
   }
 }
