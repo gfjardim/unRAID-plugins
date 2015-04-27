@@ -30,7 +30,7 @@ function save_ini_file($file, $array) {
 }
 
 function debug($m){
-  $m = "\n".date("D M j G:i:s T Y").": $m";
+  $m = "\n".date("D M j G:i:s T Y").": ".print_r($m,true);
   file_put_contents($GLOBALS["paths"]["log"], $m, FILE_APPEND);
   // echo print_r($m,true)."\n";
 }
@@ -159,8 +159,12 @@ function get_mount_params($fs) {
     case 'xfs':
       return 'rw,noatime,nodiratime';
       break;
-    default:
+    case 'vfat':
+    case 'ntfs':
       return "auto,async,nodev,nosuid,umask=000";
+      break;
+    default:
+      return "auto,async,nodev,nosuid";
       break;
   }
 }
@@ -169,11 +173,12 @@ function do_mount($dev, $dir, $fs) {
   if (! is_mounted($dev) || ! is_mounted($dir)) {
     if ($fs){
       @mkdir($dir,0777,TRUE);
-      $cmd = "mount -t auto -o ".get_mount_params($fs)." '${dev}' '${dir}'";
+      $cmd = "mount -t $fs -o ".get_mount_params($fs)." '${dev}' '${dir}'";
       debug("Mounting drive with command: $cmd");
       $o = shell_exec($cmd." 2>&1");
       foreach (range(0,5) as $t) {
         if (is_mounted($dev)) {
+          @chmod($dir, 0777);
           debug("Successfully mounted '${dev}' on '${dir}'"); return TRUE;
         } else { sleep(0.5);}
       }
@@ -221,6 +226,7 @@ function toggle_share($serial, $part, $status) {
 
 function add_smb_share($dir, $share_name) {
   global $paths;
+  $share_name = basename($dir);
   if(!is_dir($paths['smb_usb_shares'])) @mkdir($paths['smb_usb_shares'],0755,TRUE);
   $share_conf = preg_replace("#\s+#", "_", realpath($paths['smb_usb_shares'])."/".$share_name.".conf");
   $share_cont = sprintf("[%s]\npath = %s\nread only = No\nguest ok = Yes ", $share_name, $dir);
@@ -249,6 +255,7 @@ function add_smb_share($dir, $share_name) {
 
 function rm_smb_share($dir, $share_name) {
   global $paths;
+  $share_name = basename($dir);
   $share_conf = preg_replace("#\s+#", "_", realpath($paths['smb_usb_shares'])."/".$share_name.".conf");
   debug("Removing share definitions from '$share_conf'.");
   if (is_file($share_conf)) {
@@ -323,6 +330,7 @@ function get_all_disks_info($bus="all") {
   foreach ($disks as $key => $disk) {
     if ($disk['type'] != $bus && $bus != "all") continue;
     $disk['temperature'] = get_temp($key);
+    $disk['size'] = intval(trim(shell_exec("blockdev --getsize64 ${key} 2>/dev/null")));
     foreach ($disk['partitions'] as $k => $p) {
       $disk['partitions'][$k] = get_partition_info($p);
     }
@@ -387,7 +395,7 @@ function get_partition_info($device, $reload=FALSE){
     }
     $disk['owner'] = (isset($_ENV['DEVTYPE'])) ? "udev" : "user";
     $disk['automount'] = is_automount_2($disk['serial'],strpos($attrs['DEVPATH'],"usb"));
-    $disk['shared'] = config_shared($disk['serial'], $disk['part']);
+    $disk['shared'] = ($disk['target']) ? is_shared(basename($disk['mountpoint'])) : config_shared($disk['serial'], $disk['part']);
     return $disk;
   }
 }

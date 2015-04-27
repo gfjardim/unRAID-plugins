@@ -4,7 +4,7 @@
 <!ENTITY name      "unassigned.devices">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.04.26">
+<!ENTITY version   "2015.04.27">
 <!ENTITY launch    "Main/UnassignedDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -13,6 +13,9 @@
 
 <CHANGES>
 ##&name;
+
+###2015.04.27
+- Fix: sharing toggle will be applied immediately
 
 ###2015.04.26
 - Renamed to Unassigned Devices
@@ -135,8 +138,10 @@ if [[ -e /proc/mdcmd ]]; then
   fi
 fi
 
-#remove original dynamix page
-rm -f /usr/local/emhttp/plugins/dynamix/OpenDevices.page
+# Rename original Dynamix page
+if [[ ! -f /usr/local/emhttp/plugins/dynamix/OpenDevices.page- ]]; then
+  mv -f /usr/local/emhttp/plugins/dynamix/OpenDevices.page /usr/local/emhttp/plugins/dynamix/OpenDevices.page-
+fi
 
 # Update file access mode
 chmod 644 $(awk '/\.(htm|php|js|page|css|png|plg|gif|cfg|md)$/ {print "/"$0}' /var/log/packages/&name;-&version;)
@@ -157,7 +162,6 @@ echo "-----------------------------------------------------------"
 echo ""
 </INLINE>
 </FILE>
-
 
 <!--
 The 'remove' script.
@@ -180,6 +184,9 @@ removepkg ntfs-3g-2014.2.15-x86_64-1
 removepkg fuse-exfat-1.1.0-x86_64-1_SBo
 removepkg hfsprogs-332.25-x86_64-2sl
 removepkg libbsd-0.6.0-x86_64-1sl
+
+# Restore original Dynamix page
+mv -f /usr/local/emhttp/plugins/dynamix/OpenDevices.page- /usr/local/emhttp/plugins/dynamix/OpenDevices.page
 
 </INLINE>
 </FILE>
