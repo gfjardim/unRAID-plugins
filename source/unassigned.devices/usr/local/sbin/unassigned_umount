@@ -5,12 +5,17 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/lib.php");
 $PRESENT=array();
 
 $DEVNAME = (isset($_ENV['DEVNAME'])) ? $_ENV['DEVNAME'] : ( isset($argv[1]) ? $argv[1] : NULL );
+$DEVNAME = (file_exists($DEVNAME)) ? realpath($DEVNAME) : $DEVNAME;
 foreach(get_unasigned_disks() as $disk) {
   $device = $disk['device'];
   $PRESENT[] = $device;
   foreach ($disk['partitions'] as $partition) {
     if ( preg_match("#".$DEVNAME."#i", realpath($partition)) || $DEVNAME == "all" ) {
       $info = get_partition_info($partition);
+      if (! $info['automount'] && ( $DEVNAME == "all" || isset($_ENV['DEVNAME']) )) {
+        debug("Disk with serial '${info[serial]}' auto mount is disabled, aborting.");
+        continue;
+      }
       debug("\nDrive found with the following attributes: ".(implode(', ', array_map(function ($v, $k) { return "$k='$v'"; }, $info, array_keys($info)))));
       if ( is_mounted($info['device']) ) {
         debug("Removing disk ${info[label]} share ...");

@@ -4,7 +4,7 @@
 <!ENTITY name      "unassigned.devices">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.04.27">
+<!ENTITY version   "2015.04.28">
 <!ENTITY launch    "Main/UnassignedDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -13,6 +13,11 @@
 
 <CHANGES>
 ##&name;
+
+###2015.04.28
+- Fix: a small typo
+- Fix: disks with automount off will not we unmounted on array stop
+
 
 ###2015.04.27
 - Fix: sharing toggle will be applied immediately
