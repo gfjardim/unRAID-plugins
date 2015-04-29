@@ -5,7 +5,7 @@ Markdown="false"
 <?PHP
 $plugin = "unassigned.devices";
 require_once("plugins/${plugin}/include/lib.php");
-@unlink("plugins/dynamix/OpenDevices.page");
+if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/OpenDevices.page","plugins/dynamix/OpenDevices.page-");
 
 // echo "<pre>".print_r(get_all_disks_info(), true)."</pre>";
 ?>
@@ -21,6 +21,7 @@ require_once("plugins/${plugin}/include/lib.php");
   table.custom_head thead tr td{font-size:13px;font-weight:normal;background:-webkit-radial-gradient(#101010,#202020);background:linear-gradient(#101010,#202020);padding:5px 20px 5px 6px;white-space:nowrap;text-align:left;}
   table.custom_head tbody tr.even{background-color: #0C0C0C;}
   <?endif;?>
+  table.usb_disks thead tr>td{text-align:left;width:8%;padding-left:12px;}
   table.usb_disks {padding:0px;margin:-21px 0px 22px 0px;border-collapse:collapse;white-space:nowrap;}
   table.usb_disks tr>td{text-align:left;width:8%;padding-left:12px;padding-right:0;white-space:nowrap;}
   table.usb_disks tr>td+td{min-width:400px;}
@@ -30,6 +31,7 @@ require_once("plugins/${plugin}/include/lib.php");
   table.usb_disks tr>td+td+td+td+td+td+td+td+td+td{text-align:left;padding:0px 0px 0px 12px;width: 75px;}
   table.usb_disks tr>td+td+td+td+td+td+td+td+td+td+td+td{text-align:right;padding-left:0;padding-right:12px;}
 
+  table.usb_absent thead tr>td{text-align:left;width:8%;padding-left:12px;}
   table.usb_absent tr>td{text-align:left;width:8%;padding-left:12px;padding-right:0;white-space:nowrap;}
   table.usb_absent tr>td+td{text-align:left;width:auto;}
   table.usb_absent tr>td+td+td+td{text-align:right;padding-left:0;padding-right:12px;width: 5em;}

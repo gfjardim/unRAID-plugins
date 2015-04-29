@@ -159,6 +159,7 @@ function get_mount_params($fs) {
     case 'xfs':
       return 'rw,noatime,nodiratime';
       break;
+    case 'exfat':
     case 'vfat':
     case 'ntfs':
       return "auto,async,nodev,nosuid,umask=000";
@@ -232,7 +233,7 @@ function add_smb_share($dir, $share_name) {
   $share_cont = sprintf("[%s]\npath = %s\nread only = No\nguest ok = Yes ", $share_name, $dir);
   debug("Defining share '$share_name' on file '$share_conf' .");
   file_put_contents($share_conf, $share_cont);
-  if (! exist_in_file($paths['smb_extra'], $share_name)) {
+  if (! exist_in_file($paths['smb_extra'], $share_conf)) {
     debug("Adding share $share_name to ".$paths['smb_extra']);
     $c = (is_file($paths['smb_extra'])) ? @file($paths['smb_extra'],FILE_IGNORE_NEW_LINES) : array();
     $c[] = ""; $c[] = "include = $share_conf";

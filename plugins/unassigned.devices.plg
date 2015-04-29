@@ -4,7 +4,7 @@
 <!ENTITY name      "unassigned.devices">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.04.28">
+<!ENTITY version   "2015.04.29">
 <!ENTITY launch    "Main/UnassignedDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -13,6 +13,10 @@
 
 <CHANGES>
 ##&name;
+
+###&version;
+-Fix: exfat mounting permissions
+-Add: exfat-utils-1.1.1-x86_64-1_SBo.tgz
 
 ###2015.04.28
 - Fix: a small typo
@@ -102,6 +106,13 @@ ntfs-3g-2014.2.15-x86_64-1.txz
 -->
 <FILE Name="/boot/config/plugins/&name;/ntfs-3g-2014.2.15-x86_64-1.txz" Run="upgradepkg --install-new">
 <URL>https://raw.github.com/gfjardim/unRAID-plugins/master/source/packages/ntfs-3g-2014.2.15-x86_64-1.txz</URL>
+</FILE>
+
+<!--
+exfat-utils-1.1.1-x86_64-1_SBo.tgz
+-->
+<FILE Name="/boot/config/plugins/&name;/exfat-utils-1.1.1-x86_64-1_SBo.tgz" Run="upgradepkg --install-new">
+<URL>https://raw.github.com/gfjardim/unRAID-plugins/master/source/packages/exfat-utils-1.1.1-x86_64-1_SBo.tgz</URL>
 </FILE>
 
 <!--

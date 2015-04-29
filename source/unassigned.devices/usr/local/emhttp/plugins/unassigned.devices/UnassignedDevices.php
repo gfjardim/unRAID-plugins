@@ -69,7 +69,7 @@ switch ($_POST['action']) {
         $p = (count($disk['partitions']) == 1) ? render_partition($disk, $disk['partitions'][0]) : FALSE;
         echo "<tr class='$odd'>";
         printf( "<td><img src='/webGui/images/%s'> %s</td>", ( is_disk_running($disk['device']) ? "green-on.png":"green-blink.png" ), basename($disk['device']) );
-        echo "<td><span class='exec toggle-hdd' hdd='".basename($disk['device'])."'><i class='glyphicon glyphicon-hdd hdd'></i>".($p?"<span style='margin:4px;'></span>":"<i class='glyphicon glyphicon-minus-sign glyphicon-append'></i>").$disk['partitions'][0]['serial']."</td>";
+        echo "<td><span class='exec toggle-hdd' hdd='".basename($disk['device'])."'><i class='glyphicon glyphicon-hdd hdd'></i>".($p?"<span style='margin:4px;'></span>":"<i class='glyphicon glyphicon-plus-sign glyphicon-append'></i>").$disk['partitions'][0]['serial']."</td>";
         echo "<td><span style='width:auto;text-align:right;'>".($disk_mounted ? "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/usr/local/sbin/unassigned_umount {$disk[device]}');\"><i class='glyphicon glyphicon-export'></i> Unmount</button>" : "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/usr/local/sbin/unassigned_mount {$disk[device]}');\"><i class='glyphicon glyphicon-import'></i>  Mount</button>")."</span></td>";
         echo "<td>{$temp}</td>";
         echo ($p)?$p[5]:"<td>-</td>";
@@ -116,7 +116,6 @@ switch ($_POST['action']) {
       $(".toggle-hdd").click(function(e) {
         $(this).disableSelection();disk = $(this).attr("hdd");el = $(this);
         $(".toggle-"+disk).slideToggle(0,function(){
-          console.log($("tr.toggle-"+disk+":first").is(":visible"));
           if ( $("tr.toggle-"+disk+":first").is(":visible") ){
             el.find(".glyphicon-append").addClass("glyphicon-minus-sign").removeClass("glyphicon-plus-sign");
           } else {
