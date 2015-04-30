@@ -157,7 +157,7 @@ if [[ -e /proc/mdcmd ]]; then
 fi
 
 # Rename original Dynamix page
-if [[ ! -f /usr/local/emhttp/plugins/dynamix/OpenDevices.page- ]]; then
+if [[ ! -f /usr/local/emhttp/plugins/dynamix/OpenDevices.page ]]; then
   mv -f /usr/local/emhttp/plugins/dynamix/OpenDevices.page /usr/local/emhttp/plugins/dynamix/OpenDevices.page-
 fi
 
