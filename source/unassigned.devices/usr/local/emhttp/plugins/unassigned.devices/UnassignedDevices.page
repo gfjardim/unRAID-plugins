@@ -57,6 +57,13 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
     $.fn.textWidth.fakeEl.text(text || this.val() || this.text()).css('font', font || this.css('font'));
     return $.fn.textWidth.fakeEl.width();
   };
+  function openWindow_fsck(cmd,title,height,width) {
+    var run = cmd;
+    var top = (screen.height-height)/2;
+    var left = (screen.width-width)/2;
+    var options = 'resizeable=yes,scrollbars=yes,height='+height+',width='+width+',top='+top+',left='+left;
+    window.open(run, 'log', options);
+  }
 
   function startWaitMe(el) {
     <?if ($display['theme'] == 'white'):?>
@@ -70,7 +77,7 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
     el = $('#usb_devices_list');
     startWaitMe(el);
     $.post('/update.php',{'#command':cmd});
-    setTimeout('$('+el+').waitMe("hide")',10000);
+    setTimeout('$("#usb_devices_list").waitMe("hide")',10000);
   }
   function pin_tab(n) {
     $.removeCookie('one',{path:'/'});

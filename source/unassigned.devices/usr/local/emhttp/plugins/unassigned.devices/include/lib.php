@@ -283,11 +283,9 @@ function rm_smb_share($dir, $share_name) {
   }
 }
 
-
 #########################################################
 ############         DISK FUNCTIONS         #############
 #########################################################
-
 
 function get_unasigned_disks() {
   $disks = array();
@@ -401,24 +399,37 @@ function get_partition_info($device, $reload=FALSE){
   }
 }
 
-function get_fsck_commands($fs) {
+function get_fsck_commands($fs, $dev, $type = "ro") {
   switch ($fs) {
     case 'vfat':
-    return array('ro'=>'/sbin/fsck -n %s','rw'=>'/sbin/fsck -a %s');
-    break;
+      $cmd = array('ro'=>'/sbin/fsck -n %s','rw'=>'/sbin/fsck -a %s');
+      break;
     case 'ntfs':
-    return array('ro'=>'/bin/ntfsfix %s','rw'=>'/bin/ntfsfix -a %s');
-    break;
-    case 'exfat':
-    return array('ro'=>'/sbin/exfatfsck %s','rw'=>false);
-    break;
+      $cmd = array('ro'=>'/bin/ntfsfix -n %s','rw'=>'/bin/ntfsfix -b -d %s');
+      break;
     case 'hfsplus';
-    return array('ro'=>'/usr/sbin/fsck.hfsplus -l %s','rw'=>'/usr/sbin/fsck.hfsplus -y %s');
-    break;
+      $cmd = array('ro'=>'/usr/sbin/fsck.hfsplus -l %s','rw'=>'/usr/sbin/fsck.hfsplus -y %s');
+      break;
     case 'xfs':
-    return array('ro'=>'/sbin/xfs_repair -n %s','rw'=>'/sbin/xfs_repair %s');
-    break;
+      $cmd = array('ro'=>'/sbin/xfs_repair -n %s','rw'=>'/sbin/xfs_repair %s');
+      break;
+    case 'exfat':
+      $cmd = array('ro'=>'/sbin/fsck.exfat %s','rw'=>'/sbin/fsck.exfat %s');
+      break;
+    case 'btrfs':
+      $cmd = array('ro'=>'/sbin/btrfs scrub start -B -R -d -r %s','rw'=>'/sbin/btrfs scrub start -B -R -d %s');
+      break;
+    case 'ext4':
+      $cmd = array('ro'=>'/sbin/fsck.ext4 -vn %s','rw'=>'/sbin/fsck.ext4 -v -f -p %s');
+      break;
+    case 'reiserfs':
+      $cmd = array('ro'=>'/sbin/reiserfsck --check %s','rw'=>'/sbin/reiserfsck --fix-fixable %s');
+      break;
+    default:
+      $cmd = array('ro'=>false,'rw'=>false);
+      break;
   }
+  return $cmd[$type] ? sprintf($cmd[$type], $dev) : "";
 }
 
 function setSleepTime($device) {

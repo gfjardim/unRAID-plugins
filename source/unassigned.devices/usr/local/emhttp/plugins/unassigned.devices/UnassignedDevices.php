@@ -27,10 +27,10 @@ function render_used_and_free($partition) {
 function render_partition($disk, $partition) {
   global $plugin;
   $o = array();
-  $fscheck = sprintf(get_fsck_commands($partition['fstype'])['ro'], $partition['device'] );
+  $fscheck = "/plugins/${plugin}/include/fsck.php?disk={$partition[device]}&fs={$partition[fstype]}&type=ro";
   $icon = "<i class='glyphicon glyphicon-th-large partition'></i>";
   $mounted = is_mounted($partition['device']);
-  $fscheck = ((! $mounted) ? "<a class='exec' onclick='openWindow(\"{$fscheck}\",\"Check filesystem\",600,900);'>${icon}{$partition[part]}</a>" : "${icon}{$partition[part]}");
+  $fscheck = ( (! $mounted &&  $partition['fstype'] != 'btrfs') || ($mounted && $partition['fstype'] == 'btrfs') ) ? "<a class='exec' onclick='openWindow_fsck(\"{$fscheck}\",\"Check filesystem\",600,900);'>${icon}{$partition[part]}</a>" : "${icon}{$partition[part]}";
   $o[] = "<tr class='$odd toggle-parts toggle-".basename($disk['device'])."' style='__SHOW__' >";
   $o[] = "<td></td>";
   $c = "<td><div>{$fscheck}<i class='glyphicon glyphicon-arrow-right'></i>";
