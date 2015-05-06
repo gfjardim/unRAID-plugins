@@ -110,7 +110,7 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
       buttons: {
         "Yes": function() {
           $( this ).dialog( "close" );
-          $.post("/plugins/<?=$plugin;?>/update_cfg.php",{action:"remove_config",serial:serial},"json");
+          $.post(URL,{action:"remove_config",serial:serial},"json");
           usb_disks(tab_usbdisks);
         },
         Cancel: function() {

@@ -296,8 +296,8 @@ function get_unasigned_disks() {
   $unraid_flash = realpath("/dev/disk/by-label/UNRAID");
   $unraid_disks = array();
   foreach (parse_ini_string(shell_exec('/root/mdcmd status 2>/dev/null')) as $k => $v) {
-    if (strpos($k, "rdevName") !== FALSE) {
-      if (strlen($v)) $unraid_disks[] = realpath("/dev/$v");
+    if (strpos($k, "rdevName") !== FALSE && strlen($v)) {
+      $unraid_disks[] = realpath("/dev/$v");
     }
   }
   $unraid_cache = array();
@@ -308,7 +308,7 @@ function get_unasigned_disks() {
   }
   foreach ($paths as $d) {
     $path = realpath($d);
-    if (preg_match("/ata|usb(?:(?!part).)*$/i", $d) && ! in_array($path, $unraid_disks)){
+    if (preg_match("/ata|usb|scsi(?:(?!part).)*$/i", $d) && ! in_array($path, $unraid_disks)){
       if ($m = array_values(preg_grep("#$d.*-part\d+#", $paths))) {
         natsort($m);
         foreach ($m as $k => $v) $m_real[$k] = realpath($v);
@@ -336,7 +336,7 @@ function get_all_disks_info($bus="all") {
     $disks[$key] = $disk;
   }
   // debug("get_all_disks_info: ".(time() - $d1));
-  usort($disks, create_function('$a, $b','if ($a["device"] == $b["device"]) return 0; return ($a["device"] < $b["device"]) ? -1 : 1;'));
+  usort($disks, create_function('$a, $b','$key="device";if ($a[$key] == $b[$key]) return 0; return ($a[$key] < $b[$key]) ? -1 : 1;'));
   return $disks;
 }
 
