@@ -151,18 +151,22 @@ function is_mounted($dev) {
   return (shell_exec("mount 2>&1|grep -c '${dev} '") == 0) ? FALSE : TRUE;
 }
 
-function get_mount_params($fs) {
+function get_mount_params($fs, $dev) {
+  $discard = trim(shell_exec("cat /sys/block/".preg_replace("#\d+#i", "", basename($dev))."/queue/discard_max_bytes")) ? ",discard" : "";
   switch ($fs) {
     case 'hfsplus':
       return "force,rw,users,async,umask=000";
       break;
     case 'xfs':
-      return 'rw,noatime,nodiratime';
+      return "rw,noatime,nodiratime{$discard}";
       break;
     case 'exfat':
     case 'vfat':
     case 'ntfs':
       return "auto,async,nodev,nosuid,umask=000";
+      break;
+    case 'ext4':
+      return "auto,async,nodev,nosuid{$discard}";
       break;
     default:
       return "auto,async,nodev,nosuid";
@@ -174,7 +178,7 @@ function do_mount($dev, $dir, $fs) {
   if (! is_mounted($dev) || ! is_mounted($dir)) {
     if ($fs){
       @mkdir($dir,0777,TRUE);
-      $cmd = "mount -t $fs -o ".get_mount_params($fs)." '${dev}' '${dir}'";
+      $cmd = "mount -t $fs -o ".get_mount_params($fs, $dev)." '${dev}' '${dir}'";
       debug("Mounting drive with command: $cmd");
       $o = shell_exec($cmd." 2>&1");
       foreach (range(0,5) as $t) {

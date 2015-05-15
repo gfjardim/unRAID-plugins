@@ -5,6 +5,10 @@ require_once ("webGui/include/Helpers.php");
 
 if (isset($_POST['display'])) $display = $_POST['display'];
 
+function pid_is_running($pid) {
+  return file_exists( "/proc/$pid" );
+}
+
 function render_used_and_free($partition) {
   global $display;
   $o = "";
@@ -58,6 +62,7 @@ function render_partition($disk, $partition) {
 switch ($_POST['action']) {
   case 'get_content':
     $disks = get_all_disks_info();
+    $preclear = "";
     echo "<table class='usb_disks custom_head'><thead><tr><td>Device</td><td>Identification</td><td></td><td>Temp</td><td>FS</td><td>Size</td><td>Used</td><td>Free</td><td>Open files</td><td>Auto mount</td><td>Share</td><td>Script</td></tr></thead>";
     echo "<tbody>";
     if ( count($disks) ) {
@@ -69,7 +74,10 @@ switch ($_POST['action']) {
         $p = (count($disk['partitions']) == 1) ? render_partition($disk, $disk['partitions'][0]) : FALSE;
         echo "<tr class='$odd'>";
         printf( "<td><img src='/webGui/images/%s'> %s</td>", ( is_disk_running($disk['device']) ? "green-on.png":"green-blink.png" ), basename($disk['device']) );
-        echo "<td><span class='exec toggle-hdd' hdd='".basename($disk['device'])."'><i class='glyphicon glyphicon-hdd hdd'></i>".($p?"<span style='margin:4px;'></span>":"<i class='glyphicon glyphicon-plus-sign glyphicon-append'></i>").$disk['partitions'][0]['serial']."</td>";
+        echo "<td><span class='exec toggle-hdd' hdd='".basename($disk['device'])."'><i class='glyphicon glyphicon-hdd hdd'></i>".($p?"<span style='margin:4px;'></span>":"<i class='glyphicon glyphicon-plus-sign glyphicon-append'></i>").$disk['partitions'][0]['serial']."<div id='preclear_".basename($disk['device'])."'></div></td>";
+        if (is_file("/tmp/preclear_stat_".basename($disk['device']))) {
+          $preclear .= "get_preclear('".basename($disk["device"])."');";
+        }
         echo "<td><span style='width:auto;text-align:right;'>".($disk_mounted ? "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/usr/local/sbin/unassigned_umount {$disk[device]}');\"><i class='glyphicon glyphicon-export'></i> Unmount</button>" : "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/usr/local/sbin/unassigned_mount {$disk[device]}');\"><i class='glyphicon glyphicon-import'></i>  Mount</button>")."</span></td>";
         echo "<td>{$temp}</td>";
         echo ($p)?$p[5]:"<td>-</td>";
@@ -106,6 +114,7 @@ switch ($_POST['action']) {
 
     echo 
     '<script type="text/javascript">
+    '.$preclear.'
     $(".automount").each(function(){var checked = $(this).is(":checked");$(this).switchButton({labels_placement: "right", checked:checked});});
     $(".automount").change(function(){$.post(URL,{action:"automount",serial:$(this).attr("serial"),status:$(this).is(":checked")},function(data){$(this).prop("checked",data.automount);},"json");});
     
@@ -124,6 +133,9 @@ switch ($_POST['action']) {
         });
       });
     });
+    function rm_preclear(dev) {
+      $.post(URL,{action:"rm_preclear",device:dev}).always(function(){usb_disks(tab_usbdisks)});
+    }
     </script>';
     break;
   case 'detect':
@@ -167,7 +179,20 @@ switch ($_POST['action']) {
       rm_smb_share($info['mountpoint'], $info['label']);
     }
   break;
-
+  case 'get_preclear':
+    $device = urldecode($_POST['device']);
+    if (is_file("/tmp/preclear_stat_{$device}")) {
+      $preclear = explode("|", file_get_contents("/tmp/preclear_stat_{$device}"));
+      $status = (count($preclear) > 3) ? ( file_exists( "/proc/".trim($preclear[3])) ? "<span style='color:#478406;'>{$preclear[2]}</span>" : "<span style='color:#CC0000;'>{$preclear[2]} <span class='rm_preclear' onclick='rm_preclear(\"{$device}\");'> [clear]</span></span>" ) : $preclear[2]." <span class='rm_preclear' onclick='rm_preclear(\"{$device}\");'> [clear]</span>";
+      echo json_encode(array( 'preclear' => "<i class='glyphicon glyphicon-dashboard hdd'></i><span style='margin:4px;'></span>".$status ));
+    } else {
+      echo json_encode(array( 'preclear' => " "));
+    }
+  break;
+  case 'rm_preclear':
+    $device = urldecode($_POST['device']);
+    @unlink("/tmp/preclear_stat_{$device}");
+  break;
 }
 switch ($_GET['action']) {
   case 'change_mountpoint':

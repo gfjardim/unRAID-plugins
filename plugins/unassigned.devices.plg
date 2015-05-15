@@ -4,7 +4,7 @@
 <!ENTITY name      "unassigned.devices">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.04.30">
+<!ENTITY version   "2015.05.15">
 <!ENTITY launch    "Main/UnassignedDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -14,12 +14,17 @@
 <CHANGES>
 ##&name;
 
+###2015.05.15
+- Fix: not removing missing disk configuration
+- Fix: add trim/discard to SSD mount options (XFS/EXT4 only)
+- Add: show preclear status
+
 ###2015.04.30
 - Add filesystem check for partitions.
 
 ###2015.04.29
--Fix: exfat mounting permissions
--Add: exfat-utils-1.1.1-x86_64-1_SBo.tgz
+- Fix: exfat mounting permissions
+- Add: exfat-utils-1.1.1-x86_64-1_SBo.tgz
 
 ###2015.04.28
 - Fix: a small typo

@@ -64,7 +64,10 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
     var options = 'resizeable=yes,scrollbars=yes,height='+height+',width='+width+',top='+top+',left='+left;
     window.open(run, 'log', options);
   }
-
+  function get_preclear(device) {
+    clearTimeout(timers.preclear);
+    $.post(URL,{action:"get_preclear",device:device},function(data){if(data.preclear){$('#preclear_'+device).html(data.preclear);}},"json").always(function(){timers.preclear=setTimeout('get_preclear("'+device+'")',5000);});
+  }
   function startWaitMe(el) {
     <?if ($display['theme'] == 'white'):?>
     $(el).waitMe({effect:'ios',text:' ',bg:'rgba(255,255,255,0.9)',color:'#000',sizeW:'',sizeH:'',source:''});
