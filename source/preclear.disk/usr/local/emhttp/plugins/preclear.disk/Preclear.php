@@ -175,7 +175,6 @@ switch ($_POST['action']) {
     } else {
       $cmd = "/usr/local/sbin/preclear_disk.sh -Y{$op} /dev/$device";
     }
-
     echo $cmd;
     tmux_kill_window("preclear_disk_{$device}");
     tmux_new_session("preclear_disk_{$device}");
