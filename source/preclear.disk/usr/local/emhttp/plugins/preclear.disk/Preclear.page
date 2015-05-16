@@ -6,8 +6,10 @@ $plugin = "preclear.disk";
 ?>
 <link type="text/css" rel="stylesheet" href="/webGui/styles/jquery-ui.min.css">
 <link type="text/css" rel="stylesheet" href="/webGui/styles/jquery.switchButton.css">
-<script type="text/javascript" src="/webGui/scripts/jquery.switchButton.js"></script>
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/<?=$plugin;?>.css">
+<link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/waitMe.min.css">
+<script type="text/javascript" src="/plugins/<?=$plugin;?>/assets/waitMe.min.js"></script>
+<script type="text/javascript" src="/webGui/scripts/jquery.switchButton.js"></script>
 <style>
   <?if ($display['theme'] == 'white'):?>
   table.custom_head thead tr td{font-size:13px;font-weight:normal;background:-webkit-radial-gradient(#E0E0E0,#C0C0C0);background:linear-gradient(#E0E0E0,#C0C0C0);padding:5px 20px 5px 6px;white-space:nowrap;text-align:left;}
@@ -116,13 +118,21 @@ $plugin = "preclear.disk";
     add_to_form("#formPreclear", "device", device);
     $("#formPreclear").submit();
   }
+  function startWaitMe(el) {
+    <?if ($display['theme'] == 'white'):?>
+    $(el).waitMe({effect:'ios',text:'Please wait...',bg:'rgba(255,255,255,0.9)',color:'#000',sizeW:'',sizeH:'',source:''});
+    <?else:?>
+    $(el).waitMe({effect:'ios',text:'Please wait...',bg:'rgba(0,0,0,0.9)',color:'#FFF',sizeW:'',sizeH:'',source:''});
+    <?endif;?>
+    $('.waitMe_content').css('top','55px');
+  }
 </script>
 <form id="formPreclear" method="POST" action="/plugins/<?=$plugin;?>/Preclear.php" target="progressFrame">
 </form>
 <div id="dialog-stop" style="display:none;" title=""></div>
 <div id="dialog-confirm" style="display:none;" title="">
   <dl>
-    <dt>Passes: </dt>
+    <dt>Cicles: </dt>
     <dd>
       <select name="-c" onchange="prepareForm(this)" onclick="prepareForm(this)"><?for ($i=1; $i <= 20; $i++){echo "<option value='$i'>$i</option>";}?></select>
     </dd>
@@ -153,6 +163,6 @@ $plugin = "preclear.disk";
   </table>
 </div>
 <script type="text/javascript">
-  get_content();
+  startWaitMe('#unassigned_devices_list');get_content();
   $(".switch").each(function(){var checked = $(this).is(":checked");$(this).switchButton({labels_placement: "right", checked:checked});});
 </script>
