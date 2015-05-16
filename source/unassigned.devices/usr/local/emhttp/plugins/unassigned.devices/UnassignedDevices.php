@@ -30,6 +30,7 @@ function render_used_and_free($partition) {
 
 function render_partition($disk, $partition) {
   global $plugin;
+  if (! isset($partition['device'])) return '';
   $o = array();
   $fscheck = "/plugins/${plugin}/include/fsck.php?disk={$partition[device]}&fs={$partition[fstype]}&type=ro";
   $icon = "<i class='glyphicon glyphicon-th-large partition'></i>";
@@ -71,10 +72,10 @@ switch ($_POST['action']) {
         $disk_mounted = false;
         foreach ($disk['partitions'] as $p) if (is_mounted($p['device'])) $disk_mounted = TRUE;
         $temp = my_temp($disk['temperature']);
-        $p = (count($disk['partitions']) == 1) ? render_partition($disk, $disk['partitions'][0]) : FALSE;
+        $p = (count($disk['partitions']) <= 1) ? render_partition($disk, $disk['partitions'][0]) : FALSE;
         echo "<tr class='$odd'>";
         printf( "<td><img src='/webGui/images/%s'> %s</td>", ( is_disk_running($disk['device']) ? "green-on.png":"green-blink.png" ), basename($disk['device']) );
-        echo "<td><span class='exec toggle-hdd' hdd='".basename($disk['device'])."'><i class='glyphicon glyphicon-hdd hdd'></i>".($p?"<span style='margin:4px;'></span>":"<i class='glyphicon glyphicon-plus-sign glyphicon-append'></i>").$disk['partitions'][0]['serial']."<div id='preclear_".basename($disk['device'])."'></div></td>";
+        echo "<td><span class='exec toggle-hdd' hdd='".basename($disk['device'])."'><i class='glyphicon glyphicon-hdd hdd'></i>".(($p === FALSE)?"<i class='glyphicon glyphicon-plus-sign glyphicon-append'></i>":"<span style='margin:4px;'></span>").$disk['serial']."<div id='preclear_".basename($disk['device'])."'></div></td>";
         if (is_file("/tmp/preclear_stat_".basename($disk['device']))) {
           $preclear .= "get_preclear('".basename($disk["device"])."');";
         }

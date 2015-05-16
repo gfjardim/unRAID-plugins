@@ -335,9 +335,11 @@ function get_all_disks_info($bus="all") {
   foreach ($disks as $key => $disk) {
     if ($disk['type'] != $bus && $bus != "all") continue;
     $disk['temperature'] = get_temp($key);
+    debug($key);
     $disk['size'] = intval(trim(shell_exec("blockdev --getsize64 ${key} 2>/dev/null")));
+    $disk = array_merge($disk, get_disk_info($key));
     foreach ($disk['partitions'] as $k => $p) {
-      $disk['partitions'][$k] = get_partition_info($p);
+      if ($p) $disk['partitions'][$k] = get_partition_info($p);
     }
     $disks[$key] = $disk;
   }
@@ -362,6 +364,16 @@ function get_udev_info($device, $udev=NULL, $reload) {
     // debug("Not using udev cache for '$device'.");
     return $state[$device];
   }
+}
+
+function get_disk_info($device, $reload=FALSE){
+  $disk = array();
+  $attrs = (isset($_ENV['DEVTYPE'])) ? get_udev_info($device, $_ENV, $reload) : get_udev_info($device, NULL, $reload);
+  $device = realpath($device);
+  $disk['serial']       = $attrs['ID_SERIAL'];
+  $disk['serial_short'] = $attrs['ID_SERIAL_SHORT'];
+  $disk['device']       = $device;
+  return $disk;
 }
 
 function get_partition_info($device, $reload=FALSE){
