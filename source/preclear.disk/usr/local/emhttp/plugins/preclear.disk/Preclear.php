@@ -55,7 +55,7 @@ function get_unasigned_disks() {
   }
   foreach ($paths as $d) {
     $path = realpath($d);
-    if (preg_match("/ata|usb|scsi(?:(?!part).)*$/i", $d) && ! in_array($path, $unraid_disks)){
+    if (preg_match("#(ata|usb|scsi)(.(?!part))*$#", $d) && ! in_array($path, $unraid_disks)){
       if ($m = array_values(preg_grep("#$d.*-part\d+#", $paths))) {
         natsort($m);
         foreach ($m as $k => $v) $m_real[$k] = realpath($v);
@@ -64,6 +64,8 @@ function get_unasigned_disks() {
         } else if ( in_array($path, $usb_disks) && ! in_array($unraid_flash, $m_real)) {
           $disks[$d] = array('device'=>$path,'type'=>'usb','partitions'=>$m);
         }
+      } else {
+        $disks[$d] = array('device'=>$path,'type'=>'und','partitions'=>array());
       }
     }
   }
@@ -132,16 +134,20 @@ switch ($_POST['action']) {
         echo "<td><span class='toggle-hdd' hdd='{$disk_name}'><i class='glyphicon glyphicon-hdd hdd'></i>".($p?"<span style='margin:4px;'></span>":"<i class='glyphicon glyphicon-plus-sign glyphicon-append'></i>").$serial."</td>";
         echo "<td>{$temp}</td>";
         $status = $disk_mounted ? "Disk mounted" : "<a class='exec' onclick='start_preclear(\"".$serial."\",\"{$disk_name}\")'>Start Preclear</a>";
+        if (tmux_is_session("preclear_disk_{$disk_name}")) {
+          $status = "{$status}<a class='exec' onclick='openPreclear(\"{$disk_name}\");' title='Preview'><i class='glyphicon glyphicon-eye-open'></i></a>";
+          $status = "{$status}<a title='Clear' style='color:#CC0000;' class='exec' onclick='remove_session(\"{$disk_name}\");'> <i class='glyphicon glyphicon-remove hdd'></i></a>";
+        }
         if (is_file("/tmp/preclear_stat_{$disk_name}")) {
           $preclear = explode("|", file_get_contents("/tmp/preclear_stat_{$disk_name}"));
           if (count($preclear) > 3) {
             if (file_exists( "/proc/".trim($preclear[3]))) {
               $status = "<span style='color:#478406;'>{$preclear[2]}</span>";
-              if (tmux_is_session("preclear_disk_{$disk_name}")) $status = "<a class='exec' onclick='openPreclear(\"{$disk_name}\");' title='Preview'>$status</a>";
+              if (tmux_is_session("preclear_disk_{$disk_name}")) $status = "$status<a class='exec' onclick='openPreclear(\"{$disk_name}\");' title='Preview'><i class='glyphicon glyphicon-eye-open'></i></a>";
               $status = "{$status}<a title='Stop Preclear' style='color:#CC0000;' class='exec rm_preclear' onclick='stop_preclear(\"{$serial}\",\"{$disk_name}\");'> <i class='glyphicon glyphicon-remove hdd'></i></a>";
             } else {
               $status = "<span style='color:#CC0000;'>{$preclear[2]} <a class='exec' style='color:#CC0000;font-weight:bold;' onclick='clear_preclear(\"{$disk_name}\");' title='Clear stats'> <i class='glyphicon glyphicon-remove hdd'></i></a></span>";
-              if (tmux_is_session("preclear_disk_{$disk_name}")) $status = "<a class='exec' onclick='openPreclear(\"{$disk_name}\");' title='Preview'>$status</a>";
+              if (tmux_is_session("preclear_disk_{$disk_name}")) $status = "$status<a class='exec' onclick='openPreclear(\"{$disk_name}\");' title='Preview'><i class='glyphicon glyphicon-eye-open'></i></a>";
             } 
           } else {
             $status = "{$preclear[2]} <span class='rm_preclear' onclick='stop_preclear(\"{$disk_name}\");'> [clear]</span>";
@@ -158,16 +164,22 @@ switch ($_POST['action']) {
     break;
   case 'start_preclear':
     $device = urldecode($_POST['device']);
+    $op       = (isset($_POST['op']) && $_POST['op'] != "0") ? " ".urldecode($_POST['op']) : "";
     $mail     = (isset($_POST['-M']) && $_POST['-M'] > 0) ? " -M ".urldecode($_POST['-M']) : "";
     $passes   = isset($_POST['-c']) ? " -c ".urldecode($_POST['-c']) : "";
     $read_sz  = (isset($_POST['-r']) && $_POST['-r'] != 0) ? " -r ".urldecode($_POST['-r']) : "";
     $write_sz = (isset($_POST['-w']) && $_POST['-w'] != 0) ? " -w ".urldecode($_POST['-w']) : "";
     $pre_read = (isset($_POST['-W']) && $_POST['-W'] == "on") ? " -W" : "";
-    $cmd = "/usr/local/sbin/preclear_disk.sh -Y{$mail}{$passes}{$read_sz}{$write_sz}{$pre_read} /dev/$device";
-    // echo $cmd; die();
-    tmux_new_session("preclear_disk_".$device);
-    tmux_send_command("preclear_disk_".$device, $cmd);
-    echo "<script>parent.location=parent.location;</script>";
+    if (! $op){
+      $cmd = "/usr/local/sbin/preclear_disk.sh -Y{$op}{$mail}{$passes}{$read_sz}{$write_sz}{$pre_read} /dev/$device";
+    } else {
+      $cmd = "/usr/local/sbin/preclear_disk.sh -Y{$op} /dev/$device";
+    }
+
+    echo $cmd;
+    tmux_kill_window("preclear_disk_{$device}");
+    tmux_new_session("preclear_disk_{$device}");
+    tmux_send_command("preclear_disk_{$device}", $cmd);
     break;
   case 'stop_preclear':
     $device = urldecode($_POST['device']);

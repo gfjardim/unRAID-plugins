@@ -48,7 +48,9 @@ $plugin = "preclear.disk";
   }
   function start_preclear(serial, device){
     var title = 'Start Preclear: '+serial;
-    $( "#dialog-confirm" ).dialog({
+    $( "#dialog-start" ).html($("#start-defaults").html());
+    $( "#dialog-start" ).find(".switch").switchButton({labels_placement: "right"});
+    $( "#dialog-start" ).dialog({
       title: title,
       resizable: false,
       width: 500,
@@ -57,9 +59,16 @@ $plugin = "preclear.disk";
       hide : {effect: 'fade' , duration: 250},
       buttons: {
         "Start": function() {
-          add_to_form("#formPreclear", "action", "start_preclear");
-          add_to_form("#formPreclear", "device", device);
-          $("#formPreclear").submit();
+          var opts = new Object();
+          opts["action"] = "start_preclear";
+          opts["device"] = device;
+          opts["op"] = getVal(this, "op");
+          opts["-c"] = getVal(this, "-c");
+          opts["-M"] = getVal(this, "-M");
+          opts["-r"] = getVal(this, "-r");
+          opts["-w"] = getVal(this, "-w");
+          opts["-W"] = getVal(this, "-W");
+          $.post(URL,opts,function(data){alert(data);}).always(function(data){location.reload();});
           $( this ).dialog( "close" );
         },
         Cancel: function() {
@@ -72,18 +81,13 @@ $plugin = "preclear.disk";
     $(".ui-dialog .ui-dialog-content").css('padding-top','15px').css('font-weight','bold');
     $(".ui-button-text").css('padding','0px 5px');
   }
-  function add_to_form(form, name, value) {
-    var form = $(form);
-    var input = form.find("input[name="+name+"]");
-    if (input.length > 0) {
-      input.val(value);
-    } else {
-      form.append('<input type="hidden" name="'+name+'" value="'+value+'">');
-    }
+  function remove_session(device) {
+    $.post(URL,{action:"stop_preclear",device:device}).always(function(){location.reload();});
   }
   function stop_preclear(serial, device){
-    var title = 'Stop Preclear: '+serial;
-    $( "#dialog-stop" ).html( "<br><br><span style='color: #E80000;'>Are you sure?</span>" );
+    var title = 'Stop Preclear';
+    $( "#dialog-stop" ).html('Disk: '+serial);
+    $( "#dialog-stop" ).append( "<br><br><span style='color: #E80000;'>Are you sure?</span>" );
     $( "#dialog-stop" ).dialog({
       title: title,
       resizable: false,
@@ -93,9 +97,7 @@ $plugin = "preclear.disk";
       hide : {effect: 'fade' , duration: 250},
       buttons: {
         "Stop": function() {
-          add_to_form("#formPreclear", "action", "stop_preclear");
-          add_to_form("#formPreclear", "device", device);
-          $("#formPreclear").submit();
+          $.post(URL,{action:"stop_preclear",device:device}).always(function(){location.reload();});
           $( this ).dialog( "close" );
         },
         Cancel: function() {
@@ -108,15 +110,12 @@ $plugin = "preclear.disk";
     $(".ui-dialog .ui-dialog-content").css('padding-top','15px').css('font-weight','bold');
     $(".ui-button-text").css('padding','0px 5px');
   }
-  function prepareForm(el) {
-    var name = $(el).attr('name');
-    var value = ( $(el).attr('type') == 'checkbox' ) ? ($(el).is(':checked') ? "on" : "off") : $(el).val();
-    add_to_form("#formPreclear", name, value);
+  function getVal(el, name) {
+    el = $(el).find("*[name="+name+"]");
+    return value = ( $(el).attr('type') == 'checkbox' ) ? ($(el).is(':checked') ? "on" : "off") : $(el).val();
   }
   function clear_preclear(device) {
-    add_to_form("#formPreclear", "action", "clear_preclear");
-    add_to_form("#formPreclear", "device", device);
-    $("#formPreclear").submit();
+    $.post(URL,{action:"clear_preclear",device:device}).always(function(){location.reload();});
   }
   function startWaitMe(el) {
     <?if ($display['theme'] == 'white'):?>
@@ -127,31 +126,43 @@ $plugin = "preclear.disk";
     $('.waitMe_content').css('top','55px');
   }
 </script>
-<form id="formPreclear" method="POST" action="/plugins/<?=$plugin;?>/Preclear.php" target="progressFrame">
-</form>
 <div id="dialog-stop" style="display:none;" title=""></div>
-<div id="dialog-confirm" style="display:none;" title="">
+<div id="dialog-start" style="display:none;" title=""></div>
+<div id="start-defaults" style="display:none;">
   <dl>
+    <dt>Operation: </dt>
+    <dd>
+      <select name="op" onchange="if(this.selectedIndex > 0){$(this).parent().siblings('.test_options').css('display','none');} else {$(this).parent().siblings('.test_options').css('display','block');};">
+        <option value='0'>Clear</option>
+        <option value='-t'>Test</option>
+        <option value='-C 64'>Convert to a start sector of 64</option>
+        <option value='-C 63'>Convert to a start sector of 63</option>
+        <option value='-z'>Zero only the MBR</option>
+        <option value='-V'>Run the post-read-verify</option>
+      </select>
+    </dd>
+    <div class='test_options'>
     <dt>Cicles: </dt>
     <dd>
-      <select name="-c" onchange="prepareForm(this)" onclick="prepareForm(this)"><?for ($i=1; $i <= 20; $i++){echo "<option value='$i'>$i</option>";}?></select>
+      <select name="-c"><?for ($i=1; $i <= 20; $i++){echo "<option value='$i'>$i</option>";}?></select>
     </dd>
     <dt>Mail: </dt>
     <dd>
-      <select name="-M" onchange="prepareForm(this)" onclick="prepareForm(this)"><option value="0">Never</option><option value="1">On preclear's end</option><option value="2">On every cicle's end</option><option value="3">On every cicle's and step's end</option><option value="4">On every 25% of progress</option></select>
+      <select name="-M" ><option value="0">Never</option><option value="1">On preclear's end</option><option value="2">On every cicle's end</option><option value="3">On every cicle's and step's end</option><option value="4">On every 25% of progress</option></select>
     </dd>
     <dt>Read size: </dt>
     <dd>
-      <select name="-r" onchange="prepareForm(this)" onclick="prepareForm(this)"><option value="0">Default</option><?for ($i=1; $i <= 10; $i++){echo "<option value='{$i}M'>{$i}M</option>";}?></select>
+      <select name="-r" ><option value="0">Default</option><?for ($i=1; $i <= 10; $i++){echo "<option value='{$i}M'>{$i}M</option>";}?></select>
     </dd>
     <dt>Write size: </dt>
     <dd>
-      <select name="-w" onchange="prepareForm(this)" onclick="prepareForm(this)"><option value="0">Default</option><?for ($i=1; $i <= 10; $i++){echo "<option value='{$i}M'>{$i}M</option>";}?></select>
+      <select name="-w" ><option value="0">Default</option><?for ($i=1; $i <= 10; $i++){echo "<option value='{$i}M'>{$i}M</option>";}?></select>
     </dd>
     <dt>Skip Pre-read: </dt>
     <dd>
-      <input type="checkbox" name="-W" class="switch" onchange="prepareForm(this)" onclick="prepareForm(this)">
+      <input type="checkbox" name="-W" class="switch" >
     </dd>
+    </div>
   </dl>
 </div>
 <div id="unassigned_devices_list">
@@ -164,5 +175,4 @@ $plugin = "preclear.disk";
 </div>
 <script type="text/javascript">
   startWaitMe('#unassigned_devices_list');get_content();
-  $(".switch").each(function(){var checked = $(this).is(":checked");$(this).switchButton({labels_placement: "right", checked:checked});});
 </script>
