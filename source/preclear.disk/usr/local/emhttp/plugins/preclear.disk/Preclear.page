@@ -1,0 +1,158 @@
+Menu="Utilities"
+Title="Preclear Disks"
+---
+<?
+$plugin = "preclear.disk";
+?>
+<link type="text/css" rel="stylesheet" href="/webGui/styles/jquery-ui.min.css">
+<link type="text/css" rel="stylesheet" href="/webGui/styles/jquery.switchButton.css">
+<script type="text/javascript" src="/webGui/scripts/jquery.switchButton.js"></script>
+<link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/<?=$plugin;?>.css">
+<style>
+  <?if ($display['theme'] == 'white'):?>
+  table.custom_head thead tr td{font-size:13px;font-weight:normal;background:-webkit-radial-gradient(#E0E0E0,#C0C0C0);background:linear-gradient(#E0E0E0,#C0C0C0);padding:5px 20px 5px 6px;white-space:nowrap;text-align:left;}
+  table.custom_head tbody tr.even{background-color:#F8F8F8;}
+  <?else:?>
+  table.custom_head thead tr td{font-size:13px;font-weight:normal;background:-webkit-radial-gradient(#101010,#202020);background:linear-gradient(#101010,#202020);padding:5px 20px 5px 6px;white-space:nowrap;text-align:left;}
+  table.custom_head tbody tr.even{background-color: #0C0C0C;}
+  <?endif;?>
+  table.preclear {padding:0px;margin:-21px 0px 22px 0px;border-collapse:collapse;white-space:nowrap;}
+  table.preclear thead tr>td{text-align:left;width:8%;padding-left:12px;}
+  table.preclear thead tr>td+td{text-align:left;width:auto;padding-left:12px;}
+  table.preclear tr>td+td+td{text-align:left;width:auto;padding-left:30px;}
+  table.preclear tr>td{text-align:left;width:8%;padding-left:12px;padding-right:0;white-space:nowrap;}
+  table.preclear tr>td+td+td+td{text-align:right;padding-left:0;padding-right:12px;width: 5em;}
+
+  button[type=button] {margin:0px 14px 0 14px;}
+  i.glyphicon{margin:0px 5px 0 5px;}
+  i.hdd{margin:0px; 0px;font-size: 1.1em}
+  i.partition{margin-left: 18px;}
+  .exec{cursor: pointer;}
+  i.glyphicon-append{margin:0px;font-size: 0.8em;position: relative; left:-0.3em;top:0.7em;}
+</style>
+<script type="text/javascript">
+  var URL = '/plugins/<?=$plugin;?>/Preclear.php';
+  var display = <?=json_encode($display);?>;
+  function get_content() {
+   $.post(URL,{action:"get_content",display:display},function(data){$('#unassigned_devices_list').html(data);}).always(function(){timers.preclear=setTimeout('get_content()',<?=$display['refresh'];?>);});
+  }
+  function openPreclear(device) {
+    var width=900;
+    var height=600;
+    var top = (screen.height-height)/2;
+    var left = (screen.width-width)/2;
+    var options = 'resizeable=yes,scrollbars=yes,height=600,width=900,top='+top+',left='+left;
+    window.open('/plugins/<?=$plugin;?>/Preclear.php?action=show_preclear&device='+device, 'Preclear', options);
+  }
+  function start_preclear(serial, device){
+    var title = 'Start Preclear: '+serial;
+    $( "#dialog-confirm" ).dialog({
+      title: title,
+      resizable: false,
+      width: 500,
+      modal: true,
+      show : {effect: 'fade' , duration: 250},
+      hide : {effect: 'fade' , duration: 250},
+      buttons: {
+        "Start": function() {
+          add_to_form("#formPreclear", "action", "start_preclear");
+          add_to_form("#formPreclear", "device", device);
+          $("#formPreclear").submit();
+          $( this ).dialog( "close" );
+        },
+        Cancel: function() {
+          $( this ).dialog( "close" );
+        }
+      }
+    });
+    $(".ui-dialog .ui-dialog-titlebar").addClass('menu');
+    $(".ui-dialog .ui-dialog-title").css('text-align','center').css( 'width', "100%");
+    $(".ui-dialog .ui-dialog-content").css('padding-top','15px').css('font-weight','bold');
+    $(".ui-button-text").css('padding','0px 5px');
+  }
+  function add_to_form(form, name, value) {
+    var form = $(form);
+    var input = form.find("input[name="+name+"]");
+    if (input.length > 0) {
+      input.val(value);
+    } else {
+      form.append('<input type="hidden" name="'+name+'" value="'+value+'">');
+    }
+  }
+  function stop_preclear(serial, device){
+    var title = 'Stop Preclear: '+serial;
+    $( "#dialog-stop" ).html( "<br><br><span style='color: #E80000;'>Are you sure?</span>" );
+    $( "#dialog-stop" ).dialog({
+      title: title,
+      resizable: false,
+      width: 500,
+      modal: true,
+      show : {effect: 'fade' , duration: 250},
+      hide : {effect: 'fade' , duration: 250},
+      buttons: {
+        "Stop": function() {
+          add_to_form("#formPreclear", "action", "stop_preclear");
+          add_to_form("#formPreclear", "device", device);
+          $("#formPreclear").submit();
+          $( this ).dialog( "close" );
+        },
+        Cancel: function() {
+          $( this ).dialog( "close" );
+        }
+      }
+    });
+    $(".ui-dialog .ui-dialog-titlebar").addClass('menu');
+    $(".ui-dialog .ui-dialog-title").css('text-align','center').css( 'width', "100%");
+    $(".ui-dialog .ui-dialog-content").css('padding-top','15px').css('font-weight','bold');
+    $(".ui-button-text").css('padding','0px 5px');
+  }
+  function prepareForm(el) {
+    var name = $(el).attr('name');
+    var value = ( $(el).attr('type') == 'checkbox' ) ? ($(el).is(':checked') ? "on" : "off") : $(el).val();
+    add_to_form("#formPreclear", name, value);
+  }
+  function clear_preclear(device) {
+    add_to_form("#formPreclear", "action", "clear_preclear");
+    add_to_form("#formPreclear", "device", device);
+    $("#formPreclear").submit();
+  }
+</script>
+<form id="formPreclear" method="POST" action="/plugins/<?=$plugin;?>/Preclear.php" target="progressFrame">
+</form>
+<div id="dialog-stop" style="display:none;" title=""></div>
+<div id="dialog-confirm" style="display:none;" title="">
+  <dl>
+    <dt>Passes: </dt>
+    <dd>
+      <select name="-c" onchange="prepareForm(this)" onclick="prepareForm(this)"><?for ($i=1; $i <= 20; $i++){echo "<option value='$i'>$i</option>";}?></select>
+    </dd>
+    <dt>Mail: </dt>
+    <dd>
+      <select name="-M" onchange="prepareForm(this)" onclick="prepareForm(this)"><option value="0">Never</option><option value="1">On preclear's end</option><option value="2">On every cicle's end</option><option value="3">On every cicle's and step's end</option><option value="4">On every 25% of progress</option></select>
+    </dd>
+    <dt>Read size: </dt>
+    <dd>
+      <select name="-r" onchange="prepareForm(this)" onclick="prepareForm(this)"><option value="0">Default</option><?for ($i=1; $i <= 10; $i++){echo "<option value='{$i}M'>{$i}M</option>";}?></select>
+    </dd>
+    <dt>Write size: </dt>
+    <dd>
+      <select name="-w" onchange="prepareForm(this)" onclick="prepareForm(this)"><option value="0">Default</option><?for ($i=1; $i <= 10; $i++){echo "<option value='{$i}M'>{$i}M</option>";}?></select>
+    </dd>
+    <dt>Skip Pre-read: </dt>
+    <dd>
+      <input type="checkbox" name="-W" class="switch" onchange="prepareForm(this)" onclick="prepareForm(this)">
+    </dd>
+  </dl>
+</div>
+<div id="unassigned_devices_list">
+  <table class='preclear custom_head'>
+    <thead><tr><td>Device</td><td>Identification</td><td>Temp</td><td>Preclear Status</td></tr></thead>
+    <tbody>
+    <tr><td colspan='12' style='text-align:center;font-weight:bold;'></td></tr>
+    </tbody>
+  </table>
+</div>
+<script type="text/javascript">
+  get_content();
+  $(".switch").each(function(){var checked = $(this).is(":checked");$(this).switchButton({labels_placement: "right", checked:checked});});
+</script>

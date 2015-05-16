@@ -1,0 +1,86 @@
+<?xml version='1.0' standalone='yes'?>
+
+<!DOCTYPE PLUGIN [
+<!ENTITY name      "preclear.disk">
+<!ENTITY repo      "unRAID-plugins">
+<!ENTITY author    "gfjardim">
+<!ENTITY version   "2015.05.16">
+<!ENTITY launch    "Settings/Preclear">
+<!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
+]>
+
+<PLUGIN name="&name;" author="&author;" launch="&launch;" version="&version;" pluginURL="&pluginURL;">
+
+<CHANGES>
+##&name;
+
+###2015.05.16
+- initial release.
+</CHANGES>
+
+<!--
+The 'source' file.
+-->
+<FILE Name="/boot/config/plugins/&name;/&name;-&version;.txz" Run="upgradepkg --install-new">
+<URL>https://raw.github.com/gfjardim/unRAID-plugins/master/archive/&name;-&version;.txz</URL>
+</FILE>
+
+<!--
+tmux-1.8-x86_64-1.txz
+-->
+<FILE Name="/boot/config/plugins/&name;/tmux-1.8-x86_64-1.txz" Run="upgradepkg --install-new">
+<URL>http://mirrors.slackware.com/slackware/slackware64-14.1/slackware64/ap/tmux-1.8-x86_64-1.txz</URL>
+</FILE>
+
+<!--
+libevent-2.0.21-x86_64-1.txz
+-->
+<FILE Name="/boot/config/plugins/&name;/libevent-2.0.21-x86_64-1.txz" Run="upgradepkg --install-new">
+<URL>http://mirrors.slackware.com/slackware/slackware64-14.1/slackware64/l/libevent-2.0.21-x86_64-1.txz</URL>
+</FILE>
+
+<!--
+The 'post-install' script.
+-->
+<FILE Run="/bin/bash">
+<INLINE>
+# fix permissions of executable files
+chmod +x /usr/local/sbin/preclear_disk.sh
+
+# Update file access mode
+chmod 644 $(awk '/\.(htm|php|js|page|css|png|plg|gif|cfg|md)$/ {print "/"$0}' /var/log/packages/&name;-&version;)
+
+# Cleaning old source files
+find /boot/config/plugins/&name;/ -type f -iname "&name;*.txz" ! -iname "*&version;*" -delete
+
+echo ""
+echo "-----------------------------------------------------------"
+echo " &name; has been installed."
+echo " This plugin requires Dynamix webGui to operate"
+echo " Copyright 2015, gfjardim"
+echo " Version: &version;"
+echo "-----------------------------------------------------------"
+echo ""
+</INLINE>
+</FILE>
+
+<!--
+The 'remove' script.
+-->
+<FILE Run="/bin/bash" Method="remove">
+<INLINE>
+
+# Remove plugin related files
+# rm -rf /boot/config/plugins/&name;
+rm -f /tmp/plugins/&name;.plg
+
+# Uninstall the 'source' package
+removepkg &name;-&version;
+
+removepkg libevent-2.0.21-x86_64-1
+removepkg tmux-1.8-x86_64-1
+
+</INLINE>
+</FILE>
+
+</PLUGIN>
