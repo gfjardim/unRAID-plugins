@@ -1,4 +1,3 @@
-**Unassigned Devices**
+**Preclear Disks**
 
-This plugin uses UDEV to automount and share disks that are not part of your unRAID array.
-Available devices are listed under "Main/Unassigned Devices" tab.
+This plugin is a parser for Joe L. excelent Preclear Disk Script
