@@ -48,8 +48,9 @@ $plugin = "preclear.disk";
     window.open('/plugins/<?=$plugin;?>/Preclear.php?action=show_preclear&device='+device, 'Preclear', options);
   }
   function start_preclear(serial, device){
-    var title = 'Start Preclear: '+serial;
-    $( "#dialog-start" ).html($("#start-defaults").html());
+    var title = 'Start Preclear';
+    $( "#dialog-start" ).html("<dl><dt>Disk:</dt><dd>"+serial+"</dd></dl>");
+    $( "#dialog-start" ).append($("#start-defaults").html());
     $( "#dialog-start" ).find(".switch").switchButton({labels_placement: "right"});
     $( "#dialog-start" ).dialog({
       title: title,

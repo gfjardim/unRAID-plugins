@@ -8,7 +8,7 @@ function tmux_is_session($name) {
 }
 function tmux_new_session($name) {
   if (! tmux_is_session($name)) {
-    exec("/usr/bin/tmux new-session -d -x 140 -y 35 -s '${name}' 2>/dev/null");
+    exec("/usr/bin/tmux new-session -d -x 140 -y 50 -s '${name}' 2>/dev/null");
   }
 }
 function tmux_get_session($name) {
@@ -21,6 +21,9 @@ function tmux_kill_window($name) {
   if (tmux_is_session($name)) {
     exec("/usr/bin/tmux kill-window -t '${name}' 2>/dev/null");
   }
+}
+function reload_partition($name) {
+  exec("hdparm -z /dev/{$name} >/dev/null 2>&1 &");
 }
 function listDir($root) {
   $iter = new RecursiveIteratorIterator(
@@ -148,11 +151,13 @@ switch ($_POST['action']) {
               if (tmux_is_session("preclear_disk_{$disk_name}")) $status = "$status<a class='exec' onclick='openPreclear(\"{$disk_name}\");' title='Preview'><i class='glyphicon glyphicon-eye-open'></i></a>";
               $status = "{$status}<a title='Stop Preclear' style='color:#CC0000;' class='exec rm_preclear' onclick='stop_preclear(\"{$serial}\",\"{$disk_name}\");'> <i class='glyphicon glyphicon-remove hdd'></i></a>";
             } else {
-              $status = "<span style='color:#CC0000;'>{$preclear[2]} <a class='exec' style='color:#CC0000;font-weight:bold;' onclick='clear_preclear(\"{$disk_name}\");' title='Clear stats'> <i class='glyphicon glyphicon-remove hdd'></i></a></span>";
+              $status = "<span >{$preclear[2]}</span>";
               if (tmux_is_session("preclear_disk_{$disk_name}")) $status = "$status<a class='exec' onclick='openPreclear(\"{$disk_name}\");' title='Preview'><i class='glyphicon glyphicon-eye-open'></i></a>";
+              $status = "{$status}<a class='exec' style='color:#CC0000;font-weight:bold;' onclick='clear_preclear(\"{$disk_name}\");' title='Clear stats'> <i class='glyphicon glyphicon-remove hdd'></i></a>";
             } 
           } else {
-            $status = "{$preclear[2]} <span class='rm_preclear' onclick='stop_preclear(\"{$disk_name}\");'> [clear]</span>";
+            $status = "<span >{$preclear[2]}</span>";
+            $status = "{$status}<a class='exec' style='color:#CC0000;font-weight:bold;' onclick='clear_preclear(\"{$disk_name}\");' title='Clear stats'> <i class='glyphicon glyphicon-remove hdd'></i></a>";
           } 
         }
         echo "<td><span>".my_scale($disk['size'], $unit)." $unit</span></td>";
@@ -175,6 +180,7 @@ switch ($_POST['action']) {
     $pre_read = (isset($_POST['-W']) && $_POST['-W'] == "on") ? " -W" : "";
     if (! $op){
       $cmd = "/usr/local/sbin/preclear_disk.sh -Y{$op}{$mail}{$passes}{$read_sz}{$write_sz}{$pre_read} /dev/$device";
+      @file_put_contents("/tmp/preclear_stat_{$device}","{$device}|NN|Starting...");
     } else {
       $cmd = "/usr/local/sbin/preclear_disk.sh -Y{$op} /dev/$device";
     }
@@ -186,6 +192,7 @@ switch ($_POST['action']) {
   case 'stop_preclear':
     $device = urldecode($_POST['device']);
     tmux_kill_window("preclear_disk_{$device}");
+    reload_partition($device);
     echo "<script>parent.location=parent.location;</script>";
     break;
   case 'clear_preclear':

@@ -65,8 +65,7 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
     window.open(run, 'log', options);
   }
   function get_preclear(device) {
-    clearTimeout(timers.preclear);
-    $.post(URL,{action:"get_preclear",device:device},function(data){if(data.preclear){$('#preclear_'+device).html(data.preclear);}},"json").always(function(){timers.preclear=setTimeout('get_preclear("'+device+'")',5000);});
+    $.post(URL,{action:"get_preclear",device:device},function(data){if(data.preclear){$('#preclear_'+device).html(data.preclear);}},"json").always(function(){setTimeout('get_preclear("'+device+'")',5000);});
   }
   function startWaitMe(el) {
     <?if ($display['theme'] == 'white'):?>

@@ -296,9 +296,9 @@ list_device_names() {
 
 send_mail() {
   if [ -f "/usr/local/sbin/notify" ]; then
-    /usr/local/sbin/notify -e "Preclear $model $serial" -s "${1}" -m "${2}" -i "normal 7"
+    /usr/local/sbin/notify -e "Preclear $model $serial" -s "${1}" -d "${2}" -m "${3}" -i "normal 7"
   else
-    echo -e "${2}" | mail -s "${1}" "${3}"
+    echo -e "${3}" | mail -s "${1}" "${4}"
   fi
 }
 
@@ -704,7 +704,7 @@ then
             report_out+="Elapsed Time of current cycle: $(timer $zerotmr)\\n"
             report_out+="Total Elapsed time: $(timer $tmr)"
 
-            send_mail "Preclear: Zeroing Disk $disk_basename in Progress ${percent_wrote}% complete cycle $cc of $cycle_count" "$report_out" $mail_rcpt
+            send_mail "Preclear: Zeroing Disk $disk_basename" "Preclear: Zeroing Disk $disk_basename in Progress ${percent_wrote}% complete cycle $cc of $cycle_count" "$report_out" $mail_rcpt
         fi
     fi
 
@@ -1037,7 +1037,7 @@ read_entire_disk( ) {
           report_out+="Using Block size of `format_number $units` Bytes\\n "
           report_out+="Next report at $report_percentage%"
 
-          send_mail "Preclear: Post Read Started on $disk_basename. Cycle $cc of $cycle_count" "$report_out" $mail_rcpt
+          send_mail "Preclear: Post Read Started on $disk_basename." "Preclear: Post Read Started on $disk_basename. Cycle $cc of $cycle_count" "$report_out" $mail_rcpt
       fi
 
       if [ $use_mail -eq 4 ]
@@ -1054,7 +1054,7 @@ read_entire_disk( ) {
               report_out+="Elapsed Time of current cycle: $(timer $posttmr)\\n"
               report_out+="Total Elapsed time: $(timer $tmr)"
 
-              send_mail "Preclear: Post Read in Progress on $disk_basename ${percent_read}% complete ($read_speed) cycle $cc of $cycle_count" "$report_out" $mail_rcpt
+              send_mail "Preclear: Post Read in Progress on $disk_basename" "Preclear: Post Read in Progress on $disk_basename ${percent_read}% complete ($read_speed) cycle $cc of $cycle_count" "$report_out" $mail_rcpt
           fi
      fi
      #bjp999 4/9/11
@@ -1084,7 +1084,7 @@ read_entire_disk( ) {
           report_out+="Using Block size of `format_number $units` Bytes\\n "
           report_out+="Next report at $report_percentage%"
 
-          send_mail "Preclear: Pre Read Started on $disk_basename. Cycle $cc of $cycle_count " "$report_out" $mail_rcpt
+          send_mail "Preclear: Pre Read Started on $disk_basename." "Preclear: Pre Read Started on $disk_basename. Cycle $cc of $cycle_count " "$report_out" $mail_rcpt
       fi
 
       if [ $use_mail -eq 4 ]
@@ -1101,7 +1101,7 @@ read_entire_disk( ) {
               report_out+="Elapsed Time of current cycle: $(timer $pretmr)\\n"
               report_out+="Total Elapsed time: $(timer $tmr)"
 
-              send_mail "Preclear: Pre Read in Progress on $disk_basename ${percent_read}% complete ($read_speed) cycle $cc of $cycle_count" "$report_out" $mail_rcpt
+              send_mail "Preclear: Pre Read in Progress on $disk_basename" "Preclear: Pre Read in Progress on $disk_basename ${percent_read}% complete ($read_speed) cycle $cc of $cycle_count" "$report_out" $mail_rcpt
          fi
      fi
      #bjp999 4/9/11
@@ -1217,7 +1217,7 @@ read_entire_disk( ) {
         report_out+="Using Block size of `format_number $units` Bytes\\n "
         report_out+="Calculated Read Speed - $cal_post_read_speed MB/s"
 
-        send_mail "Preclear: Post Read finished on $disk_basename. Cycle $cc of $cycle_count" "$report_out" $mail_rcpt
+        send_mail "Preclear: Post Read finished on $disk_basename." "Preclear: Post Read finished on $disk_basename. Cycle $cc of $cycle_count" "$report_out" $mail_rcpt
     fi
   fi
   if [ "$2" = "preread" ]
@@ -1237,7 +1237,7 @@ read_entire_disk( ) {
         report_out+="Using Block size of `format_number $units` Bytes\\n "
         report_out+="Calculated Read Speed - $cal_pre_read_speed MB/s"
 
-        send_mail "Preclear: Pre Read finished on $disk_basename. Cycle $cc of $cycle_count" "$report_out" $mail_rcpt
+        send_mail "Preclear: Pre Read finished on $disk_basename." "Preclear: Pre Read finished on $disk_basename. Cycle $cc of $cycle_count" "$report_out" $mail_rcpt
     fi
   fi
   if [ "$3" = "display_progress" ]
@@ -1826,7 +1826,7 @@ do
   if [ $use_mail -ge 3 ]
   then
       report=$(echo -e "Zeroing Disk $theDisk Started.  \\n`disk_temperature 1`\\n")
-      send_mail "Preclear: Zeroing Disk $disk_basename Started. Cycle $cc of $cycle_count" "$report" $mail_rcpt
+      send_mail "Preclear: Zeroing Disk $disk_basename Started." "Preclear: Zeroing Disk $disk_basename Started. Cycle $cc of $cycle_count" "$report" $mail_rcpt
   fi
 
 
@@ -1902,7 +1902,7 @@ do
       report_out+="`disk_temperature 1`\\n"
       report_out+="Calculated Write Speed: $cal_zero_write_speed MB/s"
 
-      send_mail "Preclear: Zeroing Disk $disk_basename Done. Cycle $cc of $cycle_count" "$report_out" $mail_rcpt
+      send_mail "Preclear: Zeroing Disk $disk_basename Done." "Preclear: Zeroing Disk $disk_basename Done. Cycle $cc of $cycle_count" "$report_out" $mail_rcpt
   fi
 
   #bjp999 4/9/11
@@ -2064,9 +2064,9 @@ do
     then
         if [ "$verify_only" = "y" ]
         then
-            send_mail "Preclear: FAIL! Verify Disk $disk_basename Failed!!! Cycle $cc of $cycle_count" "Preclear Verify Disk $theDisk FAILED!!!!.  " $mail_rcpt
+            send_mail "Preclear: FAIL! Verify Disk $disk_basename Failed!!!" "Preclear: FAIL! Verify Disk $disk_basename Failed!!! Cycle $cc of $cycle_count" "Preclear Verify Disk $theDisk FAILED!!!!.  " $mail_rcpt
         else
-            send_mail "Preclear: FAIL! Preclearing Disk $disk_basename Failed!!! Cycle $cc of $cycle_count" "Preclear Disk $theDisk FAILED!!!!.  " $mail_rcpt
+            send_mail "Preclear: FAIL! Preclearing Disk $disk_basename Failed!!!" "Preclear: FAIL! Preclearing Disk $disk_basename Failed!!! Cycle $cc of $cycle_count" "Preclear Disk $theDisk FAILED!!!!.  " $mail_rcpt
         fi
     fi
 
@@ -2131,7 +2131,7 @@ do
           report_out+="== Starting next cycle\n"
           report_out+="==\n"
           report_out+="========================================================================$ver\n"
-          send_mail "Preclear: Disk $disk_basename PASSED cycle $cc! Starting Next cycle" "$report_out" $mail_rcpt
+          send_mail "Preclear: Disk $disk_basename PASSED cycle $cc!" "Preclear: Disk $disk_basename PASSED cycle $cc! Starting Next cycle" "$report_out" $mail_rcpt
       fi
   fi
 done
@@ -2308,5 +2308,5 @@ echo -e "$report_out " | logger -tpreclear_disk-diff -plocal7.info -i
 
 if [ $use_mail -ge 1 ]
 then
-  send_mail "Preclear: PASS! Preclearing Disk $disk_basename Finished!!! Cycle $cc of $cycle_count" "${report_out}" $mail_rcpt
+  send_mail "Preclear: PASS! Preclearing Disk $disk_basename Finished!!!" "Preclear: PASS! Preclearing Disk $disk_basename Finished!!! Cycle $cc of $cycle_count" "${report_out}" $mail_rcpt
 fi
