@@ -61,6 +61,8 @@ function get_unasigned_disks() {
         foreach ($m as $k => $v) $m_real[$k] = realpath($v);
         if (strpos($d, "ata") !== FALSE && ! count(array_intersect($unraid_cache, $m_real)) && ! in_array($path, $usb_disks)) {
           $disks[$d] = array('device'=>$path,'type'=>'ata','partitions'=>$m);
+        } else if (strpos($d, "scsi") !== FALSE && ! count(array_intersect($unraid_cache, $m_real)) && ! in_array($path, $usb_disks)) {
+          $disks[$d] = array('device'=>$path,'type'=>'scsi','partitions'=>$m);
         } else if ( in_array($path, $usb_disks) && ! in_array($unraid_flash, $m_real)) {
           $disks[$d] = array('device'=>$path,'type'=>'usb','partitions'=>$m);
         }
@@ -119,7 +121,7 @@ if (isset($_POST['display'])) $display = $_POST['display'];
 switch ($_POST['action']) {
   case 'get_content':
     $disks = get_all_disks_info();
-    echo "<table class='preclear custom_head'><thead><tr><td>Device</td><td>Identification</td><td>Temp</td><td>Preclear Status</td></tr></thead>";
+    echo "<table class='preclear custom_head'><thead><tr><td>Device</td><td>Identification</td><td>Temp</td><td>Size</td><td>Preclear Status</td></tr></thead>";
     echo "<tbody>";
     if ( count($disks) ) {
       $odd="odd";
@@ -153,6 +155,7 @@ switch ($_POST['action']) {
             $status = "{$preclear[2]} <span class='rm_preclear' onclick='stop_preclear(\"{$disk_name}\");'> [clear]</span>";
           } 
         }
+        echo "<td><span>".my_scale($disk['size'], $unit)." $unit</span></td>";
         echo "<td>$status</td>";
         echo "</tr>";
         $odd = ($odd == "odd") ? "even" : "odd";

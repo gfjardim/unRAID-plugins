@@ -1,5 +1,6 @@
 Menu="Utilities"
-Title="Preclear Disks"
+Title="Preclear Disk"
+Icon="preclear.disk.png"
 ---
 <?
 $plugin = "preclear.disk";
@@ -21,9 +22,9 @@ $plugin = "preclear.disk";
   table.preclear {padding:0px;margin:-21px 0px 22px 0px;border-collapse:collapse;white-space:nowrap;}
   table.preclear thead tr>td{text-align:left;width:8%;padding-left:12px;}
   table.preclear thead tr>td+td{text-align:left;width:auto;padding-left:12px;}
-  table.preclear tr>td+td+td{text-align:left;width:auto;padding-left:30px;}
   table.preclear tr>td{text-align:left;width:8%;padding-left:12px;padding-right:0;white-space:nowrap;}
-  table.preclear tr>td+td+td+td{text-align:right;padding-left:0;padding-right:12px;width: 5em;}
+  table.preclear tr>td+td+td+td{text-align:left;width:auto;padding-left:30px;}
+  table.preclear tr>td+td+td+td+td{text-align:right;padding-left:0;padding-right:12px;width: 5em;}
 
   button[type=button] {margin:0px 14px 0 14px;}
   i.glyphicon{margin:0px 5px 0 5px;}
@@ -142,7 +143,7 @@ $plugin = "preclear.disk";
       </select>
     </dd>
     <div class='test_options'>
-    <dt>Cicles: </dt>
+    <dt>Cycles: </dt>
     <dd>
       <select name="-c"><?for ($i=1; $i <= 20; $i++){echo "<option value='$i'>$i</option>";}?></select>
     </dd>
@@ -167,7 +168,7 @@ $plugin = "preclear.disk";
 </div>
 <div id="unassigned_devices_list">
   <table class='preclear custom_head'>
-    <thead><tr><td>Device</td><td>Identification</td><td>Temp</td><td>Preclear Status</td></tr></thead>
+    <thead><tr><td>Device</td><td>Identification</td><td>Temp</td><td>Size</td><td>Preclear Status</td></tr></thead>
     <tbody>
     <tr><td colspan='12' style='text-align:center;font-weight:bold;'></td></tr>
     </tbody>

@@ -316,7 +316,7 @@ function get_unasigned_disks() {
       if ($m = array_values(preg_grep("#$d.*-part\d+#", $paths))) {
         natsort($m);
         foreach ($m as $k => $v) $m_real[$k] = realpath($v);
-        if (strpos($d, "ata") !== FALSE && ! count(array_intersect($unraid_cache, $m_real)) && ! in_array($path, $usb_disks)) {
+        if ((strpos($d, "scsi") !== FALSE || strpos($d, "ata") !== FALSE) && ! count(array_intersect($unraid_cache, $m_real)) && ! in_array($path, $usb_disks)) {
           $disks[$d] = array('device'=>$path,'type'=>'ata','partitions'=>$m);
         } else if ( in_array($path, $usb_disks) && ! in_array($unraid_flash, $m_real)) {
           $disks[$d] = array('device'=>$path,'type'=>'usb','partitions'=>$m);

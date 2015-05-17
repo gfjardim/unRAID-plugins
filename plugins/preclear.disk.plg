@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.05.16a">
+<!ENTITY version   "2015.05.17">
 <!ENTITY launch    "Settings/Preclear">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -14,11 +14,14 @@
 <CHANGES>
 ##&name;
 
+###2015.05.17
+- Improve: detection of SCSI disks
+
 ###2015.05.16a
 - Add: other preclear operations
 
 ###2015.05.16
-- initial release.
+- Initial release.
 </CHANGES>
 
 <!--
