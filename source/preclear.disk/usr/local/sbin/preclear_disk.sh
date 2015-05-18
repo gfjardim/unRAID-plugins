@@ -63,10 +63,10 @@
 #                 default in the absence of "-A" or "-a" option.
 # Version 1.14  - Added text describing how -A and -a options are not used or needed on disks > 2.2TB.
 #                 Added additional logic to detect assigned drives in the newest of 5.0 releases.
-# Version 1.15  - Added export of LC_CTYPE=C to prevent unicode use on 64 bit printf.
-# Version 1.16  - Added PID to preclear_stat_sdX files, support for notifications and add -Y (override confirmation) option - gfjardim
-
-ver="1.16"
+# Version 1.15  - Added support for fast post read (bjp999)
+#                 Misc changes recommended by RobJ
+#                 Added PID to preclear_stat_sdX files and support for notifications - gfjardim
+ver="1.15c"
 
 progname=$0
 options=$*
@@ -136,7 +136,7 @@ To list device names of drives not assigned to the unRAID array:
        -A       = start partition on sector 64. (not compatible with unRAID 4.6 and prior)
             On unRAID 4.7 and subsequent, the -a or -A default is set based on the value
             set on the Settings page in the unRAID web-management console.
-            Both of these (-a and -A) are completely ignored on disks > 2.2TB as they 
+            Both of these (-a and -A) are completely ignored on disks > 2.2TB as they
             use a GPT partition that will always start on a 4k boundary.
 
        -C 63    = convert an existing pre-cleared disk to use sector 63 as a
@@ -172,10 +172,10 @@ To list device names of drives not assigned to the unRAID array:
                 in a subdirectory named /boot/preclear_reports
                 if the "-R" is NOT given. (The reports are always available
                 in /tmp until you reboot, even if "-R" is specified)
-       -S     = name the saved output reports by their linux device instead 
+       -S     = name the saved output reports by their linux device instead
                 of by the serial number of the disk.
-
-       -Y = Override preclear confirmation
+       -f     = use fast post-read verify (courtesy of bjp999)
+       -J     = don't prompt for confirmation
 
        Unless the -n option is specified the disk will first have its entire
        set of blocks read, then, the entire disk will be cleared by writing
@@ -228,7 +228,7 @@ do
        fi
     fi
     dev[$a]="$device"
-    echo "$ device}|C|$config" >>/tmp/preclear_assigned_disks1
+    echo "${device}|C|$config" >>/tmp/preclear_assigned_disks1
     let a=a+1
     ;;
     esac
@@ -321,6 +321,8 @@ timer()
         printf '%d:%02d:%02d' $dh $dm $ds
     fi
 }
+
+preread_skip_pct=0
 LC_CTYPE=C
 export LC_CTYPE
 short_test=0         # set to non-zero for short test for script testing - Leave 0 for normal test
@@ -346,14 +348,15 @@ save_report="y"
 zero_mbr_only="n"
 post_read_err="N"    #bjp999 4/9/11
 save_report_by_dev="no"  # default is to save by model/serial num
-max_mbr_size="0xFFFFFFFF" # max size of MBR partition 
+max_mbr_size="0xFFFFFFFF" # max size of MBR partition
 over_mbr_size="n"
-override_confirmation="n"
+fast_postread="n"
+noprompt="n" #bjp999 7-17-11
 
 sb=1
 default="(partition starting on sector 63)"
 
-while getopts ":tnc:WM:m:hvDNw:r:b:AalC:VRDd:zsSY" opt; do
+while getopts ":tnc:WM:m:hvDNw:r:b:AalC:VRDd:zsSfJ" opt; do
   case $opt in
   n ) pre_read_flag=n;post_read_flag=n ;;
   N ) skip_postread_verify="yes" ;;
@@ -386,14 +389,15 @@ while getopts ":tnc:WM:m:hvDNw:r:b:AalC:VRDd:zsSY" opt; do
       ;;
   h ) usage >&2 ;;
   s ) short_test=1 ;; # for debugging
-  Y ) override_confirmation="y" ;;
+  J ) noprompt="y" ;;      # bjp999 3-25-14 bypass all prompts - AUTOMATED ONLY
+  f ) fast_postread="y" ;; # bjp999 3-25-14 use fast post read and verify (ignores -N)
   \?) usage >&2 ;;
   esac
 done
 
 # if partition_64 not specified, use the default from how unRAID is configured.
 # Look in the disk.cfg file.
-default_format=`grep defaultFormat /boot/config/disk.cfg | sed -e "s/\([^=]*\)=\([^=]*\)/\2/" -e "s/\\r//" -e 's/"//g'  | tr -d '\n'`
+default_format=`grep defaultFormat /boot/config/disk.cfg | sed -e "s/\([^=]*\)=\([^=]*\)/\2/" -e "s/\\r//" -e 's/"//g'`
 if [ "$default_format" != "" -a "$partition_64" = "" ]
 then
    case "$default_format" in
@@ -1158,29 +1162,38 @@ read_entire_disk( ) {
     dd if=$1 of=/dev/null count=1 bs=$units skip=$skip_b3 >/dev/null 2>&1 &
     rb5=$!
 
-
-    # Now, also read the blocks linearly, from start to end, $bcount cylinders at a time.
-    read_speed=`dd if=$1 bs=$units of=/dev/null count=$bcount skip=$skip conv=noerror 2>&1|  sed -n 3p | awk '{ print $8,$9 }'`
-    echo $read_speed >/tmp/read_speed$disk_basename
-    if [ "$2" = "postread" -a "$skip_postread_verify" = "no" ]
+    if [ "$2" = "preread" -o "$fast_postread" = "n" ]
     then
-      # first block must be treated differently
-      if [ "$skip" != "0" ]
+      # Now, also read the blocks linearly, from start to end, $bcount cylinders at a time.
+      read_speed=`dd if=$1 bs=$units of=/dev/null count=$bcount skip=$skip conv=noerror 2>&1|  sed -n 3p | awk '{ print $8,$9 }'`
+      echo $read_speed >/tmp/read_speed$disk_basename
+      if [ "$2" = "postread" -a "$skip_postread_verify" = "no" ]
       then
-        # verify all zeros... complain if not. This read should be fast, as blocks should be in cache from prior read.
-        rsum=`dd if=$1 bs=$units count=$bcount skip=$skip conv=noerror 2>/dev/null|sum| awk '{print $1}'`
-        if [ "$rsum" != "00000" ]
+        # first block must be treated differently
+        if [ "$skip" != "0" ]
         then
-           echo "skip=$skip count=$bcount bs=$units returned $rsum instead of 00000" >>/tmp/postread_errors$disk_basename
-           post_read_err = "Y"          #bjp999 4/9/11
-        fi
-      else
-          rsum=`dd if=$1 bs=512 count=8192 skip=1 conv=noerror 2>/dev/null|sum| awk '{print $1}'`
+          # verify all zeros... complain if not. This read should be fast, as blocks should be in cache from prior read.
+          rsum=`dd if=$1 bs=$units count=$bcount skip=$skip conv=noerror 2>/dev/null|sum| awk '{print $1}'`
           if [ "$rsum" != "00000" ]
           then
-             echo "skip=0 bs=512 count=8192 returned $rsum instead of 00000" >>/tmp/postread_errors$disk_basename
-             post_read_err = "Y"        #bjp999 4/9/11
+             echo "skip=$skip count=$bcount bs=$units returned $rsum instead of 00000" >>/tmp/postread_errors$disk_basename
+             post_read_err="Y"          #bjp999 4/9/11
           fi
+        else
+            rsum=`dd if=$1 bs=512 count=8192 skip=1 conv=noerror 2>/dev/null|sum| awk '{print $1}'`
+            if [ "$rsum" != "00000" ]
+            then
+               echo "skip=0 bs=512 count=8192 returned $rsum instead of 00000" >>/tmp/postread_errors$disk_basename
+               post_read_err="Y"        #bjp999 4/9/11
+            fi
+        fi
+      fi
+    else
+      read_speed=`/usr/local/sbin/readvz if=$1 bs=$units count=$bcount skip=$skip memcnt=50 2>>/tmp/postread_errors$disk_basename | awk '{ print $8,$9 }'`
+      echo $read_speed >/tmp/read_speed$disk_basename
+      if [ -s /tmp/postread_errors$disk_basename ]
+      then
+         post_read_err = "Y"
       fi
     fi
 
@@ -1196,8 +1209,22 @@ read_entire_disk( ) {
    then
       break
    fi
+   if [ $preread_skip_pct -gt 0 ]
+   then
+      #echo "skip=$skip"
+      #echo "blocks=$blocks"
+      #echo "bcount=$bcount"
+      #let skip=($blocks * $preread_skip_pct / 100 / $bcount * $bcount)
+      #echo "newskip=$skip"
+      #exit
 
-   let skip=($skip + $bcount)
+      #let skip=($blocks * $preread_skip_pct % 100)
+
+      let skip=($blocks * $preread_skip_pct / 100 / $bcount * $bcount)
+      preread_skip_pct=0
+   else
+      let skip=($skip + $bcount)
+   fi
 
  done
 
@@ -1508,17 +1535,22 @@ then
     echo "${bold}however this should not affect the clearing of a disk.${norm}"
     echo "smartctl exit status = $smartstat"
     echo "$sm_out"$
-    if [ "$override_confirmation" != "y" ]
+    echo "${bold}Do you wish to continue?${norm}"
+    echo -n "(Answer ${ul}Yes${noul} to continue. Capital 'Y', lower case 'es'): "
+
+    if [ "$noprompt" = "y" ]      #bjp999 7-17-11
     then
-        echo "${bold}Do you wish to continue?${norm}"
-        echo -n "(Answer ${ul}Yes${noul} to continue. Capital 'Y', lower case 'es'): "
-        read ans
-        if [ "$ans" != "Yes" ]
-        then
-          exit 1
-        fi
+       ans="Yes"                  #bjp999 7-17-11
+    else                          #bjp999 7-17-11
+       read ans
+    fi                            #bjp999 7-17-11
+
+    if [ "$ans" != "Yes" ]
+    then
+       exit 1
     fi
 fi
+
 echo "$sm_out" | awk '/Model/,/User Capacity/'
 model=`echo "$sm_out" | awk '/Device Model/ { printf substr($0, 18,length($0)) }' | tr -d ' '`
 serial=`echo "$sm_out" | awk '/Serial Number/ { printf substr($0, 18,length($0)) }' | tr -d ' '`
@@ -1581,7 +1613,7 @@ then
     echo "=="
     echo "== ${bold}DISK $theDisk IS PRECLEARED${norm} with a GPT Protective MBR"
     echo "== Conversion not possible.  All GPT partitions are automatically 4k aligned."
-    echo "==" 
+    echo "=="
     echo "============================================================================"
     exit 2
   fi
@@ -1696,14 +1728,16 @@ fi
 
 if [ "$zero_mbr_only" = "y" ]
 then
-  if [ "$override_confirmation" = "y" ]
+  echo "Are you absolutely sure you want to zero the MBR of this drive?"
+  echo -n "(Answer ${ul}Yes${noul} to continue. Capital 'Y', lower case 'es'): "
+
+  if [ "$noprompt" = "y" ]      #bjp999 7-17-11
   then
-    ans="Yes"
-  else
-    echo "Are you absolutely sure you want to zero the MBR of this drive?"
-    echo -n "(Answer ${ul}Yes${noul} to continue. Capital 'Y', lower case 'es'): "
-    read ans
-  fi
+     ans="Yes"                  #bjp999 7-17-11
+  else                          #bjp999 7-17-11
+     read ans
+  fi                            #bjp999 7-17-11
+
   if [ "$ans" = "Yes" ]
   then
     echo "zeroing MBR only"
@@ -1735,20 +1769,22 @@ then
 else
   echo "Are you absolutely sure you want to clear this drive?"
 fi
-if [ "$override_confirmation" != "y" ]
+echo -n "(Answer ${ul}Yes${noul} to continue. Capital 'Y', lower case 'es'): "
+if [ "$noprompt" = "y" ]      #bjp999 7-17-11
 then
-  echo -n "(Answer ${ul}Yes${noul} to continue. Capital 'Y', lower case 'es'): "
-  read ans
-  if [ "$ans" != "Yes" ]
-  then
-      if [ "$verify_only" = "y" ]
-      then
-        echo "${bold}Verification will NOT be performed${norm}"
-      else
-        echo "${bold}Clearing will NOT be performed${norm}"
-      fi
-      exit 2
-  fi
+   ans="Yes"                  #bjp999 7-17-11
+else                          #bjp999 7-17-11
+   read ans
+fi                            #bjp999 7-17-11
+if [ "$ans" != "Yes" ]
+then
+    if [ "$verify_only" = "y" ]
+    then
+      echo "${bold}Verification will NOT be performed${norm}"
+    else
+      echo "${bold}Clearing will NOT be performed${norm}"
+    fi
+    exit 2
 fi
 tmr=$(timer)
 cyctmr=$tmr  #Set start of 1st cycle timer

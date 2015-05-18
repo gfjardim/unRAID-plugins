@@ -49,13 +49,14 @@ $plugin = "preclear.disk";
   }
   function start_preclear(serial, device){
     var title = 'Start Preclear';
-    $( "#dialog-start" ).html("<dl><dt>Disk:</dt><dd>"+serial+"</dd></dl>");
+    $( "#dialog-start" ).html("<dl><dt>Disk:</dt><dd><span style='color:#CC0000;font-weight:bold;'>"+serial+"</span></dd></dl>");
     $( "#dialog-start" ).append($("#start-defaults").html());
-    $( "#dialog-start" ).find(".switch").switchButton({labels_placement: "right"});
+    $( "#dialog-start" ).find(".switch").switchButton({labels_placement:"right",on_label:'YES',off_label:'NO'});
+    $( "#dialog-start" ).find(".switch-button-background").css("margin-top", "6px");
     $( "#dialog-start" ).dialog({
       title: title,
       resizable: false,
-      width: 500,
+      width: 600,
       modal: true,
       show : {effect: 'fade' , duration: 250},
       hide : {effect: 'fade' , duration: 250},
@@ -70,7 +71,8 @@ $plugin = "preclear.disk";
           opts["-r"] = getVal(this, "-r");
           opts["-w"] = getVal(this, "-w");
           opts["-W"] = getVal(this, "-W");
-          $.post(URL,opts,function(data){alert(data);}).always(function(data){location.reload();});
+          opts["-f"] = getVal(this, "-f");
+          $.post(URL,opts,function(data){alert(data);openPreclear(device)}).always(function(data){location.reload();});
           $( this ).dialog( "close" );
         },
         Cancel: function() {
@@ -80,7 +82,7 @@ $plugin = "preclear.disk";
     });
     $(".ui-dialog .ui-dialog-titlebar").addClass('menu');
     $(".ui-dialog .ui-dialog-title").css('text-align','center').css( 'width', "100%");
-    $(".ui-dialog .ui-dialog-content").css('padding-top','15px').css('font-weight','bold');
+    $(".ui-dialog .ui-dialog-content").css('padding-top','15px').css('vertical-align','bottom');
     $(".ui-button-text").css('padding','0px 5px');
   }
   function remove_session(device) {
@@ -127,6 +129,18 @@ $plugin = "preclear.disk";
     <?endif;?>
     $('.waitMe_content').css('top','55px');
   }
+  function toggleSettings(el) {
+    if(el.selectedIndex > 0 && el.selectedIndex != 5){
+      $(el).parent().siblings('.clear_options').css('display','none');
+      $(el).parent().siblings('.test_options').css('display','none');
+    } else if (el.selectedIndex == 5){
+      $(el).parent().siblings('.clear_options').css('display','none');
+      $(el).parent().siblings('.test_options').css('display','block');
+    } else {
+      $(el).parent().siblings('.clear_options').css('display','block');
+      $(el).parent().siblings('.test_options').css('display','block');
+    }
+  }
 </script>
 <div id="dialog-stop" style="display:none;" title=""></div>
 <div id="dialog-start" style="display:none;" title=""></div>
@@ -134,24 +148,28 @@ $plugin = "preclear.disk";
   <dl>
     <dt>Operation: </dt>
     <dd>
-      <select name="op" onchange="if(this.selectedIndex > 0){$(this).parent().siblings('.test_options').css('display','none');} else {$(this).parent().siblings('.test_options').css('display','block');};">
+      <select name="op" onchange="toggleSettings(this);">
         <option value='0'>Clear</option>
         <option value='-t'>Test</option>
         <option value='-C 64'>Convert to a start sector of 64</option>
         <option value='-C 63'>Convert to a start sector of 63</option>
         <option value='-z'>Zero only the MBR</option>
-        <option value='-V'>Run the post-read-verify</option>
+        <option value='-V'>Run the post-read verify</option>
       </select>
     </dd>
-    <div class='test_options'>
+    <div class='clear_options'>
     <dt>Cycles: </dt>
     <dd>
       <select name="-c"><?for ($i=1; $i <= 20; $i++){echo "<option value='$i'>$i</option>";}?></select>
     </dd>
+    </div>
+    <div class='test_options'>
     <dt>Mail: </dt>
     <dd>
       <select name="-M" ><option value="0">Never</option><option value="1">On preclear's end</option><option value="2">On every cicle's end</option><option value="3">On every cicle's and step's end</option><option value="4">On every 25% of progress</option></select>
     </dd>
+    </div>
+    <div class='clear_options'>
     <dt>Read size: </dt>
     <dd>
       <select name="-r" ><option value="0">Default</option><?for ($i=1; $i <= 10; $i++){echo "<option value='{$i}M'>{$i}M</option>";}?></select>
@@ -163,6 +181,12 @@ $plugin = "preclear.disk";
     <dt>Skip Pre-read: </dt>
     <dd>
       <input type="checkbox" name="-W" class="switch" >
+    </dd>
+    </div>
+    <div class='test_options'>
+    <dt>Fast post-read verify: </dt>
+    <dd>
+      <input type="checkbox" name="-f" class="switch" >
     </dd>
     </div>
   </dl>

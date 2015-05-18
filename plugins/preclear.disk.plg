@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.05.17a">
+<!ENTITY version   "2015.05.18">
 <!ENTITY launch    "Settings/Preclear">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -13,6 +13,9 @@
 
 <CHANGES>
 ##&name;
+
+###2015.05.18
+- Add: fast preclear option (bjp999 mod)
 
 ###2015.05.17a
 - Improve: detection of SCSI disks
@@ -51,7 +54,7 @@ The 'post-install' script.
 <FILE Run="/bin/bash">
 <INLINE>
 # fix permissions of executable files
-chmod +x /usr/local/sbin/preclear_disk.sh
+chmod +x /usr/local/sbin/preclear_disk.sh /usr/local/sbin/readvz
 
 # Update file access mode
 chmod 644 $(awk '/\.(htm|php|js|page|css|png|plg|gif|cfg|md)$/ {print "/"$0}' /var/log/packages/&name;-&version;)

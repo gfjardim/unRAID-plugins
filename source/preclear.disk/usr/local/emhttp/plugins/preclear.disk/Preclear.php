@@ -178,11 +178,15 @@ switch ($_POST['action']) {
     $read_sz  = (isset($_POST['-r']) && $_POST['-r'] != 0) ? " -r ".urldecode($_POST['-r']) : "";
     $write_sz = (isset($_POST['-w']) && $_POST['-w'] != 0) ? " -w ".urldecode($_POST['-w']) : "";
     $pre_read = (isset($_POST['-W']) && $_POST['-W'] == "on") ? " -W" : "";
-    if (! $op){
-      $cmd = "/usr/local/sbin/preclear_disk.sh -Y{$op}{$mail}{$passes}{$read_sz}{$write_sz}{$pre_read} /dev/$device";
+    $fast_read = (isset($_POST['-f']) && $_POST['-f'] == "on") ? " -f" : "";
+    if (! $op ){
+      $cmd = "/usr/local/sbin/preclear_disk.sh -J{$op}{$mail}{$passes}{$read_sz}{$write_sz}{$pre_read}{$fast_read} /dev/$device";
+      @file_put_contents("/tmp/preclear_stat_{$device}","{$device}|NN|Starting...");
+    } else if ($op == " -V"){
+      $cmd = "/usr/local/sbin/preclear_disk.sh -J{$op}{$fast_read} /dev/$device";
       @file_put_contents("/tmp/preclear_stat_{$device}","{$device}|NN|Starting...");
     } else {
-      $cmd = "/usr/local/sbin/preclear_disk.sh -Y{$op} /dev/$device";
+      $cmd = "/usr/local/sbin/preclear_disk.sh -J{$op} /dev/$device";
     }
     echo $cmd;
     tmux_kill_window("preclear_disk_{$device}");
@@ -206,7 +210,7 @@ switch ($_GET['action']) {
     $device = urldecode($_GET['device']);
     echo "<script type='text/javascript' src='/webGui/scripts/dynamix.js'></script>";
     echo str_replace("\n", "<br>", tmux_get_session("preclear_disk_".$device));
-    echo "<script>document.title='Preclear for disk /dev/{$device} ';$(function(){setTimeout('location.reload()',10000);});</script>";
+    echo "<script>document.title='Preclear for disk /dev/{$device} ';$(function(){setTimeout('location.reload()',5000);});</script>";
     break;
 }
 ?>
