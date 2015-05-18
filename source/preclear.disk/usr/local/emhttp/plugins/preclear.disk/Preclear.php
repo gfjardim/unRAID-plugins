@@ -37,12 +37,11 @@ function listDir($root) {
   }
   return $paths;
 }
+
 function get_unasigned_disks() {
   $disks = array();
   $paths=listDir("/dev/disk/by-id");
   natsort($paths);
-  $usb_disks = array();
-  foreach (listDir("/dev/disk/by-path") as $v) if (preg_match("#usb#", $v)) $usb_disks[] = realpath($v);
   $unraid_flash = realpath("/dev/disk/by-label/UNRAID");
   $unraid_disks = array();
   foreach (parse_ini_string(shell_exec("/root/mdcmd status 2>/dev/null")) as $k => $v) {
@@ -50,29 +49,27 @@ function get_unasigned_disks() {
       $unraid_disks[] = realpath("/dev/$v");
     }
   }
+  // foreach ($unraid_disks as $k) {$o .= "  $k\n";}; debug("UNRAID DISKS:\n$o");
   $unraid_cache = array();
   foreach (parse_ini_file("/boot/config/disk.cfg") as $k => $v) {
-    if (strpos($k, "cacheId") !== FALSE) {
-      foreach ( preg_grep("#".$v."#i", $paths) as $c) $unraid_cache[] = realpath($c);
+    if (strpos($k, "cacheId") !== FALSE && strlen($v)) {
+      foreach ( preg_grep("#".$v."$#i", $paths) as $c) $unraid_cache[] = realpath($c);
     }
   }
+  // foreach ($unraid_cache as $k) {$g .= "  $k\n";}; debug("UNRAID CACHE:\n$g");
   foreach ($paths as $d) {
     $path = realpath($d);
     if (preg_match("#^(.(?!wwn|part))*$#", $d)) {
-      if (! in_array($path, $unraid_disks)) {
-        if ($m = array_values(preg_grep("#$d.*-part\d+#", $paths))) {
-          natsort($m);
-          foreach ($m as $k => $v) $m_real[$k] = realpath($v);
-          if ((strpos($d, "scsi") !== FALSE || strpos($d, "ata") !== FALSE) && ! count(array_intersect($unraid_cache, $m_real)) && ! in_array($path, $usb_disks)) {
-            $disks[$d] = array("device"=>$path,"type"=>"ata","partitions"=>$m);
-          } else if ( in_array($path, $usb_disks) && ! in_array($unraid_flash, $m_real)) {
-            $disks[$d] = array("device"=>$path,"type"=>"usb","partitions"=>$m);
-          }
-        } else {
-          $disks[$d] = array("device"=>$path,"type"=>"und","partitions"=>array());
-        }
+      if (! in_array($path, $unraid_disks) && ! in_array($path, $unraid_cache) && strpos($unraid_flash, $path) === FALSE) {
+        $m = array_values(preg_grep("#$d.*-part\d+#", $paths));
+        natsort($m);
+        $disks[$d] = array("device"=>$path,"type"=>"ata","partitions"=>$m);
+        // debug("Unassigned disk: $d");
+      } else {
+        // debug("Discarded: => $d ($path)");
+        continue;
       }
-    }
+    } 
   }
   return $disks;
 }

@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.05.18a">
+<!ENTITY version   "2015.05.18b">
 <!ENTITY launch    "Settings/Preclear">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -13,6 +13,9 @@
 
 <CHANGES>
 ##&name;
+
+###2015.05.18b
+- Fix: empty cacheId variable crashing the code
 
 ###2015.05.18a
 - Fix: plugin not appearing under Settings/Utilities
