@@ -299,7 +299,7 @@ function get_unasigned_disks() {
   foreach (listDir("/dev/disk/by-path") as $v) if (preg_match("#usb#", $v)) $usb_disks[] = realpath($v);
   $unraid_flash = realpath("/dev/disk/by-label/UNRAID");
   $unraid_disks = array();
-  foreach (parse_ini_string(shell_exec('/root/mdcmd status 2>/dev/null')) as $k => $v) {
+  foreach (parse_ini_string(shell_exec("/root/mdcmd status 2>/dev/null")) as $k => $v) {
     if (strpos($k, "rdevName") !== FALSE && strlen($v)) {
       $unraid_disks[] = realpath("/dev/$v");
     }
@@ -312,19 +312,22 @@ function get_unasigned_disks() {
   }
   foreach ($paths as $d) {
     $path = realpath($d);
-    if (preg_match("#(ata|usb|scsi)(.(?!part))*$#", $d) && ! in_array($path, $unraid_disks)){
-      if ($m = array_values(preg_grep("#$d.*-part\d+#", $paths))) {
-        natsort($m);
-        foreach ($m as $k => $v) $m_real[$k] = realpath($v);
-        if ((strpos($d, "scsi") !== FALSE || strpos($d, "ata") !== FALSE) && ! count(array_intersect($unraid_cache, $m_real)) && ! in_array($path, $usb_disks)) {
-          $disks[$d] = array('device'=>$path,'type'=>'ata','partitions'=>$m);
-        } else if ( in_array($path, $usb_disks) && ! in_array($unraid_flash, $m_real)) {
-          $disks[$d] = array('device'=>$path,'type'=>'usb','partitions'=>$m);
+    if (preg_match("#^(.(?!wwn|part))*$#", $d)) {
+      if (! in_array($path, $unraid_disks)) {
+        if ($m = array_values(preg_grep("#$d.*-part\d+#", $paths))) {
+          natsort($m);
+          foreach ($m as $k => $v) $m_real[$k] = realpath($v);
+          if ((strpos($d, "scsi") !== FALSE || strpos($d, "ata") !== FALSE) && ! count(array_intersect($unraid_cache, $m_real)) && ! in_array($path, $usb_disks)) {
+            $disks[$d] = array("device"=>$path,"type"=>"ata","partitions"=>$m);
+          } else if ( in_array($path, $usb_disks) && ! in_array($unraid_flash, $m_real)) {
+            $disks[$d] = array("device"=>$path,"type"=>"usb","partitions"=>$m);
+          }
+          debug("Unassigned disk: $d");
+        } else {
+          $disks[$d] = array("device"=>$path,"type"=>"und","partitions"=>array());
         }
-      } else {
-        $disks[$d] = array('device'=>$path,'type'=>'und','partitions'=>array());
-      }
-    }
+      } else {debug("Discarded: Array device  => $d");}
+    } else { debug("Discarded: Partition/WWN => $d");}
   }
   return $disks;
 }
@@ -335,7 +338,6 @@ function get_all_disks_info($bus="all") {
   foreach ($disks as $key => $disk) {
     if ($disk['type'] != $bus && $bus != "all") continue;
     $disk['temperature'] = get_temp($key);
-    debug($key);
     $disk['size'] = intval(trim(shell_exec("blockdev --getsize64 ${key} 2>/dev/null")));
     $disk = array_merge($disk, get_disk_info($key));
     foreach ($disk['partitions'] as $k => $p) {

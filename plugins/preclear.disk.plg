@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.05.18">
+<!ENTITY version   "2015.05.18a">
 <!ENTITY launch    "Settings/Preclear">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -13,6 +13,9 @@
 
 <CHANGES>
 ##&name;
+
+###2015.05.18a
+- Fix: plugin not appearing under Settings/Utilities
 
 ###2015.05.18
 - Add: fast preclear option (bjp999 mod)
