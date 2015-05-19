@@ -6,9 +6,22 @@ Markdown="false"
 $plugin = "unassigned.devices";
 require_once("plugins/${plugin}/include/lib.php");
 if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/OpenDevices.page","plugins/dynamix/OpenDevices.page-");
-
-// echo "<pre>".print_r(get_all_disks_info(), true)."</pre>";
 ?>
+<script type="text/javascript">
+var this_tab = $('input[name$="tabs"]').length;
+$(function() {
+  var last = $('input[name$="tabs"]').length;
+  var elementId = "rescanDisks";
+  $('.tabs').append($('<span id="'+elementId+'" class="status vhshift" style=";display: none;"><input type="button" onclick="$.post(\'/update.php\',{\'#command\':\'/sbin/udevadm trigger --action=change\'});" value="Rescan Disks"></span>'));
+<?if ($tabbed):?>
+  if ($('#tab'+this_tab).is(':checked')) {
+    $('#'+elementId).show();
+  }
+  $('#tab'+this_tab).bind({click:function(){$('#'+elementId).show();}});
+  for (var x=1; x<=last; x++) if(x != this_tab) $('#tab'+x).bind({click:function(){$('#'+elementId).hide();}});
+<?endif;?>
+});
+</script>
 <link type='text/css' rel='stylesheet' href='/webGui/styles/jquery.switchButton.css'>
 <link type="text/css" rel="stylesheet" href="/webGui/styles/jquery-ui.min.css">
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/waitMe.min.css">
@@ -36,7 +49,7 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
   table.usb_absent tr>td+td{text-align:left;width:auto;}
   table.usb_absent tr>td+td+td+td{text-align:right;padding-left:0;padding-right:12px;width: 5em;}
 
-  button[type=button] {margin:0px 14px 0 14px;}
+  button[type=button].mount {margin:0px 14px 0 14px;}
   i.glyphicon{margin:0px 5px 0 5px;}
   i.hdd{margin:0px; 0px;font-size: 1.1em}
   i.partition{margin-left: 18px;}
