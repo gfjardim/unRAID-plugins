@@ -63,9 +63,9 @@
 #                 default in the absence of "-A" or "-a" option.
 # Version 1.14  - Added text describing how -A and -a options are not used or needed on disks > 2.2TB.
 #                 Added additional logic to detect assigned drives in the newest of 5.0 releases.
-# Version 1.15  - Added support for fast post read (bjp999)
-#                 Misc changes recommended by RobJ
-#                 Added PID to preclear_stat_sdX files and support for notifications - gfjardim
+# Version 1.15  - a) Added PID to preclear_stat_sdX files and support for notifications - gfjardim
+#                 b) Add notification channel choice
+#                 c) Added support for fast post read (bjp999)
 ver="1.15c"
 
 progname=$0
@@ -74,7 +74,7 @@ options=$*
 usage() {
   cat <<EOF
 
-Usage: $progname [-t] [-n] [-N] [-W] [-R] [-m e-mail-addr] [-M 1|2|3|4] [-c count] [-A|-a] /dev/???
+Usage: $progname [-t] [-n] [-N] [-W] [-R] [-m e-mail-addr] [-M 1|2|3|4 -o 1|2|3|4|5|6|7] [-c count] [-A|-a] /dev/???
 
 To test if a drive is cleared:
        $progname -t /dev/???
@@ -136,7 +136,7 @@ To list device names of drives not assigned to the unRAID array:
        -A       = start partition on sector 64. (not compatible with unRAID 4.6 and prior)
             On unRAID 4.7 and subsequent, the -a or -A default is set based on the value
             set on the Settings page in the unRAID web-management console.
-            Both of these (-a and -A) are completely ignored on disks > 2.2TB as they
+            Both of these (-a and -A) are completely ignored on disks > 2.2TB as they 
             use a GPT partition that will always start on a 4k boundary.
 
        -C 63    = convert an existing pre-cleared disk to use sector 63 as a
@@ -172,10 +172,20 @@ To list device names of drives not assigned to the unRAID array:
                 in a subdirectory named /boot/preclear_reports
                 if the "-R" is NOT given. (The reports are always available
                 in /tmp until you reboot, even if "-R" is specified)
-       -S     = name the saved output reports by their linux device instead
+       -S     = name the saved output reports by their linux device instead 
                 of by the serial number of the disk.
        -f     = use fast post-read verify (courtesy of bjp999)
-       -J     = don't prompt for confirmation
+       -J     = don't prompt for confirmation (bjp999)
+
+Notifications (unRAID v6 only). Must be combined with -M option:
+
+       -o 1   = notify using browser-popups only (default);
+       -o 2   = notify using e-mail only;
+       -o 3   = notify using browser-popups and e-mail;
+       -o 4   = notify using agents only;
+       -o 5   = notify using browser-popups and agents;
+       -o 6   = notify using e-mail and agents;
+       -o 7   = notify using browser popups, e-mail and agents;
 
        Unless the -n option is specified the disk will first have its entire
        set of blocks read, then, the entire disk will be cleared by writing
@@ -294,9 +304,10 @@ list_device_names() {
   rm /tmp/un_assigned_flag >/dev/null 2>&1
 }
 
+# gfjardim - add notification system capability without breaking legacy mail.
 send_mail() {
   if [ -f "/usr/local/sbin/notify" ]; then
-    /usr/local/sbin/notify -e "Preclear $model $serial" -s "${1}" -d "${2}" -m "${3}" -i "normal 7"
+    /usr/local/sbin/notify -e "Preclear ${model} ${serial}" -s "${1}" -d "${2}" -m "${3}" -i "normal ${notify_channels}"
   else
     echo -e "${3}" | mail -s "${1}" "${4}"
   fi
@@ -348,15 +359,16 @@ save_report="y"
 zero_mbr_only="n"
 post_read_err="N"    #bjp999 4/9/11
 save_report_by_dev="no"  # default is to save by model/serial num
-max_mbr_size="0xFFFFFFFF" # max size of MBR partition
+max_mbr_size="0xFFFFFFFF" # max size of MBR partition 
 over_mbr_size="n"
 fast_postread="n"
 noprompt="n" #bjp999 7-17-11
+notify_channels="1" # gfjardim - default notify to browser popups
 
 sb=1
 default="(partition starting on sector 63)"
 
-while getopts ":tnc:WM:m:hvDNw:r:b:AalC:VRDd:zsSfJ" opt; do
+while getopts ":tnc:WM:m:hvDNw:r:b:AalC:VRDd:zsSfJo:" opt; do
   case $opt in
   n ) pre_read_flag=n;post_read_flag=n ;;
   N ) skip_postread_verify="yes" ;;
@@ -391,13 +403,14 @@ while getopts ":tnc:WM:m:hvDNw:r:b:AalC:VRDd:zsSfJ" opt; do
   s ) short_test=1 ;; # for debugging
   J ) noprompt="y" ;;      # bjp999 3-25-14 bypass all prompts - AUTOMATED ONLY
   f ) fast_postread="y" ;; # bjp999 3-25-14 use fast post read and verify (ignores -N)
+  o ) notify_channels=$OPTARG ;; # gfjardim
   \?) usage >&2 ;;
   esac
 done
 
 # if partition_64 not specified, use the default from how unRAID is configured.
 # Look in the disk.cfg file.
-default_format=`grep defaultFormat /boot/config/disk.cfg | sed -e "s/\([^=]*\)=\([^=]*\)/\2/" -e "s/\\r//" -e 's/"//g'`
+default_format=`grep defaultFormat /boot/config/disk.cfg | sed -e "s/\([^=]*\)=\([^=]*\)/\2/" -e "s/\\r//" -e 's/"//g'  | tr -d '\n'`
 if [ "$default_format" != "" -a "$partition_64" = "" ]
 then
    case "$default_format" in
@@ -1613,7 +1626,7 @@ then
     echo "=="
     echo "== ${bold}DISK $theDisk IS PRECLEARED${norm} with a GPT Protective MBR"
     echo "== Conversion not possible.  All GPT partitions are automatically 4k aligned."
-    echo "=="
+    echo "==" 
     echo "============================================================================"
     exit 2
   fi

@@ -154,6 +154,7 @@ switch ($_POST['action']) {
             } 
           } else {
             $status = "<span >{$preclear[2]}</span>";
+            if (tmux_is_session("preclear_disk_{$disk_name}")) $status = "$status<a class='exec' onclick='openPreclear(\"{$disk_name}\");' title='Preview'><i class='glyphicon glyphicon-eye-open'></i></a>";
             $status = "{$status}<a class='exec' style='color:#CC0000;font-weight:bold;' onclick='clear_preclear(\"{$disk_name}\");' title='Clear stats'> <i class='glyphicon glyphicon-remove hdd'></i></a>";
           } 
         }
@@ -198,6 +199,7 @@ switch ($_POST['action']) {
     break;
   case 'clear_preclear':
     $device = urldecode($_POST['device']);
+    tmux_kill_window("preclear_disk_{$device}");
     @unlink("/tmp/preclear_stat_{$device}");
     echo "<script>parent.location=parent.location;</script>";
     break;
