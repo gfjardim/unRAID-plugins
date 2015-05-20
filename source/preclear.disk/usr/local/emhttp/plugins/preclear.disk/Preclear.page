@@ -4,6 +4,8 @@ Icon="preclear.disk.png"
 ---
 <?
 $plugin = "preclear.disk";
+$script_file = "/boot/config/plugins/preclear.disk/preclear_disk.sh";
+$script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>/dev/null|cut -d: -f2")) : FALSE;
 ?>
 <link type="text/css" rel="stylesheet" href="/webGui/styles/jquery-ui.min.css">
 <link type="text/css" rel="stylesheet" href="/webGui/styles/jquery.switchButton.css">
@@ -36,6 +38,8 @@ $plugin = "preclear.disk";
 <script type="text/javascript">
   var URL = '/plugins/<?=$plugin;?>/Preclear.php';
   var display = <?=json_encode($display);?>;
+  <?echo ($script_version) ? "$('.tabs').append('<span id=\"progress\" class=\"status\">Script: <span class=\"green\">Present, version $script_version</span></span>');" : "$('.tabs').append('<span id=\"progress\" class=\"status\">Script: <span class=\"red\">Not present</span></span>');";
+  ?>
   function get_content() {
    $.post(URL,{action:"get_content",display:display},function(data){$('#unassigned_devices_list').html(data);}).always(function(){timers.preclear=setTimeout('get_content()',<?=$display['refresh'];?>);});
   }
@@ -163,7 +167,7 @@ $plugin = "preclear.disk";
       <select name="-c"><?for ($i=1; $i <= 20; $i++){echo "<option value='$i'>$i</option>";}?></select>
     </dd>
     </div>
-    <div class='test_options'>
+    <div style="display:none;">
     <dt>Mail: </dt>
     <dd>
       <select name="-M" ><option value="0">Never</option><option value="1">On preclear's end</option><option value="2">On every cicle's end</option><option value="3">On every cicle's and step's end</option><option value="4">On every 25% of progress</option></select>
@@ -183,7 +187,7 @@ $plugin = "preclear.disk";
       <input type="checkbox" name="-W" class="switch" >
     </dd>
     </div>
-    <div class='test_options'>
+    <div style="display:none;">
     <dt>Fast post-read verify: </dt>
     <dd>
       <input type="checkbox" name="-f" class="switch" >

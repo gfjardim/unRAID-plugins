@@ -1,6 +1,8 @@
 <?
 $plugin = "preclear.disk";
 require_once ("webGui/include/Helpers.php");
+$script_file = "/boot/config/plugins/preclear.disk/preclear_disk.sh";
+$script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>/dev/null|cut -d: -f2")) : FALSE;
 
 function tmux_is_session($name) {
   exec('/usr/bin/tmux ls 2>/dev/null|cut -d: -f1', $screens);
@@ -73,11 +75,9 @@ function get_unasigned_disks() {
   }
   return $disks;
 }
-
 function is_mounted($dev) {
   return (shell_exec("mount 2>&1|grep -c '${dev} '") == 0) ? FALSE : TRUE;
 }
-
 function get_all_disks_info($bus="all") {
   // $d1 = time();
   $disks = get_unasigned_disks();
@@ -92,7 +92,6 @@ function get_all_disks_info($bus="all") {
   usort($disks, create_function('$a, $b','$key="device";if ($a[$key] == $b[$key]) return 0; return ($a[$key] < $b[$key]) ? -1 : 1;'));
   return $disks;
 }
-
 function get_disk_info($device, $reload=FALSE){
   $disk = array();
   $attrs = parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device ) 2>/dev/null"));
@@ -102,12 +101,10 @@ function get_disk_info($device, $reload=FALSE){
     $disk['device']       = $device;
     return $disk;
 }
-
 function is_disk_running($dev) {
   $state = trim(shell_exec("hdparm -C $dev 2>/dev/null| grep -c standby"));
   return ($state == 0) ? TRUE : FALSE;
 }
-
 function get_temp($dev) {
   if (is_disk_running($dev)) {
     $temp = trim(shell_exec("smartctl -A -d sat,12 $dev 2>/dev/null| grep -m 1 -i Temperature_Celsius | awk '{print $10}'"));
@@ -159,7 +156,7 @@ switch ($_POST['action']) {
           } 
         }
         echo "<td><span>".my_scale($disk['size'], $unit)." $unit</span></td>";
-        echo "<td>$status</td>";
+        echo (is_file($script_file)) ? "<td>$status</td>" : "<td>Script not present</td>";
         echo "</tr>";
         $odd = ($odd == "odd") ? "even" : "odd";
       }
@@ -171,25 +168,36 @@ switch ($_POST['action']) {
   case 'start_preclear':
     $device = urldecode($_POST['device']);
     $op       = (isset($_POST['op']) && $_POST['op'] != "0") ? " ".urldecode($_POST['op']) : "";
-    $mail     = (isset($_POST['-M']) && $_POST['-M'] > 0) ? " -M ".urldecode($_POST['-M']) : "";
+    $mail     = "";//(isset($_POST['-M']) && $_POST['-M'] > 0) ? " -M ".urldecode($_POST['-M']) : "";
     $passes   = isset($_POST['-c']) ? " -c ".urldecode($_POST['-c']) : "";
     $read_sz  = (isset($_POST['-r']) && $_POST['-r'] != 0) ? " -r ".urldecode($_POST['-r']) : "";
     $write_sz = (isset($_POST['-w']) && $_POST['-w'] != 0) ? " -w ".urldecode($_POST['-w']) : "";
     $pre_read = (isset($_POST['-W']) && $_POST['-W'] == "on") ? " -W" : "";
-    $fast_read = (isset($_POST['-f']) && $_POST['-f'] == "on") ? " -f" : "";
+    $fast_read = "";//(isset($_POST['-f']) && $_POST['-f'] == "on") ? " -f" : "";
+    $wait_confirm = (! $op || $op == " -z" || $op == " -V") ? TRUE : FALSE;
     if (! $op ){
-      $cmd = "/usr/local/sbin/preclear_disk.sh -J{$op}{$mail}{$passes}{$read_sz}{$write_sz}{$pre_read}{$fast_read} /dev/$device";
+      $cmd = "$script_file {$op}{$mail}{$passes}{$read_sz}{$write_sz}{$pre_read}{$fast_read} /dev/$device";
       @file_put_contents("/tmp/preclear_stat_{$device}","{$device}|NN|Starting...");
     } else if ($op == " -V"){
-      $cmd = "/usr/local/sbin/preclear_disk.sh -J{$op}{$fast_read} /dev/$device";
+      $cmd = "$script_file {$op}{$fast_read} /dev/$device";
       @file_put_contents("/tmp/preclear_stat_{$device}","{$device}|NN|Starting...");
     } else {
-      $cmd = "/usr/local/sbin/preclear_disk.sh -J{$op} /dev/$device";
+      $cmd = "$script_file {$op} /dev/$device";
     }
     echo $cmd;
     tmux_kill_window("preclear_disk_{$device}");
     tmux_new_session("preclear_disk_{$device}");
     tmux_send_command("preclear_disk_{$device}", $cmd);
+    if ($wait_confirm) {
+      while ( true ) {
+        if ( strpos(tmux_get_session("preclear_disk_{$device}"), "Answer Yes to continue") ) {
+          tmux_send_command("preclear_disk_{$device}", "Yes");
+          break;
+        } else {
+          sleep(0.5);
+        }
+      }
+    }
     break;
   case 'stop_preclear':
     $device = urldecode($_POST['device']);

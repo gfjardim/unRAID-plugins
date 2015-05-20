@@ -4,15 +4,19 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.05.18b">
+<!ENTITY version   "2015.05.20">
 <!ENTITY launch    "Settings/Preclear">
-<!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
+<!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
+<!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
 ]>
 
 <PLUGIN name="&name;" author="&author;" launch="&launch;" version="&version;" pluginURL="&pluginURL;">
 
 <CHANGES>
 ##&name;
+
+###2015.05.20
+- Remove preclear script from package. It must be manually added to /boot/config/plugins/preclear.disk/ directory.
 
 ###2015.05.18b
 - Fix: empty cacheId variable crashing the code
@@ -37,7 +41,17 @@
 The 'source' file.
 -->
 <FILE Name="/boot/config/plugins/&name;/&name;-&version;.txz" Run="upgradepkg --install-new">
-<URL>https://raw.github.com/gfjardim/unRAID-plugins/master/archive/&name;-&version;.txz</URL>
+<URL>&gitURL;/archive/&name;-&version;.txz</URL>
+</FILE>
+
+<!--
+The 'readvz' script.
+-->
+<FILE Name="/boot/config/plugins/&name;/readvz">
+<URL>&gitURL;/source/packages/readvz</URL>
+</FILE>
+<FILE Name="/usr/local/sbin/readvz" Mode="755">
+<LOCAL>/boot/config/plugins/&name;/readvz</LOCAL>
 </FILE>
 
 <!--
@@ -60,7 +74,7 @@ The 'post-install' script.
 <FILE Run="/bin/bash">
 <INLINE>
 # fix permissions of executable files
-chmod +x /usr/local/sbin/preclear_disk.sh /usr/local/sbin/readvz
+chmod +x /usr/local/sbin/readvz
 
 # Update file access mode
 chmod 644 $(awk '/\.(htm|php|js|page|css|png|plg|gif|cfg|md)$/ {print "/"$0}' /var/log/packages/&name;-&version;)
@@ -86,8 +100,8 @@ The 'remove' script.
 <INLINE>
 
 # Remove plugin related files
-# rm -rf /boot/config/plugins/&name;
-rm -f /tmp/plugins/&name;.plg
+rm -rf /boot/config/plugins/&name;
+rm -f /tmp/plugins/&name;.plg /usr/local/sbin/readvz
 
 # Uninstall the 'source' package
 removepkg &name;-&version;
