@@ -175,7 +175,8 @@ $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>
         <select name="-c"><?for ($i=1; $i <= 20; $i++){echo "<option value='$i'>$i</option>";}?></select>
       </dd>
     </div>
-    <div <?echo (preg_match("#\d+[a-z]$#", $script_version)) ? "class='test_options'" : "style='display:none;'";?> >
+    <?if (preg_match("#\d+c$#", $script_version)):?>
+    <div class='test_options'>
       <dt>Mail: </dt>
       <dd>
         <select name="-M" onchange="toggleMail(this);"><option value="0">Never</option><option value="1">On preclear's end</option><option value="2">On every cicle's end</option><option value="3">On every cicle's and step's end</option><option value="4">On every 25% of progress</option></select>
@@ -195,6 +196,7 @@ $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>
         </dd>
       </div>
     </div>
+    <?endif;?>
     <div class='clear_options'>
       <dt>Read size: </dt>
       <dd>
@@ -209,12 +211,14 @@ $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>
         <input type="checkbox" name="-W" class="switch" >
       </dd>
     </div>
-    <div <?echo (preg_match("#\d+[a-z]$#", $script_version)) ? "class='test_options'" : "style='display:none;'";?> >
+    <?if (preg_match("#\d+[bc]$#", $script_version)):?>
+    <div class='test_options'>
       <dt>Fast post-read verify: </dt>
       <dd>
         <input type="checkbox" name="-f" class="switch" >
       </dd>
     </div>
+    <?endif;?>
   </dl>
 </div>
 <div id="unassigned_devices_list">

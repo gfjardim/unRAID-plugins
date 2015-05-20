@@ -642,8 +642,7 @@ fi
 
 if [ "$fast_postread" == "y" ]
 then
-  no_readvz=`which readvz 2>&1 | awk '{print $2}'`
-  if [ "$no_readvz" = "no" ]
+  if [ ! -e "/boot/readvz" ]
   then
     echo "error: \"readvz\" program does not exist." >&2
     usage >&2
@@ -1213,7 +1212,7 @@ read_entire_disk( ) {
         fi
       fi
     else
-      read_speed=`readvz if=$1 bs=$units count=$bcount skip=$skip memcnt=50 2>>/tmp/postread_errors$disk_basename | awk '{ print $8,$9 }'`
+      read_speed=`/boot/readvz if=$1 bs=$units count=$bcount skip=$skip memcnt=50 2>>/tmp/postread_errors$disk_basename | awk '{ print $8,$9 }'`
       echo $read_speed >/tmp/read_speed$disk_basename
       if [ -s /tmp/postread_errors$disk_basename ]
       then
