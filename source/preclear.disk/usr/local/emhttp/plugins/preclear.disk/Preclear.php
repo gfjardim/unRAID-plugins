@@ -143,7 +143,7 @@ switch ($_POST['action']) {
             if (file_exists( "/proc/".trim($preclear[3]))) {
               $status = "<span style='color:#478406;'>{$preclear[2]}</span>";
               if (tmux_is_session("preclear_disk_{$disk_name}")) $status = "$status<a class='exec' onclick='openPreclear(\"{$disk_name}\");' title='Preview'><i class='glyphicon glyphicon-eye-open'></i></a>";
-              $status = "{$status}<a title='Stop Preclear' style='color:#CC0000;' class='exec rm_preclear' onclick='stop_preclear(\"{$serial}\",\"{$disk_name}\");'> <i class='glyphicon glyphicon-remove hdd'></i></a>";
+              $status = "{$status}<a class='exec' title='Stop Preclear' style='color:#CC0000;' onclick='stop_preclear(\"{$serial}\",\"{$disk_name}\");'> <i class='glyphicon glyphicon-remove hdd'></i></a>";
             } else {
               $status = "<span >{$preclear[2]}</span>";
               if (tmux_is_session("preclear_disk_{$disk_name}")) $status = "$status<a class='exec' onclick='openPreclear(\"{$disk_name}\");' title='Preview'><i class='glyphicon glyphicon-eye-open'></i></a>";
@@ -152,7 +152,7 @@ switch ($_POST['action']) {
           } else {
             $status = "<span >{$preclear[2]}</span>";
             if (tmux_is_session("preclear_disk_{$disk_name}")) $status = "$status<a class='exec' onclick='openPreclear(\"{$disk_name}\");' title='Preview'><i class='glyphicon glyphicon-eye-open'></i></a>";
-            $status = "{$status}<a class='exec' style='color:#CC0000;font-weight:bold;' onclick='clear_preclear(\"{$disk_name}\");' title='Clear stats'> <i class='glyphicon glyphicon-remove hdd'></i></a>";
+            $status = "{$status}<a class='exec' style='color:#CC0000;font-weight:bold;'onclick='stop_preclear(\"{$serial}\",\"{$disk_name}\");' title='Clear stats'> <i class='glyphicon glyphicon-remove hdd'></i></a>";
           } 
         }
         echo "<td><span>".my_scale($disk['size'], $unit)." $unit</span></td>";
@@ -168,15 +168,16 @@ switch ($_POST['action']) {
   case 'start_preclear':
     $device = urldecode($_POST['device']);
     $op       = (isset($_POST['op']) && $_POST['op'] != "0") ? " ".urldecode($_POST['op']) : "";
-    $mail     = "";//(isset($_POST['-M']) && $_POST['-M'] > 0) ? " -M ".urldecode($_POST['-M']) : "";
+    $mail     = (isset($_POST['-M']) && $_POST['-M'] > 0) ? " -M ".urldecode($_POST['-M']) : "";
+    $notify   = (isset($_POST['-o']) && $_POST['-M'] > 0) ? " -o ".urldecode($_POST['-o']) : "";
     $passes   = isset($_POST['-c']) ? " -c ".urldecode($_POST['-c']) : "";
     $read_sz  = (isset($_POST['-r']) && $_POST['-r'] != 0) ? " -r ".urldecode($_POST['-r']) : "";
     $write_sz = (isset($_POST['-w']) && $_POST['-w'] != 0) ? " -w ".urldecode($_POST['-w']) : "";
     $pre_read = (isset($_POST['-W']) && $_POST['-W'] == "on") ? " -W" : "";
-    $fast_read = "";//(isset($_POST['-f']) && $_POST['-f'] == "on") ? " -f" : "";
+    $fast_read = (isset($_POST['-f']) && $_POST['-f'] == "on") ? " -f" : "";
     $wait_confirm = (! $op || $op == " -z" || $op == " -V") ? TRUE : FALSE;
     if (! $op ){
-      $cmd = "$script_file {$op}{$mail}{$passes}{$read_sz}{$write_sz}{$pre_read}{$fast_read} /dev/$device";
+      $cmd = "$script_file {$op}{$mail}{$notify}{$passes}{$read_sz}{$write_sz}{$pre_read}{$fast_read} /dev/$device";
       @file_put_contents("/tmp/preclear_stat_{$device}","{$device}|NN|Starting...");
     } else if ($op == " -V"){
       $cmd = "$script_file {$op}{$fast_read} /dev/$device";
@@ -202,6 +203,7 @@ switch ($_POST['action']) {
   case 'stop_preclear':
     $device = urldecode($_POST['device']);
     tmux_kill_window("preclear_disk_{$device}");
+    @unlink("/tmp/preclear_stat_{$device}");
     reload_partition($device);
     echo "<script>parent.location=parent.location;</script>";
     break;

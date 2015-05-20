@@ -76,6 +76,7 @@ $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>
           opts["-w"] = getVal(this, "-w");
           opts["-W"] = getVal(this, "-W");
           opts["-f"] = getVal(this, "-f");
+          opts["-o"] = getVal(this, "-o");
           $.post(URL,opts,function(data){alert(data);openPreclear(device)}).always(function(data){location.reload();});
           $( this ).dialog( "close" );
         },
@@ -145,6 +146,13 @@ $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>
       $(el).parent().siblings('.test_options').css('display','block');
     }
   }
+  function toggleMail(el) {
+    if(el.selectedIndex > 0 ){
+      $(el).parent().siblings('.mail_options').css('display','block');
+    } else {
+      $(el).parent().siblings('.mail_options').css('display','none');
+    }
+  }
 </script>
 <div id="dialog-stop" style="display:none;" title=""></div>
 <div id="dialog-start" style="display:none;" title=""></div>
@@ -162,36 +170,50 @@ $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>
       </select>
     </dd>
     <div class='clear_options'>
-    <dt>Cycles: </dt>
-    <dd>
-      <select name="-c"><?for ($i=1; $i <= 20; $i++){echo "<option value='$i'>$i</option>";}?></select>
-    </dd>
+      <dt>Cycles: </dt>
+      <dd>
+        <select name="-c"><?for ($i=1; $i <= 20; $i++){echo "<option value='$i'>$i</option>";}?></select>
+      </dd>
     </div>
-    <div style="display:none;">
-    <dt>Mail: </dt>
-    <dd>
-      <select name="-M" ><option value="0">Never</option><option value="1">On preclear's end</option><option value="2">On every cicle's end</option><option value="3">On every cicle's and step's end</option><option value="4">On every 25% of progress</option></select>
-    </dd>
+    <div <?echo (preg_match("#\d+[a-z]$#", $script_version)) ? "class='test_options'" : "style='display:none;'";?> >
+      <dt>Mail: </dt>
+      <dd>
+        <select name="-M" onchange="toggleMail(this);"><option value="0">Never</option><option value="1">On preclear's end</option><option value="2">On every cicle's end</option><option value="3">On every cicle's and step's end</option><option value="4">On every 25% of progress</option></select>
+      </dd>
+      <div class='mail_options' style='display:none;'>
+        <dt>Notifications</dt>
+        <dd>
+          <select name="-o">
+            <option value="1">Notify using browser-popups only</option>
+            <option value="2">Notify using e-mail only</option>
+            <option value="3">Notify using browser-popups and e-mail</option>
+            <option value="4">Notify using agents only</option>
+            <option value="5">Notify using browser-popups and agents</option>
+            <option value="6">Notify using e-mail and agents</option>
+            <option value="7">Notify using browser popups, e-mail and agents</option>
+          </select>
+        </dd>
+      </div>
     </div>
     <div class='clear_options'>
-    <dt>Read size: </dt>
-    <dd>
-      <select name="-r" ><option value="0">Default</option><?for ($i=1; $i <= 10; $i++){echo "<option value='{$i}M'>{$i}M</option>";}?></select>
-    </dd>
-    <dt>Write size: </dt>
-    <dd>
-      <select name="-w" ><option value="0">Default</option><?for ($i=1; $i <= 10; $i++){echo "<option value='{$i}M'>{$i}M</option>";}?></select>
-    </dd>
-    <dt>Skip Pre-read: </dt>
-    <dd>
-      <input type="checkbox" name="-W" class="switch" >
-    </dd>
+      <dt>Read size: </dt>
+      <dd>
+        <select name="-r" ><option value="0">Default</option><?for ($i=1; $i <= 10; $i++){echo "<option value='{$i}M'>{$i}M</option>";}?></select>
+      </dd>
+      <dt>Write size: </dt>
+      <dd>
+        <select name="-w" ><option value="0">Default</option><?for ($i=1; $i <= 10; $i++){echo "<option value='{$i}M'>{$i}M</option>";}?></select>
+      </dd>
+      <dt>Skip Pre-read: </dt>
+      <dd>
+        <input type="checkbox" name="-W" class="switch" >
+      </dd>
     </div>
-    <div style="display:none;">
-    <dt>Fast post-read verify: </dt>
-    <dd>
-      <input type="checkbox" name="-f" class="switch" >
-    </dd>
+    <div <?echo (preg_match("#\d+[a-z]$#", $script_version)) ? "class='test_options'" : "style='display:none;'";?> >
+      <dt>Fast post-read verify: </dt>
+      <dd>
+        <input type="checkbox" name="-f" class="switch" >
+      </dd>
     </div>
   </dl>
 </div>
