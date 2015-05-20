@@ -10,7 +10,7 @@ function tmux_is_session($name) {
 }
 function tmux_new_session($name) {
   if (! tmux_is_session($name)) {
-    exec("/usr/bin/tmux new-session -d -x 140 -y 50 -s '${name}' 2>/dev/null");
+    exec("/usr/bin/tmux new-session -d -x 140 -y 200 -s '${name}' 2>/dev/null");
   }
 }
 function tmux_get_session($name) {
@@ -180,7 +180,7 @@ switch ($_POST['action']) {
       $cmd = "$script_file {$op}{$mail}{$notify}{$passes}{$read_sz}{$write_sz}{$pre_read}{$fast_read} /dev/$device";
       @file_put_contents("/tmp/preclear_stat_{$device}","{$device}|NN|Starting...");
     } else if ($op == " -V"){
-      $cmd = "$script_file {$op}{$fast_read} /dev/$device";
+      $cmd = "$script_file {$op}{$fast_read}{$mail}{$notify} /dev/$device";
       @file_put_contents("/tmp/preclear_stat_{$device}","{$device}|NN|Starting...");
     } else {
       $cmd = "$script_file {$op} /dev/$device";
@@ -190,12 +190,13 @@ switch ($_POST['action']) {
     tmux_new_session("preclear_disk_{$device}");
     tmux_send_command("preclear_disk_{$device}", $cmd);
     if ($wait_confirm) {
-      while ( true ) {
+      foreach(range(0, 30) as $x) {
         if ( strpos(tmux_get_session("preclear_disk_{$device}"), "Answer Yes to continue") ) {
+          sleep(1);
           tmux_send_command("preclear_disk_{$device}", "Yes");
           break;
         } else {
-          sleep(0.5);
+          sleep(1);
         }
       }
     }

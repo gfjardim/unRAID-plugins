@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.05.20a">
+<!ENTITY version   "2015.05.20b">
 <!ENTITY launch    "Settings/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -15,10 +15,13 @@
 <CHANGES>
 ##&name;
 
+###2015.05.20b
+- Minor bugfixes
+
 ###2015.05.20a
 - Add support to bjp999 version
 
-###2015.05.20a
+###2015.05.20
 - Remove preclear script from package. It must be manually added to /boot/config/plugins/preclear.disk/ directory.
 
 ###2015.05.18b

@@ -182,7 +182,7 @@ $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>
         <select name="-M" onchange="toggleMail(this);"><option value="0">Never</option><option value="1">On preclear's end</option><option value="2">On every cicle's end</option><option value="3">On every cicle's and step's end</option><option value="4">On every 25% of progress</option></select>
       </dd>
       <div class='mail_options' style='display:none;'>
-        <dt>Notifications</dt>
+        <dt>Notifications:</dt>
         <dd>
           <select name="-o">
             <option value="1">Notify using browser-popups only</option>

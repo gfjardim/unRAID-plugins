@@ -64,7 +64,7 @@
 # Version 1.14  - Added text describing how -A and -a options are not used or needed on disks > 2.2TB.
 #                 Added additional logic to detect assigned drives in the newest of 5.0 releases.
 # Version 1.15  - a) Added PID to preclear_stat_sdX files and support for notifications - gfjardim
-#                 b) Add notification channel choice
+#                 b) Add notification channel choice (-o option)
 ver="1.15b"
 
 progname=$0
@@ -173,7 +173,6 @@ To list device names of drives not assigned to the unRAID array:
                 in /tmp until you reboot, even if "-R" is specified)
        -S     = name the saved output reports by their linux device instead 
                 of by the serial number of the disk.
-       -J     = don't prompt for confirmation (bjp999)
 
 Notifications (unRAID v6 only). Must be combined with -M option:
 
@@ -357,13 +356,12 @@ post_read_err="N"    #bjp999 4/9/11
 save_report_by_dev="no"  # default is to save by model/serial num
 max_mbr_size="0xFFFFFFFF" # max size of MBR partition 
 over_mbr_size="n"
-noprompt="n" #bjp999 7-17-11
 notify_channels="1" # gfjardim - default notify to browser popups
 
 sb=1
 default="(partition starting on sector 63)"
 
-while getopts ":tnc:WM:m:hvDNw:r:b:AalC:VRDd:zsSJo:" opt; do
+while getopts ":tnc:WM:m:hvDNw:r:b:AalC:VRDd:zsSo:" opt; do
   case $opt in
   n ) pre_read_flag=n;post_read_flag=n ;;
   N ) skip_postread_verify="yes" ;;
@@ -396,7 +394,6 @@ while getopts ":tnc:WM:m:hvDNw:r:b:AalC:VRDd:zsSJo:" opt; do
       ;;
   h ) usage >&2 ;;
   s ) short_test=1 ;; # for debugging
-  J ) noprompt="y" ;;      # bjp999 3-25-14 bypass all prompts - AUTOMATED ONLY
   o ) notify_channels=$OPTARG ;; # gfjardim
   \?) usage >&2 ;;
   esac
@@ -1521,14 +1518,7 @@ then
     echo "$sm_out"$
     echo "${bold}Do you wish to continue?${norm}"
     echo -n "(Answer ${ul}Yes${noul} to continue. Capital 'Y', lower case 'es'): "
-
-    if [ "$noprompt" = "y" ]      #bjp999 7-17-11
-    then
-       ans="Yes"                  #bjp999 7-17-11
-    else                          #bjp999 7-17-11
-       read ans
-    fi                            #bjp999 7-17-11
-
+    read ans
     if [ "$ans" != "Yes" ]
     then
        exit 1
@@ -1714,14 +1704,7 @@ if [ "$zero_mbr_only" = "y" ]
 then
   echo "Are you absolutely sure you want to zero the MBR of this drive?"
   echo -n "(Answer ${ul}Yes${noul} to continue. Capital 'Y', lower case 'es'): "
-
-  if [ "$noprompt" = "y" ]      #bjp999 7-17-11
-  then
-     ans="Yes"                  #bjp999 7-17-11
-  else                          #bjp999 7-17-11
-     read ans
-  fi                            #bjp999 7-17-11
-
+  read ans
   if [ "$ans" = "Yes" ]
   then
     echo "zeroing MBR only"
@@ -1754,12 +1737,7 @@ else
   echo "Are you absolutely sure you want to clear this drive?"
 fi
 echo -n "(Answer ${ul}Yes${noul} to continue. Capital 'Y', lower case 'es'): "
-if [ "$noprompt" = "y" ]      #bjp999 7-17-11
-then
-   ans="Yes"                  #bjp999 7-17-11
-else                          #bjp999 7-17-11
-   read ans
-fi                            #bjp999 7-17-11
+read ans
 if [ "$ans" != "Yes" ]
 then
     if [ "$verify_only" = "y" ]
