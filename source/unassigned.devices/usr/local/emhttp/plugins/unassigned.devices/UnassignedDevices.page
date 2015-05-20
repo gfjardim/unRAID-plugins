@@ -65,11 +65,6 @@ $(function() {
   $('#tab'+tab_usbdisks).bind({click:function() {pin_tab(tab_usbdisks); detect_usb_disk_change(tab_usbdisks);}});
   $(function(){usb_disks(tab_usbdisks);detect_usb_disk_change(tab_usbdisks);});
 
-  $.fn.textWidth = function(text, font) {
-    if (!$.fn.textWidth.fakeEl) $.fn.textWidth.fakeEl = $('<span>').hide().appendTo(document.body);
-    $.fn.textWidth.fakeEl.text(text || this.val() || this.text()).css('font', font || this.css('font'));
-    return $.fn.textWidth.fakeEl.width();
-  };
   function openWindow_fsck(cmd,title,height,width) {
     var run = cmd;
     var top = (screen.height-height)/2;
@@ -149,6 +144,14 @@ $(function() {
     $(this).hide();
     $(this).siblings('span').show();
     $(this).siblings('span').click(showInput);
+  }
+  function openPreclear(device) {
+    var width=900;
+    var height=600;
+    var top = (screen.height-height)/2;
+    var left = (screen.width-width)/2;
+    var options = 'resizeable=yes,scrollbars=yes,height=600,width=900,top='+top+',left='+left;
+    window.open('/plugins/preclear.disk/Preclear.php?action=show_preclear&device='+device, 'Preclear', options);
   }
 </script>
 <form id="formUsbMount" method="POST" action="/update.php" target="progressFrame">

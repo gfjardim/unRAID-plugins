@@ -8,7 +8,15 @@ if (isset($_POST['display'])) $display = $_POST['display'];
 function pid_is_running($pid) {
   return file_exists( "/proc/$pid" );
 }
-
+function is_tmux_executable() {
+  return is_file("/usr/bin/tmux") ? (is_executable("/usr/bin/tmux") ? TRUE : FALSE) : FALSE;
+}
+function tmux_is_session($name) {
+  if (is_tmux_executable()) {
+    exec('/usr/bin/tmux ls 2>/dev/null|cut -d: -f1', $screens);
+    return in_array($name, $screens);
+  } else {return false;}
+}
 function render_used_and_free($partition) {
   global $display;
   $o = "";
@@ -75,7 +83,7 @@ switch ($_POST['action']) {
         $p = (count($disk['partitions']) <= 1) ? render_partition($disk, $disk['partitions'][0]) : FALSE;
         echo "<tr class='$odd'>";
         printf( "<td><img src='/webGui/images/%s'> %s</td>", ( is_disk_running($disk['device']) ? "green-on.png":"green-blink.png" ), basename($disk['device']) );
-        echo "<td><span class='exec toggle-hdd' hdd='".basename($disk['device'])."'><i class='glyphicon glyphicon-hdd hdd'></i>".(($p === FALSE)?"<i class='glyphicon glyphicon-plus-sign glyphicon-append'></i>":"<span style='margin:4px;'></span>").$disk['serial']."<div id='preclear_".basename($disk['device'])."'></div></td>";
+        echo "<td><span class='exec toggle-hdd' hdd='".basename($disk['device'])."'><i class='glyphicon glyphicon-hdd hdd'></i>".(($p === FALSE)?"<i class='glyphicon glyphicon-plus-sign glyphicon-append'></i>":"<span style='margin:4px;'></span>").$disk['serial']."</span><div id='preclear_".basename($disk['device'])."'></div></td>";
         if (is_file("/tmp/preclear_stat_".basename($disk['device']))) {
           $preclear .= "get_preclear('".basename($disk["device"])."');";
         }
@@ -118,7 +126,7 @@ switch ($_POST['action']) {
     '.$preclear.'
     $(".automount").each(function(){var checked = $(this).is(":checked");$(this).switchButton({labels_placement: "right", checked:checked});});
     $(".automount").change(function(){$.post(URL,{action:"automount",serial:$(this).attr("serial"),status:$(this).is(":checked")},function(data){$(this).prop("checked",data.automount);},"json");});
-    
+
     $(".toggle_share").each(function(){var checked = $(this).is(":checked");$(this).switchButton({labels_placement: "right", checked:checked});});
     $(".toggle_share").change(function(){$.post(URL,{action:"toggle_share",info:$(this).attr("info"),status:$(this).is(":checked")},function(data){$(this).prop("checked",data.result);},"json");});
     $(".text").click(showInput);$(".input").blur(hideInput);
@@ -185,6 +193,7 @@ switch ($_POST['action']) {
     if (is_file("/tmp/preclear_stat_{$device}")) {
       $preclear = explode("|", file_get_contents("/tmp/preclear_stat_{$device}"));
       $status = (count($preclear) > 3) ? ( file_exists( "/proc/".trim($preclear[3])) ? "<span style='color:#478406;'>{$preclear[2]}</span>" : "<span style='color:#CC0000;'>{$preclear[2]} <span class='rm_preclear' onclick='rm_preclear(\"{$device}\");'> [clear]</span></span>" ) : $preclear[2]." <span class='rm_preclear' onclick='rm_preclear(\"{$device}\");'> [clear]</span>";
+      if (tmux_is_session("preclear_disk_{$device}") && is_file("plugins/preclear.disk/Preclear.php")) $status = "$status<a class='openPreclear exec' onclick='openPreclear(\"{$device}\");' title='Preview'><i class='glyphicon glyphicon-eye-open'></i></a>";
       echo json_encode(array( 'preclear' => "<i class='glyphicon glyphicon-dashboard hdd'></i><span style='margin:4px;'></span>".$status ));
     } else {
       echo json_encode(array( 'preclear' => " "));

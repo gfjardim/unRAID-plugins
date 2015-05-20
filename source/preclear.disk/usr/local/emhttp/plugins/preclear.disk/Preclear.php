@@ -4,6 +4,9 @@ require_once ("webGui/include/Helpers.php");
 $script_file = "/boot/config/plugins/preclear.disk/preclear_disk.sh";
 $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>/dev/null|cut -d: -f2")) : FALSE;
 
+function is_tmux_executable() {
+  return is_file("/usr/bin/tmux") ? (is_executable("/usr/bin/tmux") ? TRUE : FALSE) : FALSE;
+}
 function tmux_is_session($name) {
   exec('/usr/bin/tmux ls 2>/dev/null|cut -d: -f1', $screens);
   return in_array($name, $screens);

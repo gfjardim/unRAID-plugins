@@ -306,13 +306,17 @@ list_device_names() {
 
 # gfjardim - add notification system capability without breaking legacy mail.
 send_mail() {
+  subject=$(echo ${1} | tr '"' "'" )
+  description=$(echo ${2} | tr '"' "'")
+  message=$(echo ${3} | tr '"' "'")
+  recipient=$(echo ${4} | tr '"' "'")
   if [ -f "/usr/local/sbin/notify" ]; then
-    /usr/local/sbin/notify -e "Preclear ${model} ${serial}" -s "${1}" -d "${2}" -m "${3}" -i "normal ${notify_channels}"
+    /usr/local/sbin/notify -e "Preclear ${model} ${serial}" -s "${subject}" -d "${description}" -m """${message}""" -i "normal ${notify_channels}" > /tmp/a 2>&1
+    echo /usr/local/sbin/notify -e "Preclear ${model} ${serial}" -s "${subject}" -d "${description}" -m "${message}" -i "normal ${notify_channels}" > /tmp/b
   else
-    echo -e "${3}" | mail -s "${1}" "${4}"
+    echo -e "${message}" | mail -s "${subject}" "${recipient}"
   fi
 }
-
 
 # Keep track of the elapsed time of the preread/clear/postread process
 timer()
