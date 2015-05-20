@@ -640,6 +640,17 @@ then
    rm "/tmp/postread_errors$disk_basename"
 fi
 
+if [ "$fast_postread" == "y" ]
+then
+  no_readvz=`which readvz 2>&1 | awk '{print $2}'`
+  if [ "$no_readvz" = "no" ]
+  then
+    echo "error: \"readvz\" program does not exist." >&2
+    usage >&2
+    exit 2
+  fi
+fi
+
 disk_temperature() {
         temp=`smartctl $device_type -A $theDisk | grep -i temperature | sed 1q | awk '{ print $10; }'`
 
@@ -1202,7 +1213,7 @@ read_entire_disk( ) {
         fi
       fi
     else
-      read_speed=`/usr/local/sbin/readvz if=$1 bs=$units count=$bcount skip=$skip memcnt=50 2>>/tmp/postread_errors$disk_basename | awk '{ print $8,$9 }'`
+      read_speed=`readvz if=$1 bs=$units count=$bcount skip=$skip memcnt=50 2>>/tmp/postread_errors$disk_basename | awk '{ print $8,$9 }'`
       echo $read_speed >/tmp/read_speed$disk_basename
       if [ -s /tmp/postread_errors$disk_basename ]
       then
