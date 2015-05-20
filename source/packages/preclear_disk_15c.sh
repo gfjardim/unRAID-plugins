@@ -311,8 +311,7 @@ send_mail() {
   message=$(echo ${3} | tr '"' "'")
   recipient=$(echo ${4} | tr '"' "'")
   if [ -f "/usr/local/sbin/notify" ]; then
-    /usr/local/sbin/notify -e "Preclear ${model} ${serial}" -s "${subject}" -d "${description}" -m """${message}""" -i "normal ${notify_channels}" > /tmp/a 2>&1
-    echo /usr/local/sbin/notify -e "Preclear ${model} ${serial}" -s "${subject}" -d "${description}" -m "${message}" -i "normal ${notify_channels}" > /tmp/b
+    /usr/local/sbin/notify -e "Preclear ${model} ${serial}" -s "${subject}" -d "${description}" -m """${message}""" -i "normal ${notify_channels}"
   else
     echo -e "${message}" | mail -s "${subject}" "${recipient}"
   fi
