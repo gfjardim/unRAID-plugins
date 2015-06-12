@@ -15,7 +15,7 @@
 ##&name;
 
 ###2015.06.11a
-- Fix: mounting/unmounting scripts hangng the webui
+- Fix: mounting/unmounting scripts hanging the webui
 
 ###2015.05.18
 - Fix: empty cacheId variable crashing the code
