@@ -6,7 +6,8 @@ $paths = array("smb_extra"       => "/boot/config/smb-extra.conf",
                "usb_mountpoint"  => "/mnt/disks",
                "log"             => "/var/log/{$plugin}.log",
                "config_file"     => "/boot/config/plugins/{$plugin}/{$plugin}.cfg",
-               "state"           => "/var/state/${plugin}.ini"
+               "state"           => "/var/state/${plugin}.ini",
+               "samba_mount"     => "/boot/config/plugins/${plugin}/samba_mount.cfg"
                );
 
 
@@ -152,7 +153,7 @@ function is_mounted($dev) {
 }
 
 function get_mount_params($fs, $dev) {
-  $discard = trim(shell_exec("cat /sys/block/".preg_replace("#\d+#i", "", basename($dev))."/queue/discard_max_bytes")) ? ",discard" : "";
+  $discard = trim(shell_exec("cat /sys/block/".preg_replace("#\d+#i", "", basename($dev))."/queue/discard_max_bytes 2>/dev/null")) ? ",discard" : "";
   switch ($fs) {
     case 'hfsplus':
       return "force,rw,users,async,umask=000";
@@ -168,13 +169,27 @@ function get_mount_params($fs, $dev) {
     case 'ext4':
       return "auto,async,nodev,nosuid{$discard}";
       break;
+    case 'cifs':
+      return "rw,nounix,iocharset=utf8,_netdev,file_mode=0777,dir_mode=0777,username=%s,password=%s";
+      break;
     default:
       return "auto,async,nodev,nosuid";
       break;
   }
 }
 
-function do_mount($dev, $dir, $fs) {
+function do_mount($info) {
+  if ($info['fstype'] == "cifs") {
+    return do_mount_samba($info);
+  } else {
+    return do_mount_local($info);
+  }
+}
+
+function do_mount_local($info) {
+  $dev = $info['device'];
+  $dir = $info['mountpoint'];
+  $fs  = $info['fstype'];
   if (! is_mounted($dev) || ! is_mounted($dir)) {
     if ($fs){
       @mkdir($dir,0777,TRUE);
@@ -285,6 +300,85 @@ function rm_smb_share($dir, $share_name) {
   } else {
     debug("Removal of share '${share_name}' failed."); return FALSE;
   }
+}
+
+#########################################################
+############        SAMBA FUNCTIONS         #############
+#########################################################
+
+function get_samba_config($source, $var) {
+  $config_file = $GLOBALS["paths"]["samba_mount"];
+  if (! is_file($config_file)) @mkdir(dirname($config_file),0666,TRUE);
+  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
+  return (isset($config[$source][$var])) ? $config[$sn][$var] : FALSE;
+}
+
+function set_samba_config($source, $var, $val) {
+  $config_file = $GLOBALS["paths"]["samba_mount"];
+  if (! is_file($config_file)) @mkdir(dirname($config_file),0666,TRUE);
+  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
+  $config[$source][$var] = $val;
+  save_ini_file($config_file, $config);
+  return (isset($config[$source][$var])) ? $config[$source][$var] : FALSE;
+}
+
+function get_samba_mounts() {
+  global $paths;
+  $config_file = $GLOBALS["paths"]["samba_mount"];
+  $samba_mounts = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
+  foreach ($samba_mounts as $device => $mount) {
+    $mount['device'] = $device;
+    $mount['target'] = trim(shell_exec("cat /proc/mounts 2>&1|grep '".str_replace(" ", '\\\040', $device)."'|awk '{print $2}'"));
+    $mount['fstype'] = "cifs";
+    $mount['size']   = intval(trim(shell_exec("df --output=size,source 2>/dev/null|grep -v 'Filesystem'|grep '${device}'|awk '{print $1}'")))*1024;
+    $mount['used']   = intval(trim(shell_exec("df --output=used,source 2>/dev/null|grep -v 'Filesystem'|grep '${device}'|awk '{print $1}'")))*1024;
+    $mount['avail']  = $mount['size'] - $mount['used'];
+    if (! $mount["mountpoint"]) {
+      $mount["mountpoint"] = $mount['target'] ? $mount['target'] : preg_replace("%\s+%", "_", "{$paths[usb_mountpoint]}/{$mount[ip]}_{$mount[share]}");
+    }
+    $o[] = $mount;
+  }
+  return $o;
+}
+
+function do_mount_samba($info) {
+  $dev = $info['device'];
+  $dir = $info['mountpoint'];
+  $fs  = $info['fstype'];
+  if (! is_mounted($dev) || ! is_mounted($dir)) {
+    @mkdir($dir,0777,TRUE);
+    $params = sprintf(get_mount_params($fs, $dev), ($info['user'] ? $info['user'] : "guest" ), $info['pass']);
+    $cmd = "mount -t $fs -o ".$params." '${dev}' '${dir}'";
+    debug("Mounting share with command: $cmd");
+    $o = shell_exec($cmd." 2>&1");
+    foreach (range(0,5) as $t) {
+      if (is_mounted($dev)) {
+        @chmod($dir, 0777);
+        debug("Successfully mounted '${dev}' on '${dir}'"); return TRUE;
+      } else { sleep(0.5);}
+    }
+    debug("Mount of ${dev} failed. Error message: $o"); return FALSE;
+  } else {
+    debug("Share '$dev' already mounted.");
+  }
+}
+
+function toggle_samba_automount($source, $status) {
+  $config_file = $GLOBALS["paths"]["samba_mount"];
+  if (! is_file($config_file)) @mkdir(dirname($config_file),0777,TRUE);
+  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
+  $config[$source]["automount"] = ($status == "true") ? "yes" : "no";
+  save_ini_file($config_file, $config);
+  return ($config[$source]["automount"] == "yes") ? TRUE : FALSE;
+}
+
+function remove_config_samba($source) {
+  $config_file = $GLOBALS["paths"]["samba_mount"];
+  if (! is_file($config_file)) @mkdir(dirname($config_file),0666,TRUE);
+  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
+  unset($config[$source]);
+  save_ini_file($config_file, $config);
+  return (isset($config[$source])) ? TRUE : FALSE;
 }
 
 #########################################################

@@ -37,7 +37,7 @@ $(function() {
   table.usb_disks thead tr>td{text-align:left;width:8%;padding-left:12px;}
   table.usb_disks {padding:0px;margin:-21px 0px 22px 0px;border-collapse:collapse;white-space:nowrap;}
   table.usb_disks tr>td{text-align:left;width:8%;padding-left:12px;padding-right:0;white-space:nowrap;}
-  table.usb_disks tr>td+td{min-width:400px;}
+
   table.usb_disks tr>td+td+td{min-width:0px;}
   table.usb_disks tr>td+td+td+td{text-align:center;padding-left:0;padding-right:12px;width:auto;min-width:0px;}
   table.usb_disks tr>td+td+td+td+td+td{text-align:right;padding-left:0;padding-right:12px;width:auto;}
@@ -48,6 +48,13 @@ $(function() {
   table.usb_absent tr>td{text-align:left;width:8%;padding-left:12px;padding-right:0;white-space:nowrap;}
   table.usb_absent tr>td+td{text-align:left;width:auto;}
   table.usb_absent tr>td+td+td+td{text-align:right;padding-left:0;padding-right:12px;width: 5em;}
+
+  table.samba_mounts thead tr>td{text-align:left;width:8%;padding-left:12px;}
+  table.samba_mounts tr>td{text-align:left;width:8%;padding-left:12px;padding-right:0;white-space:nowrap;}
+  table.samba_mounts tr>td+td{text-align:left;width:auto;}
+  table.samba_mounts tr>td+td+td+td+td+td+td+td{text-align:left;padding:0px 0px 0px 12px;width: 75px;}
+  table.samba_mounts tr>td+td+td+td+td+td+td+td+td{text-align:right;padding-left:0;padding-right:12px;}
+
 
   button[type=button].mount {margin:0px 14px 0 14px;}
   i.glyphicon{margin:0px 5px 0 5px;}
@@ -87,7 +94,7 @@ $(function() {
     el = $('#usb_devices_list');
     startWaitMe(el);
     $.post('/update.php',{'#command':cmd});
-    setTimeout('$("#usb_devices_list").waitMe("hide")',10000);
+    setTimeout('$("#usb_devices_list").waitMe("hide")',15000);
   }
   function pin_tab(n) {
     $.removeCookie('one',{path:'/'});
@@ -134,6 +141,34 @@ $(function() {
     $(".ui-dialog .ui-dialog-content").css('padding-top','15px').css('font-weight','bold');
     $(".ui-button-text").css('padding','0px 5px');
   }
+  function remove_samba_config(device){
+    var title = 'Removing SMB mount';
+    $( "#dialog-confirm" ).html("<dl><dt>Source</dt><dd>"+device+"</dd></dl>");
+    $( "#dialog-confirm" ).append( "<br><br><span style='color: #E80000;'>Are you sure?</span>" );
+    $( "#dialog-confirm" ).dialog({
+      title: title,
+      resizable: false,
+      width: 500,
+      modal: true,
+      show : {effect: 'fade' , duration: 250},
+      hide : {effect: 'fade' , duration: 250},
+      buttons: {
+        "Yes": function() {
+          $( this ).dialog( "close" );
+          $.post(URL,{action:"remove_samba_config",device:device},"json");
+          usb_disks(tab_usbdisks);
+        },
+        Cancel: function() {
+          $( this ).dialog( "close" );
+          $( this ).html("");
+        }
+      }
+    });
+    $(".ui-dialog .ui-dialog-titlebar").addClass('menu');
+    $(".ui-dialog .ui-dialog-title").css('text-align','center').css( 'width', "100%");
+    $(".ui-dialog .ui-dialog-content").css('padding-top','15px').css('font-weight','bold');
+    $(".ui-button-text").css('padding','0px 5px');
+  }
   function showInput(){
     $(this).off('click');
     $(this).siblings('input').each(function(){$(this).show();});
@@ -153,11 +188,87 @@ $(function() {
     var options = 'resizeable=yes,scrollbars=yes,height=600,width=900,top='+top+',left='+left;
     window.open('/plugins/preclear.disk/Preclear.php?action=show_preclear&device='+device, 'Preclear', options);
   }
+  function add_samba(){
+    var title = 'Add SAMBA share';
+    $( "#dialog-samba" ).html($("#add_samba-defaults").html());
+    $( "#dialog-samba" ).find(".switch").switchButton({labels_placement:"right",on_label:'YES',off_label:'NO'});
+    $( "#dialog-samba" ).find(".switch-button-background").css("margin-top", "6px");
+    $( "#dialog-samba" ).dialog({
+      title: title,
+      resizable: false,
+      width: 600,
+      modal: true,
+      show : {effect: 'fade' , duration: 250},
+      hide : {effect: 'fade' , duration: 250},
+      buttons: {
+        "Add": function() {
+          $( this ).dialog( "close" );
+          var opts = new Object();
+          opts["action"] = "add_samba_mount";
+          opts["IP"] = getVal("#dialog-samba","IP");
+          opts["USER"] = getVal("#dialog-samba","USER");
+          opts["PASS"] = getVal("#dialog-samba","PASS");
+          opts["SHARE"] = getVal("#dialog-samba","SHARE");
+          if (opts.SHARE && opts.IP) {
+            $.post(URL,opts).done(function(){usb_disks(tab_usbdisks);});
+          }
+        },
+        Cancel: function() {
+          $( this ).dialog( "close" );
+        }
+      }
+    });
+    $(".ui-dialog .ui-dialog-titlebar").addClass('menu');
+    $(".ui-dialog .ui-dialog-title").css('text-align','center').css( 'width', "100%");
+    $(".ui-dialog .ui-dialog-content").css('padding-top','15px').css('vertical-align','bottom');
+    $(".ui-button-text").css('padding','0px 5px');
+  }
+  function load_shares() {
+    var opts = new Object();
+    opts["action"] = "list_samba_shares";
+    opts["IP"] = getVal("#dialog-samba","IP");
+    opts["USER"] = getVal("#dialog-samba","USER");
+    opts["PASS"] = getVal("#dialog-samba","PASS");
+    if (! opts.IP.length) return false;
+    $.post(URL,opts).done(function(data){
+      if (data) {
+        var shares = data.split('\n');
+        if (shares.length) {
+          var add = "<dl><dt>Share:</dt><dd><select name='SHARE'>";
+          for(var i = 0;i < shares.length;i++){
+            if (shares[i].length) {
+              add += "<option value='"+shares[i]+"'>"+shares[i]+"</option>";
+            }
+          }
+          $("#dialog-samba").find(".samba_shares").html(add+"</select></dd></dl>");
+        }
+      }
+    });
+  }
+  function getVal(el, name) {
+    el = $(el).find("*[name="+name+"]");
+    return value = ( $(el).attr('type') == 'checkbox' ) ? ($(el).is(':checked') ? "on" : "off") : $(el).val();
+  }
 </script>
 <form id="formUsbMount" method="POST" action="/update.php" target="progressFrame">
   <input type="hidden" id="cmdUsbMount" name="#command" value="" />
 </form>
 <div id="dialog-confirm" style="display:none;" title="Dialog Title"></div>
+<div id="dialog-samba" style="display:none;" title=""></div>
+<div id="add_samba-defaults" style="display:none;">
+  <dl>
+    <dt>IP/Host:</dt>
+    <dd><input type="text" name="IP"></dd>
+    <dt>Username:</dt>
+    <dd><input type="text" name="USER"></dd>
+    <dt>Password:</dt>
+    <dd><input type="password" name="PASS"></dd>
+    <dt>&nbsp;</dt>
+    <dd><button type="button" onclick="load_shares();">Load Shares</button></dd>
+  </dl>
+    <span class="samba_shares"></span>
+  </dl>
+</div>
 <div id="usb_devices_list">
   <table class='usb_disks' id='usb_table'>
     <thead><tr><td>Device</td><td>Identification</td><td></td><td>Temp</td><td>FS</td><td>Size</td><td>Used</td><td>Free</td><td>Open files</td><td>Auto mount</td><td>Script</td></tr></thead>

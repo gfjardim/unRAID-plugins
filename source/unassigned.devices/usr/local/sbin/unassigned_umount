@@ -4,8 +4,36 @@ $plugin = "unassigned.devices";
 require_once("/usr/local/emhttp/plugins/${plugin}/include/lib.php");
 $PRESENT=array();
 
+if (!in_array("--bg", $argv)) {
+  exec(implode(" ", $argv)." --bg 1>/dev/null 2>&1 &");
+  exit(0);
+}
+
 $DEVNAME = (isset($_ENV['DEVNAME'])) ? $_ENV['DEVNAME'] : ( isset($argv[1]) ? $argv[1] : NULL );
 $DEVNAME = (file_exists($DEVNAME)) ? realpath($DEVNAME) : $DEVNAME;
+
+# Deal with SMB shares
+if (strpos($DEVNAME, "//") === 0 || $DEVNAME == "all") {
+  foreach (get_samba_mounts() as $info) {
+    $device = $info['device'];
+    if ( preg_match("#".$DEVNAME."#i", $device) || $DEVNAME == "all" ) {
+      if (! $info['automount'] && $DEVNAME == "all" ) {
+        debug("Disk with serial '${info[serial]}' auto mount is disabled, aborting.");
+        continue;
+      }
+      debug("\nDrive found with the following attributes: ".(implode(', ', array_map(function ($v, $k) { return "$k='$v'"; }, $info, array_keys($info)))));
+      if ( is_mounted($info['device']) ) {
+        execute_script($info, "REMOVE");
+        debug("Unmounting share ${info[label]} ...");
+        if ( do_unmount($info['device'], $info['mountpoint']) ) {
+          debug("Share '{$info[device]}' removed successfully.");
+        }
+      }
+    }
+  }
+}
+
+# Deal with local disks
 foreach(get_unasigned_disks() as $disk) {
   $device = $disk['device'];
   $PRESENT[] = $device;

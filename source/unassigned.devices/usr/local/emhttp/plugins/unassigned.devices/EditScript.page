@@ -4,10 +4,22 @@ Title="Edit Script"
 $plugin = "unassigned.devices";
 require_once("/usr/local/emhttp/plugins/${plugin}/include/lib.php");
 
-$serial = $_GET['s'];
-$partition = $_GET['p'];
-$file = get_config($serial,"command.{$partition}");
-if (! $file ) $file = "/boot/config/plugins/${plugin}/".( preg_replace("%\s+%", "_", urldecode($_GET['l'])) ).".sh";
+function safe_filename($string) {
+  $string = preg_replace('~[^0-9a-z -_]~i', '', $string);
+  return preg_replace('~[ ]~i', '_', $string);
+}
+
+if (isset($_GET['s'])) {
+  $serial = $_GET['s'];
+  $partition = $_GET['p'];
+  $file = get_config($serial,"command.{$partition}");
+  if (! $file ) $file = "/boot/config/plugins/${plugin}/".( preg_replace("%\s+%", "_", urldecode($_GET['l'])) ).".sh";
+} else if (isset($_GET['d'])) {
+  $device = $_GET['d'];
+  $file = get_samba_config($device,"command");
+  echo $device;
+  if (! $file ) $file = "/boot/config/plugins/${plugin}/".( preg_replace("%\s+%", "_", urldecode($_GET['l'])) ).".sh";
+}
 
 $text = @file_get_contents($file);
 $default_text = <<<EOT
@@ -61,7 +73,6 @@ Script content:
 
 : <textarea spellcheck="false" cols="80" rows="22" name="text" style="font-family:bitstream;width:66%"><?=$text;?></textarea>
 
-
 > Click the **Apply** button to commit the current edits.  Click **Reset** to
 > undo any changes you make (before Saving). Click **Done** to exit this page.
 >
@@ -73,9 +84,15 @@ Script content:
 
 <script type="text/javascript" src="/webGui/scripts/jqueryFileTree.js"></script>
 <script>
+  <?if (isset($_GET['s'])):?>
   $( "form" ).submit(function( event ) {
     $.post("/plugins/<?=$plugin;?>/UnassignedDevices.php",{action:"set_command",serial:"<?=$serial;?>",command:$("input[name='#file']").val(),part:"<?=$partition;?>"},function(data){event.preventDefault();},"json");
   });
+  <?else:?>
+  $( "form" ).submit(function( event ) {
+    $.post("/plugins/<?=$plugin;?>/UnassignedDevices.php",{action:"set_samba_command",device:"<?=$device;?>",command:$("input[name='#file']").val()},function(data){event.preventDefault();},"json");
+  });  
+  <?endif;?>
 
   function setDefault(form) {
     form.elements['text'].value = <?=json_encode($default_text);?>;

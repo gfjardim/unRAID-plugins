@@ -3,9 +3,36 @@
 $plugin = "unassigned.devices";
 require_once("/usr/local/emhttp/plugins/${plugin}/include/lib.php");
 
+// # Run in the background
+// if (!in_array("--bg", $argv)) {
+//   exec(implode(" ", $argv)." --bg 1>/dev/null 2>&1 &");
+//   exit(0);
+// }
+
 $DEVNAME = (isset($_ENV['DEVNAME'])) ? $_ENV['DEVNAME'] : ( isset($argv[1]) ? $argv[1] : NULL );
 $DEVNAME = (file_exists($DEVNAME)) ? realpath($DEVNAME) : $DEVNAME;
 if (! $DEVNAME) die("Fail: disk device not informed.\n");
+
+# Mount SMB shares
+if (strpos($DEVNAME, "//") === 0 || $DEVNAME == "all") {
+  foreach (get_samba_mounts() as $info) {
+    $device = $info['device'];
+    if ( preg_match("#".$DEVNAME."#i", $device) || $DEVNAME == "all" ) {
+      if (! $info['automount'] && $DEVNAME == "all" ) {
+        debug("SMB mount '${info[device]}' auto mount is disabled, aborting.");
+        continue;
+      }
+      debug("Drive found with the following attributes: ".(implode(', ', array_map(function ($v, $k) { return "$k='$v'"; }, $info, array_keys($info)))));
+      debug("Adding disk $drive ...");
+      if (do_mount( $info )) {
+        touch("/var/state/${plugin}");
+        execute_script($info, "ADD");
+      }
+    }
+  }
+}
+
+# Mount local disks
 foreach(get_unasigned_disks() as $name => $disk) {
   $device = $disk['device'];
   foreach ($disk['partitions'] as $partition) {
@@ -18,7 +45,8 @@ foreach(get_unasigned_disks() as $name => $disk) {
       }
       debug("Drive found with the following attributes: ".(implode(', ', array_map(function ($v, $k) { return "$k='$v'"; }, $info, array_keys($info)))));
       debug("Adding disk $drive ...");
-      if (do_mount($info['device'], $info['mountpoint'], $info['fstype'] )) {
+      if (do_mount( $info )) {
+        touch("/var/state/${plugin}");
         if (config_shared( $info['serial'],  $info['part'])) {
           add_smb_share($info['mountpoint'], $info['label']);
         } else {
