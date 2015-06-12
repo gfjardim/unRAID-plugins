@@ -324,6 +324,7 @@ function set_samba_config($source, $var, $val) {
 
 function get_samba_mounts() {
   global $paths;
+  $o = array();
   $config_file = $GLOBALS["paths"]["samba_mount"];
   $samba_mounts = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
   foreach ($samba_mounts as $device => $mount) {

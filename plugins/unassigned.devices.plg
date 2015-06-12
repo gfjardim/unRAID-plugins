@@ -4,7 +4,7 @@
 <!ENTITY name      "unassigned.devices">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.06.11">
+<!ENTITY version   "2015.06.11a">
 <!ENTITY launch    "Main/UnassignedDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -14,7 +14,7 @@
 <CHANGES>
 ##&name;
 
-###2015.06.11
+###2015.06.11a
 - Fix: mounting/unmounting scripts hangng the webui
 
 ###2015.05.18

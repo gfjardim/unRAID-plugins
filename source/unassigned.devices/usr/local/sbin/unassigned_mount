@@ -3,11 +3,11 @@
 $plugin = "unassigned.devices";
 require_once("/usr/local/emhttp/plugins/${plugin}/include/lib.php");
 
-// # Run in the background
-// if (!in_array("--bg", $argv)) {
-//   exec(implode(" ", $argv)." --bg 1>/dev/null 2>&1 &");
-//   exit(0);
-// }
+# Run in the background
+if (!in_array("--bg", $argv)) {
+  exec(implode(" ", $argv)." --bg 1>/dev/null 2>&1 &");
+  exit(0);
+}
 
 $DEVNAME = (isset($_ENV['DEVNAME'])) ? $_ENV['DEVNAME'] : ( isset($argv[1]) ? $argv[1] : NULL );
 $DEVNAME = (file_exists($DEVNAME)) ? realpath($DEVNAME) : $DEVNAME;
