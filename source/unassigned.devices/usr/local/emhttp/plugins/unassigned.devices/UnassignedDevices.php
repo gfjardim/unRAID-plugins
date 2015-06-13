@@ -110,7 +110,7 @@ switch ($_POST['action']) {
     echo "</tbody></table>";
 
     # SAMBA
-    goto endSAMBA;
+    // goto endSAMBA;
     // $echo(get_samba_mounts());
     $samba_mounts = get_samba_mounts();
       echo "<div id='title'><span class='left'><img src='/plugins/dynamix/icons/smbsettings.png' class='icon'>SMB Mounts</span></div>";
@@ -269,6 +269,7 @@ switch ($_POST['action']) {
     if (is_file("/tmp/preclear_stat_{$device}")) {
       $preclear = explode("|", file_get_contents("/tmp/preclear_stat_{$device}"));
       $status = (count($preclear) > 3) ? ( file_exists( "/proc/".trim($preclear[3])) ? "<span style='color:#478406;'>{$preclear[2]}</span>" : "<span style='color:#CC0000;'>{$preclear[2]} <span class='rm_preclear' onclick='rm_preclear(\"{$device}\");'> [clear]</span></span>" ) : $preclear[2]." <span class='rm_preclear' onclick='rm_preclear(\"{$device}\");'> [clear]</span>";
+      $status = str_replace("^n", " " , $status);
       if (tmux_is_session("preclear_disk_{$device}") && is_file("plugins/preclear.disk/Preclear.php")) $status = "$status<a class='openPreclear exec' onclick='openPreclear(\"{$device}\");' title='Preview'><i class='glyphicon glyphicon-eye-open'></i></a>";
       echo json_encode(array( 'preclear' => "<i class='glyphicon glyphicon-dashboard hdd'></i><span style='margin:4px;'></span>".$status ));
     } else {

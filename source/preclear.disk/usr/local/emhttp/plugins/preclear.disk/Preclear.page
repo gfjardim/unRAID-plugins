@@ -78,6 +78,7 @@ $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>
           opts["-f"] = getVal(this, "-f");
           opts["-o"] = getVal(this, "-o");
           $.post(URL,opts,function(data){alert(data);openPreclear(device)}).always(function(data){location.reload();});
+          startWaitMe('#unassigned_devices_list');
           $( this ).dialog( "close" );
         },
         Cancel: function() {
@@ -107,6 +108,7 @@ $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>
       buttons: {
         "Stop": function() {
           $.post(URL,{action:"stop_preclear",device:device}).always(function(){location.reload();});
+          startWaitMe('#unassigned_devices_list');
           $( this ).dialog( "close" );
         },
         Cancel: function() {

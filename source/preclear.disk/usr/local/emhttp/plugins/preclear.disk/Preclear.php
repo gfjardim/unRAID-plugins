@@ -137,7 +137,7 @@ switch ($_POST['action']) {
         echo "<td>{$temp}</td>";
         $status = $disk_mounted ? "Disk mounted" : "<a class='exec' onclick='start_preclear(\"".$serial."\",\"{$disk_name}\")'>Start Preclear</a>";
         if (tmux_is_session("preclear_disk_{$disk_name}")) {
-          $status = "{$status}<a class='exec' onclick='openPreclear(\"{$disk_name}\");' title='Preview'><i class='glyphicon glyphicon-eye-open'></i></a>";
+          $status = "<a class='exec' onclick='openPreclear(\"{$disk_name}\");' title='Preview'><i class='glyphicon glyphicon-eye-open'></i></a>";
           $status = "{$status}<a title='Clear' style='color:#CC0000;' class='exec' onclick='remove_session(\"{$disk_name}\");'> <i class='glyphicon glyphicon-remove hdd'></i></a>";
         }
         if (is_file("/tmp/preclear_stat_{$disk_name}")) {
@@ -158,6 +158,7 @@ switch ($_POST['action']) {
             $status = "{$status}<a class='exec' style='color:#CC0000;font-weight:bold;'onclick='stop_preclear(\"{$serial}\",\"{$disk_name}\");' title='Clear stats'> <i class='glyphicon glyphicon-remove hdd'></i></a>";
           } 
         }
+        $status = str_replace("^n", " " , $status);
         echo "<td><span>".my_scale($disk['size'], $unit)." $unit</span></td>";
         echo (is_file($script_file)) ? "<td>$status</td>" : "<td>Script not present</td>";
         echo "</tr>";

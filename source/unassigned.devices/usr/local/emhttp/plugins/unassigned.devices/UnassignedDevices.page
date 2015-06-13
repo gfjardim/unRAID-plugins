@@ -234,13 +234,13 @@ $(function() {
       if (data) {
         var shares = data.split('\n');
         if (shares.length) {
-          var add = "<dl><dt>Share:</dt><dd><select name='SHARE'>";
+          var add = "<select name='SHARE'>";
           for(var i = 0;i < shares.length;i++){
             if (shares[i].length) {
               add += "<option value='"+shares[i]+"'>"+shares[i]+"</option>";
             }
           }
-          $("#dialog-samba").find(".samba_shares").html(add+"</select></dd></dl>");
+          $("#dialog-samba").find(".samba_shares").html(add+"</select>");
         }
       }
     });
@@ -263,11 +263,12 @@ $(function() {
     <dd><input type="text" name="USER"></dd>
     <dt>Password:</dt>
     <dd><input type="password" name="PASS"></dd>
+    <dt>Shares:</dt>
+    <dd><span class="samba_shares"><input type='text' name='SHARES'></span></dd>
     <dt>&nbsp;</dt>
     <dd><button type="button" onclick="load_shares();">Load Shares</button></dd>
   </dl>
-    <span class="samba_shares"></span>
-  </dl>
+    
 </div>
 <div id="usb_devices_list">
   <table class='usb_disks' id='usb_table'>
