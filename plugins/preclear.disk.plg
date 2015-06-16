@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.06.13">
+<!ENTITY version   "2015.06.15">
 <!ENTITY launch    "Settings/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -15,11 +15,14 @@
 <CHANGES>
 ##&name;
 
+###2015.06.15
+- Fix: minor bugfixes
+
 ###2015.06.13
-Fix: remove ^n markup from preclear status
-Fix: show a wait message while preclear is starting
-Fix: add MD5 verification to downloaded files
-Fix: remove the Start Preclear link if an tmux session is already open
+- Fix: remove ^n markup from preclear status
+- Fix: show a wait message while preclear is starting
+- Fix: add MD5 verification to downloaded files
+- Fix: remove the Start Preclear link if an tmux session is already open
 
 ###2015.05.20b
 - Minor bugfixes

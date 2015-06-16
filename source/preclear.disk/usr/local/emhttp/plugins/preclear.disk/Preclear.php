@@ -223,7 +223,8 @@ switch ($_GET['action']) {
   case 'show_preclear':
     $device = urldecode($_GET['device']);
     echo "<script type='text/javascript' src='/webGui/scripts/dynamix.js'></script>";
-    echo str_replace("\n", "<br>", tmux_get_session("preclear_disk_".$device));
+    // echo str_replace("\n", "<br>", tmux_get_session("preclear_disk_".$device));
+    echo "<pre>".preg_replace("#\n+#", "<br>", tmux_get_session("preclear_disk_".$device))."</pre>";
     echo "<script>document.title='Preclear for disk /dev/{$device} ';$(function(){setTimeout('location.reload()',5000);});</script>";
     break;
 }

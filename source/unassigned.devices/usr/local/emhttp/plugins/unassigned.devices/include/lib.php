@@ -119,11 +119,13 @@ function execute_script($info, $action) {
   $error = '';
   putenv("ACTION=${action}");
   foreach ($info as $key => $value) putenv(strtoupper($key)."=${value}");
-  $cmd = get_config($info['serial'], "command.{$info[part]}");
+  $cmd = $info['command'];
+  $bg = ($info['command_bg'] == "true" && $action == "ADD") ? "&" : "";
   if (! $cmd) {debug("Command not available, skipping."); return FALSE;}
   debug("Running command '${cmd}' with action '${action}'.");
   @chmod($cmd, 0777);
-  exec("$cmd > /tmp/${info[serial]}.log 2>&1");
+  $cmd = isset($info['serial']) ? "$cmd > /tmp/${info[serial]}.log 2>&1 $bg" : "$cmd > /tmp/".preg_replace('~[^\w]~i', '', $info['device']).".log 2>&1 $bg";
+  exec($cmd);
 }
 
 function set_command($sn, $cmd) {
@@ -310,7 +312,7 @@ function get_samba_config($source, $var) {
   $config_file = $GLOBALS["paths"]["samba_mount"];
   if (! is_file($config_file)) @mkdir(dirname($config_file),0666,TRUE);
   $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
-  return (isset($config[$source][$var])) ? $config[$sn][$var] : FALSE;
+  return (isset($config[$source][$var])) ? $config[$source][$var] : FALSE;
 }
 
 function set_samba_config($source, $var, $val) {
@@ -505,6 +507,8 @@ function get_partition_info($device, $reload=FALSE){
     $disk['owner'] = (isset($_ENV['DEVTYPE'])) ? "udev" : "user";
     $disk['automount'] = is_automount_2($disk['serial'],strpos($attrs['DEVPATH'],"usb"));
     $disk['shared'] = ($disk['target']) ? is_shared(basename($disk['mountpoint'])) : config_shared($disk['serial'], $disk['part']);
+    $disk['command'] = get_config($disk['serial'], "command.{$disk[part]}");
+    $disk['command_bg'] = get_config($disk['serial'], "command_bg.{$disk[part]}");
     return $disk;
   }
 }

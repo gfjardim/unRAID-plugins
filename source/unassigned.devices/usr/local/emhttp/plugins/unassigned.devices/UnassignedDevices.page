@@ -143,8 +143,8 @@ $(function() {
   }
   function remove_samba_config(device){
     var title = 'Removing SMB mount';
-    $( "#dialog-confirm" ).html("<dl><dt>Source</dt><dd>"+device+"</dd></dl>");
-    $( "#dialog-confirm" ).append( "<br><br><span style='color: #E80000;'>Are you sure?</span>" );
+    $( "#dialog-confirm" ).html("<dl><dt>Source:</dt><dd>"+device+"</dd></dl>");
+    $( "#dialog-confirm" ).append( "<dl><dt><span style='color: #E80000;'>Are you sure?</span></dd></dl>" );
     $( "#dialog-confirm" ).dialog({
       title: title,
       resizable: false,

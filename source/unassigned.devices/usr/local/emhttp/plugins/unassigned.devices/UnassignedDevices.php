@@ -113,9 +113,9 @@ switch ($_POST['action']) {
     // goto endSAMBA;
     // $echo(get_samba_mounts());
     $samba_mounts = get_samba_mounts();
-      echo "<div id='title'><span class='left'><img src='/plugins/dynamix/icons/smbsettings.png' class='icon'>SMB Mounts</span></div>";
-      echo "<table class='samba_mounts custom_head'><thead><tr><td>Device</td><td>Source</td><td>Mount point</td><td></TD><td>Size</td><td>Used</td><td>Free</td><td>Auto mount</td><td>Script</td><td>Remove</td></tr></thead>";
-      echo "<tbody>";
+    echo "<div id='title'><span class='left'><img src='/plugins/dynamix/icons/smbsettings.png' class='icon'>SMB Mounts</span></div>";
+    echo "<table class='samba_mounts custom_head'><thead><tr><td>Device</td><td>Source</td><td>Mount point</td><td></TD><td>Size</td><td>Used</td><td>Free</td><td>Auto mount</td><td>Script</td><td>Remove</td></tr></thead>";
+    echo "<tbody>";
     if (count($samba_mounts)) {
       $odd="odd";
       foreach ($samba_mounts as $mount) {
@@ -208,12 +208,13 @@ switch ($_POST['action']) {
   case 'get_command':
     $serial = urldecode(($_POST['serial']));
     $part   = urldecode(($_POST['part']));
-    echo json_encode(array( 'command' => get_config($serial, "command.{$part}")));
+    echo json_encode(array( 'command' => get_config($serial, "command.{$part}"), "background" =>  get_config($serial, "command_bg.{$part}") ));
   break;
   case 'set_command':
     $serial = urldecode(($_POST['serial']));
     $part = urldecode(($_POST['part']));
     $cmd = urldecode(($_POST['command']));
+    set_config($serial, "command_bg.{$part}", urldecode($_POST['background']));
     echo json_encode(array( 'result' => set_config($serial, "command.{$part}", $cmd)));
   break;
   case 'remove_config':
@@ -261,6 +262,7 @@ switch ($_POST['action']) {
   case 'set_samba_command':
     $device = urldecode(($_POST['device']));
     $cmd = urldecode(($_POST['command']));
+    set_samba_config($device, "command_bg", urldecode($_POST['background'])) ;
     echo json_encode(array( 'result' => set_samba_config($device, "command", $cmd)));
   break;
   
@@ -268,8 +270,8 @@ switch ($_POST['action']) {
     $device = urldecode($_POST['device']);
     if (is_file("/tmp/preclear_stat_{$device}")) {
       $preclear = explode("|", file_get_contents("/tmp/preclear_stat_{$device}"));
-      $status = (count($preclear) > 3) ? ( file_exists( "/proc/".trim($preclear[3])) ? "<span style='color:#478406;'>{$preclear[2]}</span>" : "<span style='color:#CC0000;'>{$preclear[2]} <span class='rm_preclear' onclick='rm_preclear(\"{$device}\");'> [clear]</span></span>" ) : $preclear[2]." <span class='rm_preclear' onclick='rm_preclear(\"{$device}\");'> [clear]</span>";
-      $status = str_replace("^n", " " , $status);
+      $status = (count($preclear) > 3) ? ( file_exists( "/proc/".trim($preclear[3])) ? "<span style='color:#478406;'>{$preclear[2]}</span>" : "<span style='color:#CC0000;'>{$preclear[2]} <a class='exec' style='color:#CC0000;font-weight:bold;' onclick='rm_preclear(\"{$device}\");' title='Clear stats'> <i class='glyphicon glyphicon-remove hdd'></i></a></span>" ) : $preclear[2]." <a class='exec' style='color:#CC0000;font-weight:bold;' onclick='rm_preclear(\"{$device}\");' title='Clear stats'> <i class='glyphicon glyphicon-remove hdd'></i></a>";
+      $status = str_replace("^n", "<br>" , $status);
       if (tmux_is_session("preclear_disk_{$device}") && is_file("plugins/preclear.disk/Preclear.php")) $status = "$status<a class='openPreclear exec' onclick='openPreclear(\"{$device}\");' title='Preview'><i class='glyphicon glyphicon-eye-open'></i></a>";
       echo json_encode(array( 'preclear' => "<i class='glyphicon glyphicon-dashboard hdd'></i><span style='margin:4px;'></span>".$status ));
     } else {
