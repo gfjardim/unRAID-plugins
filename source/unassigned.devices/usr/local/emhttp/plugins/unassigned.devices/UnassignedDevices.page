@@ -7,25 +7,23 @@ $plugin = "unassigned.devices";
 require_once("plugins/${plugin}/include/lib.php");
 if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/OpenDevices.page","plugins/dynamix/OpenDevices.page-");
 ?>
-<script type="text/javascript">
-var this_tab = $('input[name$="tabs"]').length;
-$(function() {
-  var last = $('input[name$="tabs"]').length;
-  var elementId = "rescanDisks";
-  $('.tabs').append($('<span id="'+elementId+'" class="status vhshift" style=";display: none;"><input type="button" onclick="$.post(\'/update.php\',{\'#command\':\'/sbin/udevadm trigger --action=change\'});" value="Rescan Disks"></span>'));
-<?if ($tabbed):?>
-  if ($('#tab'+this_tab).is(':checked')) {
-    $('#'+elementId).show();
-  }
-  $('#tab'+this_tab).bind({click:function(){$('#'+elementId).show();}});
-  for (var x=1; x<=last; x++) if(x != this_tab) $('#tab'+x).bind({click:function(){$('#'+elementId).hide();}});
-<?endif;?>
-});
-</script>
 <link type='text/css' rel='stylesheet' href='/webGui/styles/jquery.switchButton.css'>
 <link type="text/css" rel="stylesheet" href="/webGui/styles/jquery-ui.min.css">
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/waitMe.min.css">
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/automount.css">
+
+<script type="text/javascript" src="/webGui/scripts/jquery.switchButton.js"></script>
+<script type="text/javascript" src="/plugins/<?=$plugin;?>/assets/waitMe.min.js"></script>
+<script type="text/javascript">
+var this_tab = $('input[name$="tabs"]').length;
+$(function() {
+  $('.smb_mounts').switchButton({ labels_placement: "left", on_label: 'SMB Mounts', off_label: 'SMB Mounts', checked: $.cookie('unassigned_smb_mounts') != 'false'});
+  $('.smb_mounts').change(function () {
+    $('.show-smb').toggle('slow');
+    $.cookie('unassigned_smb_mounts', $('.smb_mounts').is(':checked') ? 'true' : 'false', { expires: 3650 });
+  });
+});
+</script>
 <style>
   <?if ($display['theme'] == 'white'):?>
   table.custom_head thead tr td{font-size:13px;font-weight:normal;background:-webkit-radial-gradient(#E0E0E0,#C0C0C0);background:linear-gradient(#E0E0E0,#C0C0C0);padding:5px 20px 5px 6px;white-space:nowrap;text-align:left;}
@@ -62,9 +60,14 @@ $(function() {
   i.partition{margin-left: 18px;}
   .exec{cursor: pointer;}
   i.glyphicon-append{margin:0px;font-size: 0.8em;position: relative; left:-0.3em;top:0.7em;}
+
+  .switch-wrapper {
+    display: inline-block;
+    position: relative;
+    top: 3px;
+    vertical-align: middle;
+  }
 </style>
-<script type="text/javascript" src="/webGui/scripts/jquery.switchButton.js"></script>
-<script type="text/javascript" src="/plugins/<?=$plugin;?>/assets/waitMe.min.js"></script>
 <script type="text/javascript">
   var URL = '/plugins/<?=$plugin;?>/UnassignedDevices.php';
   var display = <?=json_encode($display);?>;
@@ -189,7 +192,7 @@ $(function() {
     window.open('/plugins/preclear.disk/Preclear.php?action=show_preclear&device='+device, 'Preclear', options);
   }
   function add_samba(){
-    var title = 'Add SAMBA share';
+    var title = 'Add SMB share';
     $( "#dialog-samba" ).html($("#add_samba-defaults").html());
     $( "#dialog-samba" ).find(".switch").switchButton({labels_placement:"right",on_label:'YES',off_label:'NO'});
     $( "#dialog-samba" ).find(".switch-button-background").css("margin-top", "6px");
@@ -250,6 +253,7 @@ $(function() {
     return value = ( $(el).attr('type') == 'checkbox' ) ? ($(el).is(':checked') ? "on" : "off") : $(el).val();
   }
 </script>
+<div style="margin-top: -42px;display: inline;float: right;margin-top: -56px;vertical-align: bottom;"><div class="switch-wrapper"><input type="checkbox" class="smb_mounts"></div><button type="button" onclick="$.post('/update.php',{'#command':'/sbin/udevadm trigger --action=change'});" value="Rescan Disks">Rescan Disks</button></div>
 <form id="formUsbMount" method="POST" action="/update.php" target="progressFrame">
   <input type="hidden" id="cmdUsbMount" name="#command" value="" />
 </form>
@@ -263,7 +267,7 @@ $(function() {
     <dd><input type="text" name="USER"></dd>
     <dt>Password:</dt>
     <dd><input type="password" name="PASS"></dd>
-    <dt>Shares:</dt>
+    <dt>Share:</dt>
     <dd><span class="samba_shares"><input type='text' name='SHARES'></span></dd>
     <dt>&nbsp;</dt>
     <dd><button type="button" onclick="load_shares();">Load Shares</button></dd>

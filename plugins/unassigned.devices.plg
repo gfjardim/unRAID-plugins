@@ -4,7 +4,7 @@
 <!ENTITY name      "unassigned.devices">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.06.15a">
+<!ENTITY version   "2015.06.16">
 <!ENTITY launch    "Main/UnassignedDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -13,6 +13,10 @@
 
 <CHANGES>
 ##&name;
+
+###2015.06.16
+- Fix: Rescan disks button not showing up on non-tabbed view
+- Add: Show/hide SMB Mounts
 
 ###2015.06.15a
 - Revert: run scripts in the backgroud (caused race condition issues)

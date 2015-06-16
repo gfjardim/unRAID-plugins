@@ -72,6 +72,7 @@ switch ($_POST['action']) {
   case 'get_content':
     $disks = get_all_disks_info();
     $preclear = "";
+    @unlink("/var/state/${plugin}");
     echo "<table class='usb_disks custom_head'><thead><tr><td>Device</td><td>Identification</td><td></td><td>Temp</td><td>FS</td><td>Size</td><td>Used</td><td>Free</td><td>Open files</td><td>Auto mount</td><td>Share</td><td>Script</td></tr></thead>";
     echo "<tbody>";
     if ( count($disks) ) {
@@ -113,6 +114,7 @@ switch ($_POST['action']) {
     // goto endSAMBA;
     // $echo(get_samba_mounts());
     $samba_mounts = get_samba_mounts();
+    echo "<div id='smb_tab' class='show-smb'>";
     echo "<div id='title'><span class='left'><img src='/plugins/dynamix/icons/smbsettings.png' class='icon'>SMB Mounts</span></div>";
     echo "<table class='samba_mounts custom_head'><thead><tr><td>Device</td><td>Source</td><td>Mount point</td><td></TD><td>Size</td><td>Used</td><td>Free</td><td>Auto mount</td><td>Script</td><td>Remove</td></tr></thead>";
     echo "<tbody>";
@@ -143,7 +145,7 @@ switch ($_POST['action']) {
     } else {
       echo "<tr><td colspan='12' style='text-align:center;font-weight:bold;'>No SMB mounts configured.</td></tr>";
     }
-    echo "</tbody></table><button type='button' onclick='add_samba();'>Add SMB mount</button>";
+    echo "</tbody></table><button type='button' onclick='add_samba();'>Add SMB mount</button></div>";
     endSAMBA:
 
     $config_file = $GLOBALS["paths"]["config_file"];
@@ -188,6 +190,7 @@ switch ($_POST['action']) {
     function rm_preclear(dev) {
       $.post(URL,{action:"rm_preclear",device:dev}).always(function(){usb_disks(tab_usbdisks)});
     }
+    $("#smb_tab").css("display", $(".smb_mounts").is(":checked") ? "block" : "none"); 
     </script>';
     break;
   case 'detect':
@@ -238,7 +241,7 @@ switch ($_POST['action']) {
     $user = isset($_POST['USER']) ? urlencode($_POST['USER']) : NULL;
     $pass = isset($_POST['PASS']) ? urlencode($_POST['PASS']) : NULL;
     $login = $user ? ($pass ? "-U '{$user}%{$pass}'" : "-U '{$user}' -N") : "-U%";
-    echo shell_exec("smbclient -g -L $ip $login 2>&1|awk -F'|' '/Disk/{print $2}'");
+    echo shell_exec("smbclient -g -L $ip $login 2>&1|awk -F'|' '/Disk/{print $2}'|sort");
   break;
   case 'add_samba_mount':
     $ip = urldecode($_POST['IP']);
