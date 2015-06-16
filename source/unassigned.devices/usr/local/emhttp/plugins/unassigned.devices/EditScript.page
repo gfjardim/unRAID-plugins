@@ -102,7 +102,7 @@ Script content:
   });
   <?else:?>
   $( "form" ).submit(function( event ) {
-    $.post("/plugins/<?=$plugin;?>/UnassignedDevices.php",{action:"set_samba_command",device:"<?=$device;?>",command:$("input[name='#file']").val(), background:$("input[name='run_background']").is(":checked")},function(data){event.preventDefault();},"json");
+    $.post("/plugins/<?=$plugin;?>/UnassignedDevices.php",{action:"set_samba_command",device:"<?=$device;?>",command:$("input[name='#file']").val(), background:$("input[name='run_background']").is(":checked")},function(data){event.preventDefault()},"json");
   });  
   <?endif;?>
 

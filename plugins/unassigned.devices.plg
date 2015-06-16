@@ -4,7 +4,7 @@
 <!ENTITY name      "unassigned.devices">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.06.15">
+<!ENTITY version   "2015.06.15a">
 <!ENTITY launch    "Main/UnassignedDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -14,7 +14,7 @@
 <CHANGES>
 ##&name;
 
-###2015.06.15
+###2015.06.15a
 - Revert: run scripts in the backgroud (caused race condition issues)
 - Add: "Run in background" option to "Edit Script" page
 - Add: SMB Mounts
