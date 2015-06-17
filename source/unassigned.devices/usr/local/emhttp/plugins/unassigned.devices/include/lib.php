@@ -175,7 +175,7 @@ function get_mount_params($fs, $dev) {
       return "rw,nounix,iocharset=utf8,_netdev,file_mode=0777,dir_mode=0777,username=%s,password=%s";
       break;
     default:
-      return "auto,async,nodev,nosuid";
+      return "auto,async,noatime,nodiratime";
       break;
   }
 }
@@ -200,7 +200,7 @@ function do_mount_local($info) {
       $o = shell_exec($cmd." 2>&1");
       foreach (range(0,5) as $t) {
         if (is_mounted($dev)) {
-          @chmod($dir, 0777);
+          @chmod($dir, 0777);@chown($dir, 99);@chgrp($dir, 100);
           debug("Successfully mounted '${dev}' on '${dir}'"); return TRUE;
         } else { sleep(0.5);}
       }
@@ -356,7 +356,7 @@ function do_mount_samba($info) {
     $o = shell_exec($cmd." 2>&1");
     foreach (range(0,5) as $t) {
       if (is_mounted($dev)) {
-        @chmod($dir, 0777);
+        @chmod($dir, 0777);@chown($dir, 99);@chgrp($dir, 100);
         debug("Successfully mounted '${dev}' on '${dir}'"); return TRUE;
       } else { sleep(0.5);}
     }

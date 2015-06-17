@@ -16,7 +16,7 @@ if (strpos($DEVNAME, "//") === 0 || $DEVNAME == "all") {
         debug("SMB mount '${info[device]}' auto mount is disabled, aborting.");
         continue;
       }
-      debug("Drive found with the following attributes: ".(implode(', ', array_map(function ($v, $k) { return "$k='$v'"; }, $info, array_keys($info)))));
+      debug("Drive found with the following attributes: ".(implode(', ', array_map(function($v, $k){$v = (strpos($k, "pass") !== false) ? "*******" : $v; return "$k='$v'"; }, $info, array_keys($info)))));
       debug("Adding disk $drive ...");
       if (do_mount( $info )) {
         touch("/var/state/${plugin}");
@@ -37,7 +37,7 @@ foreach(get_unasigned_disks() as $name => $disk) {
         debug("Disk with serial '${info[serial]}' auto mount is disabled, aborting.");
         continue;
       }
-      debug("Drive found with the following attributes: ".(implode(', ', array_map(function ($v, $k) { return "$k='$v'"; }, $info, array_keys($info)))));
+      debug("Drive found with the following attributes: ".(implode(', ', array_map(function($v, $k){$v = (strpos($k, "pass") !== false) ? "*******" : $v; return "$k='$v'"; }, $info, array_keys($info)))));
       debug("Adding disk $drive ...");
       if (do_mount( $info )) {
         touch("/var/state/${plugin}");

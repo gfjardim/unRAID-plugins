@@ -4,7 +4,7 @@
 <!ENTITY name      "unassigned.devices">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.06.16b">
+<!ENTITY version   "2015.06.17">
 <!ENTITY launch    "Main/UnassignedDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -13,6 +13,12 @@
 
 <CHANGES>
 ##&name;
+
+###2015.06.17
+- Fix: mask smb passwords in the log file (thanks ljm42)
+- Fix: adjust ownership of mountpoints to nobody:users
+- Fix: buttons now tabbed/non-tabbed compliant
+- Fix: mono-partitioned disks stats now shows disk size instead of partition size (thanks Freddie) 
 
 ###2015.06.16b
 - Fix: Rescan disks button not showing up on non-tabbed view

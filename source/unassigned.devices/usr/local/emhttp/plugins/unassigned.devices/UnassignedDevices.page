@@ -267,7 +267,7 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
     return value = ( $(el).attr('type') == 'checkbox' ) ? ($(el).is(':checked') ? "on" : "off") : $(el).val();
   }
 </script>
-<div style='margin-top: -42px;display: inline;float: right;margin-top: -56px;vertical-align: bottom;margin-right:0px;' id='unassigned_tabbed'></div>
+<div style='display: inline; float: right; margin: -58px -14px;' id='unassigned_tabbed'></div>
 <form id="formUsbMount" method="POST" action="/update.php" target="progressFrame">
   <input type="hidden" id="cmdUsbMount" name="#command" value="" />
 </form>
@@ -285,8 +285,7 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
     <dd><span class="samba_shares"><input type='text' name='SHARES'></span></dd>
     <dt>&nbsp;</dt>
     <dd><button type="button" onclick="load_shares();">Load Shares</button></dd>
-  </dl>
-    
+  </dl>  
 </div>
 <div id="usb_devices_list">
   <table class='usb_disks' id='usb_table'>

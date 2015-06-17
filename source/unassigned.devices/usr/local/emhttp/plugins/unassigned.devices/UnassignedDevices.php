@@ -39,33 +39,39 @@ function render_used_and_free($partition) {
 function render_partition($disk, $partition) {
   global $plugin;
   if (! isset($partition['device'])) return '';
-  $o = array();
-  $fscheck = "/plugins/${plugin}/include/fsck.php?disk={$partition[device]}&fs={$partition[fstype]}&type=ro";
-  $icon = "<i class='glyphicon glyphicon-th-large partition'></i>";
+  $out = array();
   $mounted = is_mounted($partition['device']);
-  $fscheck = ( (! $mounted &&  $partition['fstype'] != 'btrfs') || ($mounted && $partition['fstype'] == 'btrfs') ) ? "<a class='exec' onclick='openWindow_fsck(\"{$fscheck}\",\"Check filesystem\",600,900);'>${icon}{$partition[part]}</a>" : "${icon}{$partition[part]}";
-  $o[] = "<tr class='$odd toggle-parts toggle-".basename($disk['device'])."' style='__SHOW__' >";
-  $o[] = "<td></td>";
-  $c = "<td><div>{$fscheck}<i class='glyphicon glyphicon-arrow-right'></i>";
-  if ($mounted) {
-    $c .= "<a href='/Shares/Browse?dir={$partition[mountpoint]}' target='_blank'>{$partition[mountpoint]}</a>";
+
+  if ( (! $mounted &&  $partition['fstype'] != 'btrfs') || ($mounted && $partition['fstype'] == 'btrfs') ) {
+    $fscheck = "<a class='exec' onclick='openWindow_fsck(\"/plugins/${plugin}/include/fsck.php?disk={$partition[device]}&fs={$partition[fstype]}&type=ro\",\"Check filesystem\",600,900);'><i class='glyphicon glyphicon-th-large partition'></i>{$partition[part]}</a>";
   } else {
-    $c .= "<form method='POST' action='/plugins/${plugin}/UnassignedDevices.php?action=change_mountpoint&serial={$partition[serial]}&partition={$partition[part]}' target='progressFrame' style='display:inline;margin:0;padding:0;'>";
-    $c .= "<span class='text exec'><a>{$partition[mountpoint]}</a></span><input class='input' type='text' name='mountpoint' value='{$partition[mountpoint]}' hidden />";
-    $c .= "</form>";
+    $fscheck = "<i class='glyphicon glyphicon-th-large partition'></i>{$partition[part]}";
   }
-  $o[] = "{$c}</div></td>";
-  $o[] = "<td><span style='width:auto;text-align:right;'>".($mounted ? "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/usr/local/sbin/unassigned_umount ${partition[device]}');\"><i class='glyphicon glyphicon-export'></i> Unmount</button>" : "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/usr/local/sbin/unassigned_mount ${partition[device]}');\"><i class='glyphicon glyphicon-import'></i>  Mount</button>")."</span></td>";
-  $o[] = "<td>-</td>";
-  $o[] = "<td >".$partition['fstype']."</td>";
-  $o[] = "<td><span>".my_scale($partition['size'], $unit)." $unit</span></td>";
-  $o[] = render_used_and_free($partition);
-  $o[] = "<td>".(strlen($partition['target']) ? shell_exec("lsof '${partition[target]}' 2>/dev/null|grep -c -v COMMAND") : "-")."</td>";
-  $o[] = "<td>-</td>";
-  $o[] = "<td><input type='checkbox' class='toggle_share' info='".htmlentities(json_encode($partition))."' ".(($partition['shared']) ? 'checked':'')."></td>";
-  $o[] = "<td><a href='/Main/EditScript?s=".urlencode($partition['serial'])."&l=".urlencode(basename($partition['mountpoint']))."&p=".urlencode($partition['part'])."'><img src='/webGui/images/default.png' style='cursor:pointer;width:16px;".( (get_config($partition['serial'],"command.{$partition[part]}")) ? "":"opacity: 0.4;" )."'></a></td>";
-  $o[] = "<tr>";
-  return $o;
+
+  $mpoint = "<div>{$fscheck}<i class='glyphicon glyphicon-arrow-right'></i>";
+  $mbutton = "<span style='width:auto;text-align:right;'>";
+  if ($mounted) {
+    $mpoint .= "<a href='/Shares/Browse?dir={$partition[mountpoint]}' target='_blank'>{$partition[mountpoint]}</a></div>";
+    $mbutton .= "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/usr/local/sbin/unassigned_umount ${partition[device]}');\"><i class='glyphicon glyphicon-export'></i> Unmount</button>";
+  } else {
+    $mpoint .= "<form method='POST' action='/plugins/${plugin}/UnassignedDevices.php?action=change_mountpoint&serial={$partition[serial]}&partition={$partition[part]}' target='progressFrame' style='display:inline;margin:0;padding:0;'><span class='text exec'><a>{$partition[mountpoint]}</a></span><input class='input' type='text' name='mountpoint' value='{$partition[mountpoint]}' hidden /></form></div>";
+    $mbutton .= "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/usr/local/sbin/unassigned_mount ${partition[device]}');\"><i class='glyphicon glyphicon-import'></i>  Mount</button>";
+  }
+  
+  $out[] = "<tr class='$outdd toggle-parts toggle-".basename($disk['device'])."' style='__SHOW__' >";
+  $out[] = "<td></td>";
+  $out[] = "<td>{$mpoint}</td>";
+  $out[] = "<td>{$mbutton}</td>";
+  $out[] = "<td>-</td>";
+  $out[] = "<td >".$partition['fstype']."</td>";
+  $out[] = "<td><span>".my_scale($partition['size'], $unit)." $unit</span></td>";
+  $out[] = render_used_and_free($partition);
+  $out[] = "<td>".(strlen($partition['target']) ? shell_exec("lsof '${partition[target]}' 2>/dev/null|grep -c -v COMMAND") : "-")."</td>";
+  $out[] = "<td>-</td>";
+  $out[] = "<td><input type='checkbox' class='toggle_share' info='".htmlentities(json_encode($partition))."' ".(($partition['shared']) ? 'checked':'')."></td>";
+  $out[] = "<td><a href='/Main/EditScript?s=".urlencode($partition['serial'])."&l=".urlencode(basename($partition['mountpoint']))."&p=".urlencode($partition['part'])."'><img src='/webGui/images/default.png' style='cursor:pointer;width:16px;".( (get_config($partition['serial'],"command.{$partition[part]}")) ? "":"opacity: 0.4;" )."'></a></td>";
+  $out[] = "<tr>";
+  return $out;
 }
 
 switch ($_POST['action']) {
@@ -78,20 +84,34 @@ switch ($_POST['action']) {
     if ( count($disks) ) {
       $odd="odd";
       foreach ($disks as $disk) {
-        $disk_mounted = false;
-        foreach ($disk['partitions'] as $p) if (is_mounted($p['device'])) $disk_mounted = TRUE;
+        $mounted = in_array(TRUE, array_map(function($ar){return is_mounted($ar['device']);}, $disk['partitions']));
         $temp = my_temp($disk['temperature']);
+        $disk_name = basename($disk['device']);
         $p = (count($disk['partitions']) <= 1) ? render_partition($disk, $disk['partitions'][0]) : FALSE;
-        echo "<tr class='$odd'>";
-        printf( "<td><img src='/webGui/images/%s'> %s</td>", ( is_disk_running($disk['device']) ? "green-on.png":"green-blink.png" ), basename($disk['device']) );
-        echo "<td><span class='exec toggle-hdd' hdd='".basename($disk['device'])."'><i class='glyphicon glyphicon-hdd hdd'></i>".(($p === FALSE)?"<i class='glyphicon glyphicon-plus-sign glyphicon-append'></i>":"<span style='margin:4px;'></span>").$disk['serial']."</span><div id='preclear_".basename($disk['device'])."'></div></td>";
-        if (is_file("/tmp/preclear_stat_".basename($disk['device']))) {
-          $preclear .= "get_preclear('".basename($disk["device"])."');";
+
+        $mbutton = "<span style='width:auto;text-align:right;'>";
+        if ($mounted) {
+          $mbutton .= "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/usr/local/sbin/unassigned_umount ${disk[device]}');\"><i class='glyphicon glyphicon-export'></i> Unmount</button>";
+        } else {
+          $mbutton .= "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/usr/local/sbin/unassigned_mount ${disk[device]}');\"><i class='glyphicon glyphicon-import'></i>  Mount</button>";
         }
-        echo "<td><span style='width:auto;text-align:right;'>".($disk_mounted ? "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/usr/local/sbin/unassigned_umount {$disk[device]}');\"><i class='glyphicon glyphicon-export'></i> Unmount</button>" : "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/usr/local/sbin/unassigned_mount {$disk[device]}');\"><i class='glyphicon glyphicon-import'></i>  Mount</button>")."</span></td>";
+
+        if ($p === FALSE) {
+          $hdd_serial = "<span class='exec toggle-hdd' hdd='{$disk_name}'><i class='glyphicon glyphicon-hdd hdd'></i><i class='glyphicon glyphicon-plus-sign glyphicon-append'></i>{$disk[serial]}</span><div id='preclear_{$disk_name}'></div>";
+        } else {
+          $hdd_serial = "<span class='exec toggle-hdd' hdd='{$disk_name}'><i class='glyphicon glyphicon-hdd hdd'></i><span style='margin:4px;'></span>{$disk[serial]}</span><div id='preclear_{$disk_name}'></div>";
+        }
+
+        if (is_file("/tmp/preclear_stat_{$disk_name}")) {
+          $preclear .= "get_preclear('{$disk_name}');";
+        }
+        echo "<tr class='$odd'>";
+        echo "<td><img src='/webGui/images/".(is_disk_running($disk['device']) ? "green-on.png":"green-blink.png" )."'> {$disk_name}</td>";
+        echo "<td>{$hdd_serial}</td>";
+        echo "<td>{$mbutton}</td>";
         echo "<td>{$temp}</td>";
         echo ($p)?$p[5]:"<td>-</td>";
-        echo ($p)?$p[6]:"<td>".my_scale($disk['size'],$unit)." {$unit}</td>";
+        echo "<td>".my_scale($disk['size'],$unit)." {$unit}</td>";
         echo ($p)?$p[7]:"<td>-</td>";
         echo ($p)?$p[8]:"<td>-</td><td>-</td>";
         echo "<td><input type='checkbox' class='automount' serial='".$disk['partitions'][0]['serial']."' ".(($disk['partitions'][0]['automount']) ? 'checked':'')."></td>";
