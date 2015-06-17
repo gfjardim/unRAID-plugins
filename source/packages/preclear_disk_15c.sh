@@ -306,12 +306,12 @@ list_device_names() {
 
 # gfjardim - add notification system capability without breaking legacy mail.
 send_mail() {
-  subject=$(echo ${1} | tr '"' "'" )
-  description=$(echo ${2} | tr '"' "'")
-  message=$(echo ${3} | tr '"' "'")
-  recipient=$(echo ${4} | tr '"' "'")
+  subject=$(echo ${1} | tr "'" '`' )
+  description=$(echo ${2} | tr "'" '`' )
+  message=$(echo ${3} | tr "'" '`' )
+  recipient=${4}
   if [ -f "/usr/local/sbin/notify" ]; then
-    /usr/local/sbin/notify -e "Preclear ${model} ${serial}" -s "${subject}" -d "${description}" -m """${message}""" -i "normal ${notify_channels}"
+    /usr/local/sbin/notify -e "Preclear ${model} ${serial}" -s """${subject}""" -d """${description}""" -m """${message}""" -i "normal ${notify_channels}"
   else
     echo -e "${message}" | mail -s "${subject}" "${recipient}"
   fi
@@ -1219,7 +1219,7 @@ read_entire_disk( ) {
       echo $read_speed >/tmp/read_speed$disk_basename
       if [ -s /tmp/postread_errors$disk_basename ]
       then
-         post_read_err = "Y"
+         post_read_err="Y"
       fi
     fi
 
