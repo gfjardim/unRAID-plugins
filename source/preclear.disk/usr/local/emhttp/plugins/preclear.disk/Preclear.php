@@ -42,10 +42,9 @@ function listDir($root) {
   }
   return $paths;
 }
-
 function get_unasigned_disks() {
   $disks = array();
-  $paths=listDir("/dev/disk/by-id");
+  $paths = listDir("/dev/disk/by-id");
   natsort($paths);
   $unraid_flash = realpath("/dev/disk/by-label/UNRAID");
   $unraid_disks = array();
@@ -66,6 +65,7 @@ function get_unasigned_disks() {
     $path = realpath($d);
     if (preg_match("#^(.(?!wwn|part))*$#", $d)) {
       if (! in_array($path, $unraid_disks) && ! in_array($path, $unraid_cache) && strpos($unraid_flash, $path) === FALSE) {
+        if (in_array($path, array_map(function($ar){return $ar['device'];},$disks)) ) continue;
         $m = array_values(preg_grep("#$d.*-part\d+#", $paths));
         natsort($m);
         $disks[$d] = array("device"=>$path,"type"=>"ata","partitions"=>$m);

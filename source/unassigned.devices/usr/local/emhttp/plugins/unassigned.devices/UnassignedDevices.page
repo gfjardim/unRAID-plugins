@@ -14,15 +14,29 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
 
 <script type="text/javascript" src="/webGui/scripts/jquery.switchButton.js"></script>
 <script type="text/javascript" src="/plugins/<?=$plugin;?>/assets/waitMe.min.js"></script>
+
 <script type="text/javascript">
-var this_tab = $('input[name$="tabs"]').length;
-$(function() {
-  $('.smb_mounts').switchButton({ labels_placement: "left", on_label: 'SMB Mounts', off_label: 'SMB Mounts', checked: $.cookie('unassigned_smb_mounts') != 'false'});
-  $('.smb_mounts').change(function () {
-    $('.show-smb').toggle('slow');
-    $.cookie('unassigned_smb_mounts', $('.smb_mounts').is(':checked') ? 'true' : 'false', { expires: 3650 });
+  var this_tab = $('input[name$="tabs"]').length;
+  $(function() {
+    var content= "<div class='switch-wrapper'><input type='checkbox' class='complete-switch'></div><button type='button' onclick='$.post('/update.php',{'#command':'/sbin/udevadm trigger --action=change'});' value='Rescan Disks'>Rescan Disks</button></div>";
+  <?if (!$tabbed):?>
+    $("#unassigned_tabbed").html(content);
+  <?else:?>
+    var last = $('input[name$="tabs"]').length;
+    var elementId = "simpleComplete";
+    $('.tabs').append("<span id='"+elementId+"' class='status vhshift' style='display: none;'>"+content+"&nbsp;</span>");
+    if ($('#tab'+this_tab).is(':checked')) {
+      $('#'+elementId).show();
+    }
+    $('#tab'+this_tab).bind({click:function(){$('#'+elementId).show();}});
+    for (var x=1; x<=last; x++) if(x != this_tab) $('#tab'+x).bind({click:function(){$('#'+elementId).hide();}});
+  <?endif;?>
+    $('.complete-switch').switchButton({ labels_placement: "left", on_label: 'Complete', off_label: 'Simple', checked: $.cookie('unassigned-complete-view') != 'false'});
+    $('.complete-switch').change(function () {
+      $('.show-complete').toggle('slow');
+      $.cookie('unassigned-complete-view', $('.complete-switch').is(':checked') ? 'true' : 'false', { expires: 3650 });
+    });
   });
-});
 </script>
 <style>
   <?if ($display['theme'] == 'white'):?>
@@ -253,7 +267,7 @@ $(function() {
     return value = ( $(el).attr('type') == 'checkbox' ) ? ($(el).is(':checked') ? "on" : "off") : $(el).val();
   }
 </script>
-<div style="margin-top: -42px;display: inline;float: right;margin-top: -56px;vertical-align: bottom;"><div class="switch-wrapper"><input type="checkbox" class="smb_mounts"></div><button type="button" onclick="$.post('/update.php',{'#command':'/sbin/udevadm trigger --action=change'});" value="Rescan Disks">Rescan Disks</button></div>
+<div style='margin-top: -42px;display: inline;float: right;margin-top: -56px;vertical-align: bottom;' id='unassigned_tabbed'></div>
 <form id="formUsbMount" method="POST" action="/update.php" target="progressFrame">
   <input type="hidden" id="cmdUsbMount" name="#command" value="" />
 </form>

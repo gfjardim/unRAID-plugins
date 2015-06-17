@@ -114,7 +114,7 @@ switch ($_POST['action']) {
     // goto endSAMBA;
     // $echo(get_samba_mounts());
     $samba_mounts = get_samba_mounts();
-    echo "<div id='smb_tab' class='show-smb'>";
+    echo "<div id='smb_tab' class='show-complete'>";
     echo "<div id='title'><span class='left'><img src='/plugins/dynamix/icons/smbsettings.png' class='icon'>SMB Mounts</span></div>";
     echo "<table class='samba_mounts custom_head'><thead><tr><td>Device</td><td>Source</td><td>Mount point</td><td></TD><td>Size</td><td>Used</td><td>Free</td><td>Auto mount</td><td>Script</td><td>Remove</td></tr></thead>";
     echo "<tbody>";
@@ -159,8 +159,8 @@ switch ($_POST['action']) {
       }
     }
     if (strlen($ct)) {
-      echo "<div id='title'><span class='left'><img src='/plugins/{$plugin}/icons/hourglass.png' class='icon'>Historical Devices</span></div>";
-      echo "<table class='usb_absent custom_head'><thead><tr><td>Device</td><td>Serial Number</td><td>Auto mount</td><td colspan='7'>Remove config</td></tr></thead><tbody>${ct}</tbody></table>";
+      echo "<div id='smb_tab' class='show-complete'><div id='title'><span class='left'><img src='/plugins/{$plugin}/icons/hourglass.png' class='icon'>Historical Devices</span></div>";
+      echo "<table class='usb_absent custom_head'><thead><tr><td>Device</td><td>Serial Number</td><td>Auto mount</td><td colspan='7'>Remove config</td></tr></thead><tbody>${ct}</tbody></table></div>";
     }
 
     echo 
@@ -190,7 +190,7 @@ switch ($_POST['action']) {
     function rm_preclear(dev) {
       $.post(URL,{action:"rm_preclear",device:dev}).always(function(){usb_disks(tab_usbdisks)});
     }
-    $("#smb_tab").css("display", $(".smb_mounts").is(":checked") ? "block" : "none"); 
+    $(".show-complete").css("display", $(".complete-switch").is(":checked") ? "block" : "none"); 
     </script>';
     break;
   case 'detect':
