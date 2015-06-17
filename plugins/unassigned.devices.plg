@@ -4,7 +4,7 @@
 <!ENTITY name      "unassigned.devices">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.06.16a">
+<!ENTITY version   "2015.06.16b">
 <!ENTITY launch    "Main/UnassignedDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -14,9 +14,10 @@
 <CHANGES>
 ##&name;
 
-###2015.06.16a
+###2015.06.16b
 - Fix: Rescan disks button not showing up on non-tabbed view
 - Fix: duplicate hdd entry due to udev's duplicate links
+- Fix: Rescan disks not working
 - Add: Show/hide SMB Mounts/Historical Devices
 
 ###2015.06.15a

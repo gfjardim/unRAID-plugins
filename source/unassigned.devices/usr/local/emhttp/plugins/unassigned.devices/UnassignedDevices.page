@@ -18,7 +18,7 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
 <script type="text/javascript">
   var this_tab = $('input[name$="tabs"]').length;
   $(function() {
-    var content= "<div class='switch-wrapper'><input type='checkbox' class='complete-switch'></div><button type='button' onclick='$.post('/update.php',{'#command':'/sbin/udevadm trigger --action=change'});' value='Rescan Disks'>Rescan Disks</button></div>";
+    var content= "<div class='switch-wrapper'><input type='checkbox' class='complete-switch'></div><button type='button' onclick='$.post(\"/update.php\",{\"#command\":\"/sbin/udevadm trigger --action=change\"});' value='Rescan Disks'>Rescan Disks</button></div>";
   <?if (!$tabbed):?>
     $("#unassigned_tabbed").html(content);
   <?else:?>
@@ -267,7 +267,7 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
     return value = ( $(el).attr('type') == 'checkbox' ) ? ($(el).is(':checked') ? "on" : "off") : $(el).val();
   }
 </script>
-<div style='margin-top: -42px;display: inline;float: right;margin-top: -56px;vertical-align: bottom;' id='unassigned_tabbed'></div>
+<div style='margin-top: -42px;display: inline;float: right;margin-top: -56px;vertical-align: bottom;margin-right:0px;' id='unassigned_tabbed'></div>
 <form id="formUsbMount" method="POST" action="/update.php" target="progressFrame">
   <input type="hidden" id="cmdUsbMount" name="#command" value="" />
 </form>
