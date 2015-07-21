@@ -50,6 +50,8 @@ case \$ACTION in
 esac
 EOT;
 
+$remove = is_file($file) ? "<img style='cursor:pointer;' src='/plugins/$plugin/icons/remove.png' height='30px' onclick='rmfile(\"{$file}\");'> " : "";
+
 ?>
 <link type="text/css" rel="stylesheet" href="/webGui/styles/jqueryFileTree.css" >
 <script type="text/javascript" src="/webGui/scripts/jquery.switchButton.js"></script>
@@ -76,7 +78,7 @@ EOT;
 <input type="hidden" name="#include" value="update.file.php">
 
 &nbsp;
-: <input type="text" name="#file" style="width:40%;" onclick="openFileBrowser(this,'/boot/config/plugins/<?=$plugin;?>/','sh',false,true);" autocomplete="off" value="<?=$file;?>"> <input type="submit" value="Save"/><input type="reset"/><button type="button" onclick="setDefault(this.form)">Default Script</button><button type="button" onclick="done('/')">Done</button>
+: <input type="text" name="#file" style="width:40%;" onclick="openFileBrowser(this,'/boot/config/plugins/<?=$plugin;?>/','sh',false,true);" autocomplete="off" value="<?=$file;?>"> <?=$remove;?><input type="submit" value="Save"/><input type="reset"/><button type="button" onclick="setDefault(this.form)">Default Script</button><button type="button" onclick="done('/')">Done</button>
 
 &nbsp;
 : <span class="switch-wrapper"><input type="checkbox" name="run_background" <?=$background;?>></span>
@@ -140,6 +142,9 @@ Script content:
     $(document).mouseup(function(e){if(!ft.is(e.target) && ft.has(e.target).length === 0){$(ft).slideUp('fast',function (){$(ft).remove();});}});
     // Open fileTree
     ft.slideDown('fast');
+  }
+  function rmfile(file) {
+    $.post("/update.php",{"#command":"rm "+file}).done(function(){location.reload();});
   }
 
 </script>

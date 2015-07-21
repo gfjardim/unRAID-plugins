@@ -7,12 +7,16 @@ $plugin = "unassigned.devices";
 require_once("plugins/${plugin}/include/lib.php");
 if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/OpenDevices.page","plugins/dynamix/OpenDevices.page-");
 ?>
-<link type='text/css' rel='stylesheet' href='/webGui/styles/jquery.switchButton.css'>
 <link type="text/css" rel="stylesheet" href="/webGui/styles/jquery-ui.min.css">
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/waitMe.min.css">
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/automount.css">
+<link type='text/css' rel='stylesheet' href='/webGui/styles/jquery.switchbutton.css'>
 
+<?if (is_file("webGui/scripts/jquery.switchButton.js")):?>
 <script type="text/javascript" src="/webGui/scripts/jquery.switchButton.js"></script>
+<?else:?>
+<script type="text/javascript" src="/webGui/javascript/jquery.switchbutton.js"></script>
+<?endif;?>
 <script type="text/javascript" src="/plugins/<?=$plugin;?>/assets/waitMe.min.js"></script>
 
 <script type="text/javascript">

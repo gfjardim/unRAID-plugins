@@ -4,7 +4,7 @@
 <!ENTITY name      "unassigned.devices">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.06.17">
+<!ENTITY version   "2015.07.21">
 <!ENTITY launch    "Main/UnassignedDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -13,6 +13,10 @@
 
 <CHANGES>
 ##&name;
+
+###2015.07.21
+- Fix: unRAID 6.1-rc1 compatibility
+- Add: link to Preclear if the plugin is present
 
 ###2015.06.17
 - Fix: mask smb passwords in the log file (thanks ljm42)

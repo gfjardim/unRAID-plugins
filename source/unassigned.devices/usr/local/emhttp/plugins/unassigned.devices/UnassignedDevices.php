@@ -96,10 +96,11 @@ switch ($_POST['action']) {
           $mbutton .= "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/usr/local/sbin/unassigned_mount ${disk[device]}');\"><i class='glyphicon glyphicon-import'></i>  Mount</button>";
         }
 
+        $preclear_link = (! $mounted && file_exists("plugins/preclear.disk/icons/precleardisk.png")) ? " <a title='Preclear' class='exec green' href='/Settings/Preclear'><img src='plugins/preclear.disk/icons/precleardisk.png'></a>" : "";
         if ($p === FALSE) {
-          $hdd_serial = "<span class='exec toggle-hdd' hdd='{$disk_name}'><i class='glyphicon glyphicon-hdd hdd'></i><i class='glyphicon glyphicon-plus-sign glyphicon-append'></i>{$disk[serial]}</span><div id='preclear_{$disk_name}'></div>";
+          $hdd_serial = "<span class='exec toggle-hdd' hdd='{$disk_name}'><i class='glyphicon glyphicon-hdd hdd'></i><i class='glyphicon glyphicon-plus-sign glyphicon-append'></i>{$disk[serial]}</span>{$preclear_link}<div id='preclear_{$disk_name}'></div>";
         } else {
-          $hdd_serial = "<span class='exec toggle-hdd' hdd='{$disk_name}'><i class='glyphicon glyphicon-hdd hdd'></i><span style='margin:4px;'></span>{$disk[serial]}</span><div id='preclear_{$disk_name}'></div>";
+          $hdd_serial = "<span class='exec toggle-hdd' hdd='{$disk_name}'><i class='glyphicon glyphicon-hdd hdd'></i><span style='margin:4px;'></span>{$disk[serial]}</span>{$preclear_link}<div id='preclear_{$disk_name}'></div>";
         }
 
         if (is_file("/tmp/preclear_stat_{$disk_name}")) {
