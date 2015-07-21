@@ -53,9 +53,22 @@ EOT;
 $remove = is_file($file) ? "<img style='cursor:pointer;' src='/plugins/$plugin/icons/remove.png' height='30px' onclick='rmfile(\"{$file}\");'> " : "";
 
 ?>
-<link type="text/css" rel="stylesheet" href="/webGui/styles/jqueryFileTree.css" >
+
+<?if (is_file("webGui/scripts/jquery.switchButton.js")): # Pre 6.1?>
 <script type="text/javascript" src="/webGui/scripts/jquery.switchButton.js"></script>
-<link type='text/css' rel='stylesheet' href='/webGui/styles/jquery.switchButton.css'>
+<script type="text/javascript" src="/webGui/scripts/jqueryFileTree.js"></script>
+<link type="text/css" rel="stylesheet" href="/webGui/styles/jquery-ui.min.css">
+<link type="text/css" rel="stylesheet" href="/webGui/styles/jquery.switchButton.css">
+<link type="text/css" rel="stylesheet" href="/webGui/styles/jqueryFileTree.css" >
+
+<?else: # Post 6.1?>
+<script type="text/javascript" src="/webGui/javascript/jquery.switchbutton.js"></script>
+<script type="text/javascript" src="/webGui/javascript/jquery.filetree.js"></script>
+<link type="text/css" rel="stylesheet" href="/webGui/styles/jquery.ui.css">
+<link type="text/css" rel="stylesheet" href="/webGui/styles/jquery.switchbutton.css">
+<link type="text/css" rel="stylesheet" href="/webGui/styles/jquery.filetree.css" >
+<?endif;?>
+
 <style type="text/css">
   .fileTree {
     border: solid 1px #BBB;
@@ -95,7 +108,6 @@ Script content:
 
 </form>
 
-<script type="text/javascript" src="/webGui/scripts/jqueryFileTree.js"></script>
 <script>
   $("input[name=run_background]").each(function(){var checked = $(this).is(":checked");$(this).switchButton({labels_placement: "right", checked:checked,on_label:"Run in background",off_label:"Run in background"});});
   <?if (isset($_GET['s'])):?>
