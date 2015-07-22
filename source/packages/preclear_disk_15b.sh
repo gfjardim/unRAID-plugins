@@ -2279,13 +2279,13 @@ then
     dt=`date "+%Y-%m-%d"`
     if [ "$save_report_by_dev" = "yes" ]
     then
-      cp /tmp/preclear_report_$d /boot/preclear_reports/preclear_rpt_${d}_${dt}
-      cp /tmp/smart_start_$d /boot/preclear_reports/preclear_start_${d}_${dt}
-      cp /tmp/smart_finish_$d /boot/preclear_reports/preclear_finish_${d}_${dt}
+      todos < /tmp/preclear_report_$d > /boot/preclear_reports/preclear_rpt_${d}_${dt}.txt
+      todos < /tmp/smart_start_$d > /boot/preclear_reports/preclear_start_${d}_${dt}.txt
+      todos < /tmp/smart_finish_$d > /boot/preclear_reports/preclear_finish_${d}_${dt}.txt
     else # name the reports by their serial number
-      cp /tmp/preclear_report_$d "/boot/preclear_reports/preclear_rpt_${serial}_${dt}"
-      cp /tmp/smart_start_$d "/boot/preclear_reports/preclear_start_${serial}_${dt}"
-      cp /tmp/smart_finish_$d "/boot/preclear_reports/preclear_finish_${serial}_${dt}"
+      todos < /tmp/preclear_report_$d > "/boot/preclear_reports/preclear_rpt_${serial}_${dt}".txt
+      todos < /tmp/smart_start_$d > "/boot/preclear_reports/preclear_start_${serial}_${dt}".txt
+      todos < /tmp/smart_finish_$d > "/boot/preclear_reports/preclear_finish_${serial}_${dt}".txt
     fi
 fi
 report_out+="============================================================================\n"

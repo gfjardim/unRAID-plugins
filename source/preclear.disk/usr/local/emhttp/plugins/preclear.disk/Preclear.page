@@ -7,12 +7,20 @@ $plugin = "preclear.disk";
 $script_file = "/boot/config/plugins/preclear.disk/preclear_disk.sh";
 $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>/dev/null|cut -d: -f2")) : FALSE;
 ?>
-<link type="text/css" rel="stylesheet" href="/webGui/styles/jquery-ui.min.css">
-<link type="text/css" rel="stylesheet" href="/webGui/styles/jquery.switchButton.css">
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/<?=$plugin;?>.css">
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/waitMe.min.css">
 <script type="text/javascript" src="/plugins/<?=$plugin;?>/assets/waitMe.min.js"></script>
+
+<?if (is_file("webGui/scripts/jquery.switchButton.js")): # Pre 6.1?>
 <script type="text/javascript" src="/webGui/scripts/jquery.switchButton.js"></script>
+<link type="text/css" rel="stylesheet" href="/webGui/styles/jquery-ui.min.css">
+<link type="text/css" rel="stylesheet" href="/webGui/styles/jquery.switchButton.css">
+<?else: # Post 6.1?>
+<script type="text/javascript" src="/webGui/javascript/jquery.switchbutton.js"></script>
+<link type="text/css" rel="stylesheet" href="/webGui/styles/jquery.ui.css">
+<link type="text/css" rel="stylesheet" href="/webGui/styles/jquery.switchbutton.css">
+<?endif;?>
+
 <style>
   <?if ($display['theme'] == 'white'):?>
   table.custom_head thead tr td{font-size:13px;font-weight:normal;background:-webkit-radial-gradient(#E0E0E0,#C0C0C0);background:linear-gradient(#E0E0E0,#C0C0C0);padding:5px 20px 5px 6px;white-space:nowrap;text-align:left;}
@@ -41,7 +49,7 @@ $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>
   <?echo ($script_version) ? "$('.tabs').append('<span id=\"progress\" class=\"status\">Script: <span class=\"green\">Present, version $script_version</span></span>');" : "$('.tabs').append('<span id=\"progress\" class=\"status\">Script: <span class=\"red\">Not present</span></span>');";
   ?>
   function get_content() {
-   $.post(URL,{action:"get_content",display:display},function(data){$('#unassigned_devices_list').html(data);}).always(function(){timers.preclear=setTimeout('get_content()',<?=$display['refresh'];?>);});
+   $.post(URL,{action:"get_content",display:display},function(data){$('#unassigned_devices_list').html(data);}).always(function(){setTimeout('get_content()',<?=$display['refresh'] ? $display['refresh'] : "10000";?>);});
   }
   function openPreclear(device) {
     var width=900;
@@ -181,7 +189,7 @@ $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>
     <div class='test_options'>
       <dt>Mail: </dt>
       <dd>
-        <select name="-M" onchange="toggleMail(this);"><option value="0">Never</option><option value="1">On preclear's end</option><option value="2">On every cicle's end</option><option value="3">On every cicle's and step's end</option><option value="4">On every 25% of progress</option></select>
+        <select name="-M" onchange="toggleMail(this);"><option value="0">Never</option><option value="1">On preclear's end</option><option value="2">On every cycles's end</option><option value="3">On every cycles's and step's end</option><option value="4">On every 25% of progress</option></select>
       </dd>
       <div class='mail_options' style='display:none;'>
         <dt>Notifications:</dt>
