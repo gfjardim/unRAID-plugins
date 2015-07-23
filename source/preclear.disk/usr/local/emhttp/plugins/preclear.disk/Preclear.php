@@ -169,11 +169,12 @@ switch ($_POST['action']) {
     }
     echo "</tbody></table><div style='min-height:20px;'></div>";
     break;
+
   case 'start_preclear':
     $device = urldecode($_POST['device']);
     $op       = (isset($_POST['op']) && $_POST['op'] != "0") ? " ".urldecode($_POST['op']) : "";
-    $mail     = (isset($_POST['-M']) && $_POST['-M'] > 0) ? " -M ".urldecode($_POST['-M']) : "";
-    $notify   = (isset($_POST['-o']) && $_POST['-M'] > 0) ? " -o ".urldecode($_POST['-o']) : "";
+    $notify   = (isset($_POST['-o']) && $_POST['-o'] > 0) ? " -o ".urldecode($_POST['-o']) : "";
+    $mail     = (isset($_POST['-M']) && $_POST['-M'] > 0 && intval($_POST['-o']) > 0) ? " -M ".urldecode($_POST['-M']) : "";
     $passes   = isset($_POST['-c']) ? " -c ".urldecode($_POST['-c']) : "";
     $read_sz  = (isset($_POST['-r']) && $_POST['-r'] != 0) ? " -r ".urldecode($_POST['-r']) : "";
     $write_sz = (isset($_POST['-w']) && $_POST['-w'] != 0) ? " -w ".urldecode($_POST['-w']) : "";
@@ -189,7 +190,8 @@ switch ($_POST['action']) {
     } else {
       $cmd = "$script_file {$op} /dev/$device";
     }
-    echo $cmd;
+    // echo $cmd;
+    // exit();
     tmux_kill_window("preclear_disk_{$device}");
     tmux_new_session("preclear_disk_{$device}");
     tmux_send_command("preclear_disk_{$device}", $cmd);
@@ -222,7 +224,8 @@ switch ($_POST['action']) {
 switch ($_GET['action']) {
   case 'show_preclear':
     $device = urldecode($_GET['device']);
-    echo "<script type='text/javascript' src='/webGui/scripts/dynamix.js'></script>";
+    echo (is_file("webGui/scripts/dynamix.js")) ? "<script type='text/javascript' src='/webGui/scripts/dynamix.js'></script>" : 
+                                                  "<script type='text/javascript' src='/webGui/javascript/dynamix.js'></script>";
     // echo str_replace("\n", "<br>", tmux_get_session("preclear_disk_".$device));
     echo "<pre>".preg_replace("#\n+#", "<br>", tmux_get_session("preclear_disk_".$device))."</pre>";
     echo "<script>document.title='Preclear for disk /dev/{$device} ';$(function(){setTimeout('location.reload()',5000);});</script>";

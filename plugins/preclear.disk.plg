@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.07.21">
+<!ENTITY version   "2015.07.23">
 <!ENTITY launch    "Settings/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,10 @@
 
 <CHANGES>
 ##&name;
+
+###2015.07.23
+- Fix: better unRAID 6.1 compatibility
+- Fix: clearer notification system
 
 ###2015.07.21
 - Fix: unRAID 6.1-rc1 compatibility

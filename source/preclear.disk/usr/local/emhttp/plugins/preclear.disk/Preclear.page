@@ -85,7 +85,7 @@ $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>
           opts["-W"] = getVal(this, "-W");
           opts["-f"] = getVal(this, "-f");
           opts["-o"] = getVal(this, "-o");
-          $.post(URL,opts,function(data){alert(data);openPreclear(device)}).always(function(data){location.reload();});
+          $.post(URL,opts,function(data){if(data){alert(data);} openPreclear(device)}).always(function(data){location.reload();});
           startWaitMe('#unassigned_devices_list');
           $( this ).dialog( "close" );
         },
@@ -156,11 +156,11 @@ $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>
       $(el).parent().siblings('.test_options').css('display','block');
     }
   }
-  function toggleMail(el) {
+  function toggleNotification(el) {
     if(el.selectedIndex > 0 ){
-      $(el).parent().siblings('.mail_options').css('display','block');
+      $(el).parent().siblings('.notification_options').css('display','block');
     } else {
-      $(el).parent().siblings('.mail_options').css('display','none');
+      $(el).parent().siblings('.notification_options').css('display','none');
     }
   }
 </script>
@@ -187,21 +187,27 @@ $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>
     </div>
     <?if (preg_match("#\d+c$#", $script_version)):?>
     <div class='test_options'>
-      <dt>Mail: </dt>
+      <dt>Notifications:</dt>
       <dd>
-        <select name="-M" onchange="toggleMail(this);"><option value="0">Never</option><option value="1">On preclear's end</option><option value="2">On every cycles's end</option><option value="3">On every cycles's and step's end</option><option value="4">On every 25% of progress</option></select>
+        <select name="-o" onchange="toggleNotification(this);">
+          <option value="0" selected>None</option>
+          <option value="1">Notify using browser-popups only</option>
+          <option value="2">Notify using e-mail only</option>
+          <option value="3">Notify using browser-popups and e-mail</option>
+          <option value="4">Notify using agents only</option>
+          <option value="5">Notify using browser-popups and agents</option>
+          <option value="6">Notify using e-mail and agents</option>
+          <option value="7">Notify using browser popups, e-mail and agents</option>
+        </select>
       </dd>
-      <div class='mail_options' style='display:none;'>
-        <dt>Notifications:</dt>
+      <div class='notification_options' style='display:none;'>
+        <dt>Interval: </dt>
         <dd>
-          <select name="-o">
-            <option value="1">Notify using browser-popups only</option>
-            <option value="2">Notify using e-mail only</option>
-            <option value="3">Notify using browser-popups and e-mail</option>
-            <option value="4">Notify using agents only</option>
-            <option value="5">Notify using browser-popups and agents</option>
-            <option value="6">Notify using e-mail and agents</option>
-            <option value="7">Notify using browser popups, e-mail and agents</option>
+          <select name="-M">
+            <option value="1" selected>On preclear's end</option>
+            <option value="2">On every cycles's end</option>
+            <option value="3">On every cycles's and step's end</option>
+            <option value="4">On every 25% of progress</option>
           </select>
         </dd>
       </div>
