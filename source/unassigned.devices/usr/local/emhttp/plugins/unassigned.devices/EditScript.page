@@ -138,7 +138,7 @@ Script content:
     // create a random id
     var r = Math.floor((Math.random()*1000)+1);
     // Add a new span and load fileTree
-    p.after("<span id='fileTree"+r+"' class='fileTree'></span>");
+    p.after("<span id='fileTree"+r+"' class='textarea fileTree'></span>");
     var ft = $('#fileTree'+r);
     ft.fileTree({
       root: root,

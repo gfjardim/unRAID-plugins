@@ -48,7 +48,7 @@ function get_unasigned_disks() {
   natsort($paths);
   $unraid_flash = realpath("/dev/disk/by-label/UNRAID");
   $unraid_disks = array();
-  foreach (parse_ini_string(shell_exec("/root/mdcmd status 2>/dev/null")) as $k => $v) {
+  foreach (parse_ini_string(shell_exec("/usr/bin/cat /proc/mdcmd 2>/dev/null")) as $k => $v) {
     if (strpos($k, "rdevName") !== FALSE && strlen($v)) {
       $unraid_disks[] = realpath("/dev/$v");
     }
@@ -87,7 +87,7 @@ function get_all_disks_info($bus="all") {
   foreach ($disks as $key => $disk) {
     if ($disk['type'] != $bus && $bus != "all") continue;
     $disk['temperature'] = get_temp($key);
-    $disk['size'] = intval(trim(shell_exec("blockdev --getsize64 ${key} 2>/dev/null")));
+    $disk['size'] = sprintf("%s %s", my_scale( intval(trim(shell_exec("blockdev --getsize64 ${key} 2>/dev/null"))) , $unit), $unit);
     $disk = array_merge($disk, get_disk_info($key));
     $disks[$key] = $disk;
   }
@@ -98,11 +98,15 @@ function get_all_disks_info($bus="all") {
 function get_disk_info($device, $reload=FALSE){
   $disk = array();
   $attrs = parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device ) 2>/dev/null"));
+  exec("smartctl -i -d sat,12 $device 2>/dev/null", $smartInfo);
   $device = realpath($device);
-    $disk['serial']       = $attrs['ID_SERIAL'];
-    $disk['serial_short'] = $attrs['ID_SERIAL_SHORT'];
-    $disk['device']       = $device;
-    return $disk;
+  $disk['serial']       = $attrs['ID_SERIAL'];
+  $disk['serial_short'] = $attrs['ID_SERIAL_SHORT'];
+  $disk['device']       = $device;
+  $disk['family']       = trim(split(":", array_values(preg_grep("#Model Family#", $smartInfo))[0])[1]);
+  $disk['model']        = trim(split(":", array_values(preg_grep("#Device Model#", $smartInfo))[0])[1]);
+  $disk['firmware']     = trim(split(":", array_values(preg_grep("#Firmware Version#", $smartInfo))[0])[1]);
+  return $disk;
 }
 function is_disk_running($dev) {
   $state = trim(shell_exec("hdparm -C $dev 2>/dev/null| grep -c standby"));
@@ -121,6 +125,7 @@ if (isset($_POST['display'])) $display = $_POST['display'];
 switch ($_POST['action']) {
   case 'get_content':
     $disks = get_all_disks_info();
+    echo "<script>var disksInfo = Object; var disksInfo =".json_encode($disks).";</script>";
     echo "<table class='preclear custom_head'><thead><tr><td>Device</td><td>Identification</td><td>Temp</td><td>Size</td><td>Preclear Status</td></tr></thead>";
     echo "<tbody>";
     if ( count($disks) ) {
@@ -159,7 +164,7 @@ switch ($_POST['action']) {
           } 
         }
         $status = str_replace("^n", " " , $status);
-        echo "<td><span>".my_scale($disk['size'], $unit)." $unit</span></td>";
+        echo "<td><span>${disk[size]}</span></td>";
         echo (is_file($script_file)) ? "<td>$status</td>" : "<td>Script not present</td>";
         echo "</tr>";
         $odd = ($odd == "odd") ? "even" : "odd";

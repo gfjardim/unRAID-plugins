@@ -394,7 +394,7 @@ function get_unasigned_disks() {
   natsort($paths);
   $unraid_flash = realpath("/dev/disk/by-label/UNRAID");
   $unraid_disks = array();
-  foreach (parse_ini_string(shell_exec("/root/mdcmd status 2>/dev/null")) as $k => $v) {
+  foreach (parse_ini_string(shell_exec("/usr/bin/cat /proc/mdcmd 2>/dev/null")) as $k => $v) {
     if (strpos($k, "rdevName") !== FALSE && strlen($v)) {
       $unraid_disks[] = realpath("/dev/$v");
     }

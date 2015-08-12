@@ -6,6 +6,7 @@ Icon="preclear.disk.png"
 $plugin = "preclear.disk";
 $script_file = "/boot/config/plugins/preclear.disk/preclear_disk.sh";
 $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>/dev/null|cut -d: -f2")) : FALSE;
+
 ?>
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/<?=$plugin;?>.css">
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/waitMe.min.css">
@@ -46,6 +47,7 @@ $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>
 <script type="text/javascript">
   var URL = '/plugins/<?=$plugin;?>/Preclear.php';
   var display = <?=json_encode($display);?>;
+
   <?echo ($script_version) ? "$('.tabs').append('<span id=\"progress\" class=\"status\">Script: <span class=\"green\">Present, version $script_version</span></span>');" : "$('.tabs').append('<span id=\"progress\" class=\"status\">Script: <span class=\"red\">Not present</span></span>');";
   ?>
   function get_content() {
@@ -61,7 +63,11 @@ $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>
   }
   function start_preclear(serial, device){
     var title = 'Start Preclear';
-    $( "#dialog-start" ).html("<dl><dt>Disk:</dt><dd><span style='color:#CC0000;font-weight:bold;'>"+serial+"</span></dd></dl>");
+    $( "#dialog-start" ).html("<dl><dt>Model Family:</dt><dd style='margin-bottom:0px;'><span style='color:#CC0000;font-weight:bold;'>"+getDiskInfo(device, 'family')+"</span></dd></dl>");
+    $( "#dialog-start" ).append("<dl><dt>Device Model:</dt><dd style='margin-bottom:0px;'><span style='color:#CC0000;font-weight:bold;'>"+getDiskInfo(device, 'model')+"</span></dd></dl>");
+    $( "#dialog-start" ).append("<dl><dt>Serial Number:</dt><dd style='margin-bottom:0px;'><span style='color:#CC0000;font-weight:bold;'>"+getDiskInfo(device, 'serial_short')+"</span></dd></dl>");
+    $( "#dialog-start" ).append("<dl><dt>Firmware Version:</dt><dd style='margin-bottom:0px;'><span style='color:#CC0000;font-weight:bold;'>"+getDiskInfo(device, 'firmware')+"</span></dd></dl>");
+    $( "#dialog-start" ).append("<dl><dt>Size:</dt><dd style='margin-bottom:0px;'><span style='color:#CC0000;font-weight:bold;'>"+getDiskInfo(device, 'size')+"</span></dd></dl><hr style='margin-left:12px;'>");
     $( "#dialog-start" ).append($("#start-defaults").html());
     $( "#dialog-start" ).find(".switch").switchButton({labels_placement:"right",on_label:'YES',off_label:'NO'});
     $( "#dialog-start" ).find(".switch-button-background").css("margin-top", "6px");
@@ -161,6 +167,13 @@ $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>
       $(el).parent().siblings('.notification_options').css('display','block');
     } else {
       $(el).parent().siblings('.notification_options').css('display','none');
+    }
+  }
+  function getDiskInfo(device, info){
+    for (var i = disksInfo.length - 1; i >= 0; i--) {
+      if (disksInfo[i]['device'].indexOf(device) > -1 ){
+        return disksInfo[i][info];
+      }
     }
   }
 </script>
