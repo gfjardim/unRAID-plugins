@@ -264,7 +264,7 @@ rm -f /var/state/&name;.ini
 rm -f /var/state/&name;
 
 # Remove all plugin files.
-rm -f -r /usr/local/emhttp/plugins/&name;
+removepkg &name;-&version;
 
 # Remove symlink to unassigned_mount.
 rm -f /usr/local/sbin/unassigned_mount
