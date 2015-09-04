@@ -1,3 +1,3 @@
-ACTION=="add", KERNEL=="sd*", ENV{DEVTYPE}=="partition" RUN+="/usr/local/sbin/unassigned_mount"
-ACTION=="change", ENV{DEVTYPE}=="partition" RUN+="/usr/local/sbin/unassigned_reload"
-ACTION=="remove", ENV{ID_TYPE}=="disk" RUN+="/usr/local/sbin/unassigned_umount"
+ACTION=="add", KERNEL=="sd*", ENV{DEVTYPE}=="partition" RUN+="/usr/local/emhttp/plugins/unassigned.devices/scripts/unassigned_mount"
+ACTION=="change", ENV{DEVTYPE}=="partition" RUN+="/usr/local/emhttp/plugins/unassigned.devices/scripts/unassigned_reload"
+ACTION=="remove", ENV{ID_TYPE}=="disk" RUN+="/usr/local/emhttp/plugins/unassigned.devices/scripts/unassigned_umount"
