@@ -7,7 +7,6 @@ function write_log($string) {
   if (empty($string)) {
     return;
   }
-  syslog(LOG_INFO, $string);
   $string = str_replace("\n", "<br>", $string);
   $string = str_replace('"', "\\\"", trim($string));
   echo "<script>addLog(\"{$string}\");</script>";

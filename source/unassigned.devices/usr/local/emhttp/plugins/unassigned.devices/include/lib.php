@@ -454,7 +454,7 @@ function get_udev_info($device, $udev=NULL, $reload) {
     // debug("Using udev cache for '$device'.");
     return $state[$device];
   } else {
-    $state[$device] = parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device ) 2>/dev/null"));
+    $state[$device] = parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device 2>/dev/null) 2>/dev/null"));
     save_ini_file($paths['state'], $state);
     // debug("Not using udev cache for '$device'.");
     return $state[$device];

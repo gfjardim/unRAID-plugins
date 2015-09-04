@@ -52,10 +52,10 @@ function render_partition($disk, $partition) {
   $mbutton = "<span style='width:auto;text-align:right;'>";
   if ($mounted) {
     $mpoint .= "<a href='/Shares/Browse?dir={$partition[mountpoint]}' target='_blank'>{$partition[mountpoint]}</a></div>";
-    $mbutton .= "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/usr/local/sbin/unassigned_umount ${partition[device]}');\"><i class='glyphicon glyphicon-export'></i> Unmount</button>";
+    $mbutton .= "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/plugins/unassigned.devices/scripts/unassigned_umount','${partition[device]}');\"><i class='glyphicon glyphicon-export'></i> Unmount</button>";
   } else {
     $mpoint .= "<form method='POST' action='/plugins/${plugin}/UnassignedDevices.php?action=change_mountpoint&serial={$partition[serial]}&partition={$partition[part]}' target='progressFrame' style='display:inline;margin:0;padding:0;'><span class='text exec'><a>{$partition[mountpoint]}</a></span><input class='input' type='text' name='mountpoint' value='{$partition[mountpoint]}' hidden /></form></div>";
-    $mbutton .= "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/usr/local/sbin/unassigned_mount ${partition[device]}');\"><i class='glyphicon glyphicon-import'></i>  Mount</button>";
+    $mbutton .= "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/plugins/unassigned.devices/scripts/unassigned_mount','${partition[device]}');\"><i class='glyphicon glyphicon-import'></i>  Mount</button>";
   }
   
   $out[] = "<tr class='$outdd toggle-parts toggle-".basename($disk['device'])."' style='__SHOW__' >";
@@ -91,9 +91,9 @@ switch ($_POST['action']) {
 
         $mbutton = "<span style='width:auto;text-align:right;'>";
         if ($mounted) {
-          $mbutton .= "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/usr/local/sbin/unassigned_umount ${disk[device]}');\"><i class='glyphicon glyphicon-export'></i> Unmount</button>";
+          $mbutton .= "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/plugins/unassigned.devices/scripts/unassigned_umount','${disk[device]}');\"><i class='glyphicon glyphicon-export'></i> Unmount</button>";
         } else {
-          $mbutton .= "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/usr/local/sbin/unassigned_mount ${disk[device]}');\"><i class='glyphicon glyphicon-import'></i>  Mount</button>";
+          $mbutton .= "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/plugins/unassigned.devices/scripts/unassigned_mount','${disk[device]}');\"><i class='glyphicon glyphicon-import'></i>  Mount</button>";
         }
 
         $preclear_link = (! $mounted && file_exists("plugins/preclear.disk/icons/precleardisk.png")) ? " <a title='Preclear' class='exec green' href='/Settings/Preclear'><img src='plugins/preclear.disk/icons/precleardisk.png'></a>" : "";
@@ -155,7 +155,7 @@ switch ($_POST['action']) {
           <input class='input' type='text' name='mountpoint' value='{$mount[mountpoint]}' hidden />
           </form></td>";
         }
-        echo "<td><span style='width:auto;text-align:right;'>".($mounted ? "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/usr/local/sbin/unassigned_umount {$mount[device]}');\"><i class='glyphicon glyphicon-export'></i> Unmount</button>" : "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/usr/local/sbin/unassigned_mount {$mount[device]}');\"><i class='glyphicon glyphicon-import'></i>  Mount</button>")."</span></td>";
+        echo "<td><span style='width:auto;text-align:right;'>".($mounted ? "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/plugins/unassigned.devices/scripts/unassigned_umount','{$mount[device]}');\"><i class='glyphicon glyphicon-export'></i> Unmount</button>" : "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"usb_mount('/plugins/unassigned.devices/scripts/unassigned_mount','{$mount[device]}');\"><i class='glyphicon glyphicon-import'></i>  Mount</button>")."</span></td>";
         echo "<td><span>".my_scale($mount['size'], $unit)." $unit</span></td>";
         echo render_used_and_free($mount);
         echo "<td><input type='checkbox' class='samba_automount' device='{$mount[device]}' ".(($mount['automount']) ? 'checked':'')."></td>";
@@ -313,13 +313,13 @@ switch ($_GET['action']) {
     $partition = urldecode($_GET['partition']);
     $mountpoint = urldecode($_POST['mountpoint']);
     set_config($serial, "mountpoint.${partition}", $mountpoint);
-    require_once("/usr/local/emhttp/update.htm");
+    require_once("/update.htm");
     break;
   case 'change_samba_mountpoint':
     $device = urldecode($_GET['device']);
     $mountpoint = urldecode($_POST['mountpoint']);
     set_samba_config($device, "mountpoint", $mountpoint);
-    require_once("/usr/local/emhttp/update.htm");
+    require_once("/update.htm");
     break;
 }
 ?>
