@@ -4,7 +4,7 @@
 <!ENTITY name      "unassigned.devices">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.08.29">
+<!ENTITY version   "2015.08.12">
 <!ENTITY launch    "Main/UnassignedDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -13,12 +13,6 @@
 
 <CHANGES>
 ##&name;
-
-###2015.08.29
-- Fix: 6.1-rc6 compatibility.
-- Add: Move unassigned.devices scripts from /usr/local/sbin to usr/local/emhttp/plugins/&name;/scripts.
-- Add: Create symlinks to /usr/local/sbin for backwards compatibility.
-- Fix: Fixed package removal issues.
 
 ###2015.08.12
 - Fix: 6.1-rc3 compatibility
@@ -145,10 +139,10 @@
 </CHANGES>
 
 <!--
-The 'bundle' file.
+The 'source' file.
 -->
-<FILE Name="/boot/config/plugins/&name;/&name;-&version;.tgz">
-<URL>https://raw.github.com/gfjardim/unRAID-plugins/master/archive/&name;-&version;.tgz</URL>
+<FILE Name="/boot/config/plugins/&name;/&name;-&version;.txz" Run="upgradepkg --install-new">
+<URL>https://raw.github.com/gfjardim/unRAID-plugins/master/archive/&name;-&version;.txz</URL>
 </FILE>
 
 <!--
@@ -191,23 +185,8 @@ The 'post-install' script.
 -->
 <FILE Run="/bin/bash">
 <INLINE>
-# Install the 'bundle'.
-tar -xf /boot/config/plugins/&name;/&name;-&version;.tgz -C /usr/local/emhttp/plugins
-
-# Create a symlink to udevadm.
-ln -s /sbin/udevadm /usr/local/emhttp/plugins/&name;/scripts/
-
-# Create a symlink to rm.
-ln -s /bin/rm /usr/local/emhttp/plugins/&name;/scripts/
-
 # fix permissions of executable files
-chmod +x /usr/local/emhttp/plugins/&name;/scripts/unassigned_* /usr/local/emhttp/plugins/&name;/event/*
-
-# Create a symlink to unassigned_mount.
-ln -s /usr/local/emhttp/plugins/&name;/scripts/unassigned_mount /usr/local/sbin
-
-# Create a symlink to unassigned_umount.
-ln -s /usr/local/emhttp/plugins/&name;/scripts/unassigned_umount /usr/local/sbin
+chmod +x /usr/local/sbin/unassigned_* /usr/local/emhttp/plugins/&name;/event/*
 
 # create mount point
 mkdir -p /mnt/disks
@@ -215,7 +194,7 @@ mkdir -p /mnt/disks
 # mount disks if array is started
 if [[ -e /proc/mdcmd ]]; then
   if [[ $(cat /proc/mdcmd|grep mdState|cut -d"=" -f2) == STARTED ]]; then
-    /usr/local/emhttp/plugins/&name;/scripts/unassigned_mount all
+    /usr/local/sbin/unassigned_mount all
   fi
 fi
 
@@ -225,10 +204,10 @@ if [[ -e /usr/local/emhttp/plugins/dynamix/OpenDevices.page ]]; then
 fi
 
 # Update file access mode
-# chmod 644 $(awk '/\.(htm|php|js|page|css|png|plg|gif|cfg|md)$/ {print "/"$0}' /var/log/packages/&name;-&version;)
+chmod 644 $(awk '/\.(htm|php|js|page|css|png|plg|gif|cfg|md)$/ {print "/"$0}' /var/log/packages/&name;-&version;)
 
 # Cleaning old source files
-find /boot/config/plugins/&name;/ -type f -iname "&name;*.tgz" ! -iname "*&version;*" -delete
+find /boot/config/plugins/&name;/ -type f -iname "&name;*.txz" ! -iname "*&version;*" -delete
 
 # reload udev rules
 udevadm control --reload-rules
@@ -250,37 +229,19 @@ The 'remove' script.
 <FILE Run="/bin/bash" Method="remove">
 <INLINE>
 
-# remove udev rules
-rm -f /etc/udev/rules.d/99_persistent_unassigned.rules
-
-# reload udev rules
-udevadm control --reload-rules
-
 # Remove plugin related files
 # rm -rf /boot/config/plugins/&name;
 rm -f /tmp/plugins/&name;.plg
 
 # umount usb disks
-/usr/local/emhttp/plugins/&name;/scripts/unassigned_umount all
-rmdir /mnt/disks
+/usr/local/sbin/unassigned_umount all
 
-# remove state files.
-rm -f /var/state/&name;.ini
-rm -f /var/state/&name;
-
-# Remove all plugin files.
-rm -f -r /usr/local/emhttp/plugins/&name;
-
-# Remove symlink to unassigned_mount.
-rm -f /usr/local/sbin/unassigned_mount
-
-# Remove symlink to unassigned_umount.
-rm -f /usr/local/sbin/unassigned_umount
+# Uninstall the 'source' package
+removepkg &name;-&version;
 
 # Remove ntfs-3g and extfs
-removepkg ntfs-3g-2015.3.14-x86_64-1
+removepkg ntfs-3g-2014.2.15-x86_64-1
 removepkg fuse-exfat-1.1.0-x86_64-1_SBo
-removepkg exfat-utils-1.1.1-x86_64-1_SBo
 removepkg hfsprogs-332.25-x86_64-2sl
 removepkg libbsd-0.6.0-x86_64-1sl
 
