@@ -234,7 +234,7 @@ switch ($_GET['action']) {
     echo (is_file("webGui/scripts/dynamix.js")) ? "<script type='text/javascript' src='/webGui/scripts/dynamix.js'></script>" : 
                                                   "<script type='text/javascript' src='/webGui/javascript/dynamix.js'></script>";
     $content = tmux_get_session("preclear_disk_".$device);
-    if ( $content === NULL)) {
+    if ( $content === NULL ) {
       echo "<script>window.close();</script>";
     }
     echo "<pre>".preg_replace("#\n+#", "<br>", $content)."</pre>";
