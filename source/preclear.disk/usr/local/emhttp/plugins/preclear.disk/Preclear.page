@@ -5,7 +5,7 @@ Icon="preclear.disk.png"
 <?
 $plugin = "preclear.disk";
 $script_file = "/boot/config/plugins/preclear.disk/preclear_disk.sh";
-$script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>/dev/null|cut -d: -f2")) : FALSE;
+$script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>/dev/null|cut -d: -f2")) : NULL;
 
 ?>
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/<?=$plugin;?>.css">
@@ -51,7 +51,13 @@ $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>
   <?echo ($script_version) ? "$('.tabs').append('<span id=\"progress\" class=\"status\">Script: <span class=\"green\">Present, version $script_version</span></span>');" : "$('.tabs').append('<span id=\"progress\" class=\"status\">Script: <span class=\"red\">Not present</span></span>');";
   ?>
   function get_content() {
-   $.post(URL,{action:"get_content",display:display},function(data){$('#unassigned_devices_list').html(data);}).always(function(){setTimeout('get_content()',<?=$display['refresh'] ? $display['refresh'] : "10000";?>);});
+    $.post(URL,{action:"get_content",display:display},function(data){
+      $('#unassigned_devices_list').html(data);
+      if (typeof(initialDisk) !== 'undefined') {
+        start_preclear(initialDisk);
+        delete window.initialDisk;
+      }
+    }).always(function(){setTimeout('get_content()',<?=$display['refresh'] ? $display['refresh'] : "10000";?>);});
   }
   function openPreclear(device) {
     var width=900;
@@ -61,7 +67,7 @@ $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>
     var options = 'resizeable=yes,scrollbars=yes,height=600,width=900,top='+top+',left='+left;
     window.open('/plugins/<?=$plugin;?>/Preclear.php?action=show_preclear&device='+device, 'Preclear', options);
   }
-  function start_preclear(serial, device){
+  function start_preclear(device){
     var title = 'Start Preclear';
     $( "#dialog-start" ).html("<dl><dt>Model Family:</dt><dd style='margin-bottom:0px;'><span style='color:#CC0000;font-weight:bold;'>"+getDiskInfo(device, 'family')+"</span></dd></dl>");
     $( "#dialog-start" ).append("<dl><dt>Device Model:</dt><dd style='margin-bottom:0px;'><span style='color:#CC0000;font-weight:bold;'>"+getDiskInfo(device, 'model')+"</span></dd></dl>");
@@ -91,7 +97,7 @@ $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>
           opts["-W"] = getVal(this, "-W");
           opts["-f"] = getVal(this, "-f");
           opts["-o"] = getVal(this, "-o");
-          $.post(URL,opts,function(data){if(data){alert(data);} openPreclear(device)}).always(function(data){location.reload();});
+          $.post(URL,opts,function(data){if(data){alert(data);} openPreclear(device)}).always(function(data){window.location=window.location.pathname+window.location.hash;});
           startWaitMe('#unassigned_devices_list');
           $( this ).dialog( "close" );
         },
@@ -121,7 +127,7 @@ $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>
       hide : {effect: 'fade' , duration: 250},
       buttons: {
         "Stop": function() {
-          $.post(URL,{action:"stop_preclear",device:device}).always(function(){location.reload();});
+          $.post(URL,{action:"stop_preclear",device:device}).always(function(){window.location=window.location.pathname+window.location.hash;});
           startWaitMe('#unassigned_devices_list');
           $( this ).dialog( "close" );
         },
@@ -140,7 +146,7 @@ $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>
     return value = ( $(el).attr('type') == 'checkbox' ) ? ($(el).is(':checked') ? "on" : "off") : $(el).val();
   }
   function clear_preclear(device) {
-    $.post(URL,{action:"clear_preclear",device:device}).always(function(){location.reload();});
+    $.post(URL,{action:"clear_preclear",device:device}).always(function(){window.location=window.location.pathname+window.location.hash;});
   }
   function startWaitMe(el) {
     <?if ($display['theme'] == 'white'):?>
@@ -260,4 +266,5 @@ $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>
 </div>
 <script type="text/javascript">
   startWaitMe('#unassigned_devices_list');get_content();
+  <?if (isset($_GET['disk'])) echo "initialDisk = '{$_GET[disk]}'";?>
 </script>

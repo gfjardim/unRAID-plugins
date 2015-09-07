@@ -92,6 +92,7 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
 </style>
 <script type="text/javascript">
   var display = <?=json_encode($display);?>;
+  var vars = <?=json_encode($var);?>;
   var tab_usbdisks = $('input[name$="tabs"]').length;
   $('#tab'+tab_usbdisks).bind({click:function() {pin_tab(tab_usbdisks); detect_usb_disk_change(tab_usbdisks);}});
   $(function(){usb_disks(tab_usbdisks);detect_usb_disk_change(tab_usbdisks);});
@@ -246,7 +247,28 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
     $(".ui-dialog .ui-dialog-content").css('padding-top','15px').css('vertical-align','bottom');
     $(".ui-button-text").css('padding','0px 5px');
   }
-  function load_shares() {
+  function load_hosts(el) {
+    old = $(el).html();
+    $(el).html("<i class='fa fa-circle-o-notch fa-spin'></i> Searching ...");
+    $.post(URL,{'action':'list_samba_hosts','var':vars}).done(function(data){
+      $(el).html(old);
+      if (data) {
+        var hosts = data.split('\n');
+        if (hosts.length) {
+          var add = "<select name='IP'>";
+          for(var i = 0;i < hosts.length;i++){
+            if (hosts[i].length) {
+              add += "<option value='"+hosts[i]+"'>"+hosts[i]+"</option>";
+            }
+          }
+          $("#dialog-samba").find(".samba_hosts").html(add+"</select>");
+        }
+      }
+    });
+  }
+  function load_shares(el) {
+    old = $(el).html();
+    $(el).html("<i class='fa fa-circle-o-notch fa-spin'></i> Loading ...");
     var opts = new Object();
     opts["action"] = "list_samba_shares";
     opts["IP"] = getVal("#dialog-samba","IP");
@@ -254,6 +276,7 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
     opts["PASS"] = getVal("#dialog-samba","PASS");
     if (! opts.IP.length) return false;
     $.post(URL,opts).done(function(data){
+      $(el).html(old);
       if (data) {
         var shares = data.split('\n');
         if (shares.length) {
@@ -274,6 +297,7 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
   }
 </script>
 <div style='display: inline; float: right; margin: -58px -14px;' id='unassigned_tabbed'></div>
+<div class="font_preload" style="opacity: 0"><span style="font-family: 'FontAwesome', Arial, sans-serif;"></span></div>
 <form id="formUsbMount" method="POST" action="/update.php" target="progressFrame">
   <input type="hidden" id="cmdUsbMount" name="#command" value="" />
 </form>
@@ -282,7 +306,11 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
 <div id="add_samba-defaults" style="display:none;">
   <dl>
     <dt>IP/Host:</dt>
-    <dd><input type="text" name="IP"></dd>
+    <dd><span class="samba_hosts"><input type="text" name="IP"></span></dd>
+    <dt>&nbsp;</dt>
+    <dd>
+      <button type="button" onclick="load_hosts(this);">Search for hosts in <?=$var['WORKGROUP'];?></button>
+    </dd>
     <dt>Username:</dt>
     <dd><input type="text" name="USER"></dd>
     <dt>Password:</dt>

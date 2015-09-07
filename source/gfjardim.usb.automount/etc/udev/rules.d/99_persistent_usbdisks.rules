@@ -1,2 +1,0 @@
-ACTION=="add", KERNEL=="sd*", ENV{DEVTYPE}=="partition" RUN+="/usr/local/sbin/usb_mount"
-ACTION=="remove", ENV{ID_TYPE}=="disk" RUN+="/usr/local/sbin/usb_umount"

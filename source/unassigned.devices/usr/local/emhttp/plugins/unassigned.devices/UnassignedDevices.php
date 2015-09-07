@@ -4,6 +4,7 @@ require_once("plugins/${plugin}/include/lib.php");
 require_once ("webGui/include/Helpers.php");
 
 if (isset($_POST['display'])) $display = $_POST['display'];
+if (isset($_POST['var'])) $var = $_POST['var'];
 
 function pid_is_running($pid) {
   return file_exists( "/proc/$pid" );
@@ -25,7 +26,7 @@ function render_used_and_free($partition) {
       $o .= "<td>".my_scale($partition['used'], $unit)." $unit</td>";
       $o .= "<td>".my_scale($partition['avail'], $unit)." $unit</td>";
     } else {
-      $free = round(100*$partition['avail']/$partition['size']);
+      $free = $partition['size'] ? round(100*$partition['avail']/$partition['size']) : 0;
       $used = 100-$free;
       $o .= "<td><div class='usage-disk'><span style='margin:0;width:{$used}%' class='".usage_color($used,false)."'><span>".my_scale($partition['used'], $unit)." $unit</span></span></div></td>";
       $o .= "<td><div class='usage-disk'><span style='margin:0;width:{$free}%' class='".usage_color($free,true)."'><span>".my_scale($partition['avail'], $unit)." $unit</span></span></div></td>";
@@ -96,7 +97,7 @@ switch ($_POST['action']) {
           $mbutton .= "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"disk_op('mount','${disk[device]}');\"><i class='glyphicon glyphicon-import'></i>  Mount</button>";
         }
 
-        $preclear_link = (! $mounted && file_exists("plugins/preclear.disk/icons/precleardisk.png")) ? " <a title='Preclear' class='exec green' href='/Settings/Preclear'><img src='plugins/preclear.disk/icons/precleardisk.png'></a>" : "";
+        $preclear_link = (! $mounted && file_exists("plugins/preclear.disk/icons/precleardisk.png")) ? " <a title='Preclear' class='exec green' href='/Settings/Preclear?disk={$disk_name}'><img src='/plugins/preclear.disk/icons/precleardisk.png'></a>" : "";
         if ($p === FALSE) {
           $hdd_serial = "<span class='exec toggle-hdd' hdd='{$disk_name}'><i class='glyphicon glyphicon-hdd hdd'></i><i class='glyphicon glyphicon-plus-sign glyphicon-append'></i>{$disk[serial]}</span>{$preclear_link}<div id='preclear_{$disk_name}'></div>";
         } else {
@@ -258,13 +259,13 @@ switch ($_POST['action']) {
   break;
   case 'mount':
     $device = urldecode($_POST['device']);
-    if (file_exists($device)) {
+    if (file_exists($device) || strpos($device, "//") === 0 ) {
       exec("plugins/${plugin}/scripts/unassigned_mount $device 2>&1");
     }
   break;
   case 'umount':
     $device = urldecode($_POST['device']);
-    if (file_exists($device)) {
+    if (file_exists($device) || strpos($device, "//") === 0 ) {
       echo exec("plugins/${plugin}/scripts/unassigned_umount $device 2>&1");
     }
   break;
@@ -279,6 +280,22 @@ switch ($_POST['action']) {
     $login = $user ? ($pass ? "-U '{$user}%{$pass}'" : "-U '{$user}' -N") : "-U%";
     echo shell_exec("smbclient -g -L $ip $login 2>&1|awk -F'|' '/Disk/{print $2}'|sort");
   break;
+  case 'list_samba_hosts':
+    $hosts = array();
+    foreach ( explode(PHP_EOL, shell_exec("/usr/bin/nmblookup {$var[WORKGROUP]} 2>/dev/null") ) as $l ) {
+      if (! is_bool( strpos( $l, "<00>") ) ) {
+        $ip = explode(" ", $l)[0];
+        foreach ( explode(PHP_EOL, shell_exec("/usr/bin/nmblookup -r -A $ip 2>&1") ) as $l ) {
+          if (! is_bool( strpos( $l, "<00>") ) ) {
+            $hosts[] = trim(explode(" ", $l)[0])."\n";
+            break;
+          }
+        }
+      }
+    }
+    natsort($hosts);
+    echo implode(PHP_EOL, array_unique($hosts));
+    break;
   case 'add_samba_mount':
     $ip = urldecode($_POST['IP']);
     $user = isset($_POST['USER']) ? urldecode($_POST['USER']) : "";
@@ -328,13 +345,13 @@ switch ($_GET['action']) {
     $partition = urldecode($_GET['partition']);
     $mountpoint = urldecode($_POST['mountpoint']);
     set_config($serial, "mountpoint.${partition}", $mountpoint);
-    require_once("/update.htm");
+    require_once("update.htm");
     break;
   case 'change_samba_mountpoint':
     $device = urldecode($_GET['device']);
     $mountpoint = urldecode($_POST['mountpoint']);
     set_samba_config($device, "mountpoint", $mountpoint);
-    require_once("/update.htm");
+    require_once("update.htm");
     break;
 }
 ?>

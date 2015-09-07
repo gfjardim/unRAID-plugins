@@ -4,7 +4,7 @@
 <!ENTITY name      "unassigned.devices">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.09.04">
+<!ENTITY version   "2015.09.07">
 <!ENTITY launch    "Main/UnassignedDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -13,6 +13,13 @@
 
 <CHANGES>
 ##&name;
+
+###2015.09.07
+- Fix: SMB mount not working.
+- Fix: mount path change not working.
+- Fix: division by zero if SMB mount fail.
+- Add: search for SMB hosts in the current workgroup.
+- Improvment: better integration with Preclear Disk.
 
 ###2015.09.04
 - Fix: 6.1 compatibility.
