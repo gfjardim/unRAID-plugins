@@ -106,8 +106,13 @@ The 'post-install' script.
 -->
 <FILE Run="/bin/bash">
 <INLINE>
-# setting up the corrent screen type to tmux
+# Setting up the correct screen type for tmux
 echo 'set -g default-terminal "xterm"' > /root/.tmux.conf
+
+# Create a symlink to /root/mdcmd
+if [[ ! -e /root/mdcmd ]]; then
+  ln -sf /usr/local/sbin/mdcmd /root/mdcmd
+fi
 
 # Update file access mode
 chmod 644 $(awk '/\.(htm|php|js|page|css|png|plg|gif|cfg|md)$/ {print "/"$0}' /var/log/packages/&name;-&version;)
