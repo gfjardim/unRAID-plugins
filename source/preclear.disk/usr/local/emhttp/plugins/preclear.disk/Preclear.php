@@ -4,6 +4,8 @@ require_once ("webGui/include/Helpers.php");
 $script_file = "/boot/config/plugins/preclear.disk/preclear_disk.sh";
 $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>/dev/null|cut -d: -f2")) : FALSE;
 
+if (isset($_POST['display'])) $display = $_POST['display'];
+
 function is_tmux_executable() {
   return is_file("/usr/bin/tmux") ? (is_executable("/usr/bin/tmux") ? TRUE : FALSE) : FALSE;
 }
@@ -13,6 +15,7 @@ function tmux_is_session($name) {
 }
 function tmux_new_session($name) {
   if (! tmux_is_session($name)) {
+    putenv("TERMINFO=/usr/lib64/terminfo");
     exec("/usr/bin/tmux new-session -d -x 140 -y 200 -s '${name}' 2>/dev/null");
   }
 }
@@ -119,8 +122,6 @@ function get_temp($dev) {
   }
   return "*";
 }
-
-if (isset($_POST['display'])) $display = $_POST['display'];
 
 switch ($_POST['action']) {
   case 'get_content':
