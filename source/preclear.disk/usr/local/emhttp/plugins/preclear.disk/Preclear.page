@@ -7,6 +7,10 @@ $plugin = "preclear.disk";
 $script_file = "/boot/config/plugins/preclear.disk/preclear_disk.sh";
 $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>/dev/null|cut -d: -f2")) : NULL;
 
+function tmux_is_session($name) {
+  exec('/usr/bin/tmux ls 2>/dev/null|cut -d: -f1', $screens);
+  return in_array($name, $screens);
+}
 ?>
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/<?=$plugin;?>.css">
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/waitMe.min.css">
@@ -53,9 +57,9 @@ $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>
   function get_content() {
     $.post(URL,{action:"get_content",display:display},function(data){
       $('#unassigned_devices_list').html(data);
-      if (typeof(initialDisk) !== 'undefined') {
-        start_preclear(initialDisk);
-        delete window.initialDisk;
+      if (typeof(startDisk) !== 'undefined') {
+        start_preclear(startDisk);
+        delete window.startDisk;
       }
     }).always(function(){setTimeout('get_content()',<?=$display['refresh'] ? $display['refresh'] : "10000";?>);});
   }
@@ -266,5 +270,8 @@ $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>
 </div>
 <script type="text/javascript">
   startWaitMe('#unassigned_devices_list');get_content();
-  <?if (isset($_GET['disk'])) echo "initialDisk = '{$_GET[disk]}'";?>
+  <?if (isset($_GET['disk']) && ! tmux_is_session("preclear_disk_{$_GET[disk]}")) {
+    echo "startDisk = '{$_GET[disk]}'";
+  }
+  ?>
 </script>
