@@ -15,7 +15,6 @@ function tmux_is_session($name) {
 }
 function tmux_new_session($name) {
   if (! tmux_is_session($name)) {
-    putenv("TERMINFO=/usr/lib64/terminfo");
     exec("/usr/bin/tmux new-session -d -x 140 -y 200 -s '${name}' 2>/dev/null");
   }
 }

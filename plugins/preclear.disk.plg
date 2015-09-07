@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.09.07b">
+<!ENTITY version   "2015.09.07c">
 <!ENTITY launch    "Settings/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -15,7 +15,7 @@
 <CHANGES>
 ##&name;
 
-###2015.09.07b
+###2015.09.07c
 - Add: terminfo package due to unRAID's 6.1.1 absense.
 
 ###2015.09.07a
@@ -86,14 +86,6 @@ The 'readvz' script.
 </FILE>
 
 <!--
-aaa_terminfo-5.8-x86_64-1.txz
--->
-<FILE Name="/boot/config/plugins/&name;/aaa_terminfo-5.8-x86_64-1.txz" Run="upgradepkg --install-new">
-<URL>http://slackware.osuosl.org/slackware64-14.1/slackware64/a/aaa_terminfo-5.8-x86_64-1.txz</URL>
-<MD5>8bde463dbd54a37f521fd73163e51cb5</MD5>
-</FILE>
-
-<!--
 tmux-1.8-x86_64-1.txz
 -->
 <FILE Name="/boot/config/plugins/&name;/tmux-1.8-x86_64-1.txz" Run="upgradepkg --install-new">
@@ -114,6 +106,8 @@ The 'post-install' script.
 -->
 <FILE Run="/bin/bash">
 <INLINE>
+# setting up the corrent screen type to tmux
+echo 'set -g default-terminal "xterm"' > /root/.tmux.conf
 
 # Update file access mode
 chmod 644 $(awk '/\.(htm|php|js|page|css|png|plg|gif|cfg|md)$/ {print "/"$0}' /var/log/packages/&name;-&version;)
@@ -140,7 +134,7 @@ The 'remove' script.
 
 # Remove plugin related files
 rm -rf /boot/config/plugins/&name;
-rm -f /tmp/plugins/&name;.plg /boot/readvz
+rm -f /tmp/plugins/&name;.plg /boot/readvz /root/.tmux.conf
 
 # Uninstall the 'source' package
 removepkg &name;-&version;
