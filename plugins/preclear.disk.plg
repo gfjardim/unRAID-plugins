@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.09.07c">
+<!ENTITY version   "2015.09.07d">
 <!ENTITY launch    "Settings/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -15,11 +15,9 @@
 <CHANGES>
 ##&name;
 
-###2015.09.07c
-- Add: terminfo package due to unRAID's 6.1.1 absense.
-
-###2015.09.07a
-- Improvment: better integration with Unassigned Devices.
+###2015.09.07d
+- Improvement: better integration with Unassigned Devices.
+- Fix: unRAID 6.1.1 doesn't have a 'screen' terminal descriptor; xterm used instead.
 
 ###2015.08.12
 - Fix: 6.1-rc3 compatibility
@@ -106,9 +104,6 @@ The 'post-install' script.
 -->
 <FILE Run="/bin/bash">
 <INLINE>
-# Setting up the correct screen type for tmux
-echo 'set -g default-terminal "xterm"' > /root/.tmux.conf
-
 # Create a symlink to /root/mdcmd
 if [[ ! -e /root/mdcmd ]]; then
   ln -sf /usr/local/sbin/mdcmd /root/mdcmd

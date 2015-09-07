@@ -16,17 +16,19 @@ function tmux_is_session($name) {
 function tmux_new_session($name) {
   if (! tmux_is_session($name)) {
     exec("/usr/bin/tmux new-session -d -x 140 -y 200 -s '${name}' 2>/dev/null");
+    # Set TERM to xterm
+    tmux_send_command($name, "export TERM=xterm && tput clear");
   }
 }
 function tmux_get_session($name) {
-  return (tmux_is_session($name)) ? shell_exec("/usr/bin/tmux capture-pane -t '${name}' 2>/dev/null;/usr/bin/tmux show-buffer 2>&1") : "";
+  return (tmux_is_session($name)) ? shell_exec("/usr/bin/tmux capture-pane -t '${name}' 2>/dev/null;/usr/bin/tmux show-buffer 2>&1") : NULL;
 }
 function tmux_send_command($name, $cmd) {
   exec("/usr/bin/tmux send -t '$name' '$cmd' ENTER 2>/dev/null");
 }
 function tmux_kill_window($name) {
   if (tmux_is_session($name)) {
-    exec("/usr/bin/tmux kill-window -t '${name}' 2>/dev/null");
+    exec("/usr/bin/tmux kill-session -t '${name}' 2>/dev/null");
   }
 }
 function reload_partition($name) {
@@ -231,8 +233,11 @@ switch ($_GET['action']) {
     $device = urldecode($_GET['device']);
     echo (is_file("webGui/scripts/dynamix.js")) ? "<script type='text/javascript' src='/webGui/scripts/dynamix.js'></script>" : 
                                                   "<script type='text/javascript' src='/webGui/javascript/dynamix.js'></script>";
-    // echo str_replace("\n", "<br>", tmux_get_session("preclear_disk_".$device));
-    echo "<pre>".preg_replace("#\n+#", "<br>", tmux_get_session("preclear_disk_".$device))."</pre>";
+    $content = tmux_get_session("preclear_disk_".$device);
+    if ( $content === NULL)) {
+      echo "<script>window.close();</script>";
+    }
+    echo "<pre>".preg_replace("#\n+#", "<br>", $content)."</pre>";
     echo "<script>document.title='Preclear for disk /dev/{$device} ';$(function(){setTimeout('location.reload()',5000);});</script>";
     break;
 }
