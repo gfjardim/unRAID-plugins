@@ -1,8 +1,10 @@
 <?
 $plugin = "preclear.disk";
 require_once ("webGui/include/Helpers.php");
-$script_file = "/boot/config/plugins/preclear.disk/preclear_disk.sh";
-$script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>/dev/null|cut -d: -f2")) : FALSE;
+$script_file    = "/boot/config/plugins/preclear.disk/preclear_disk.sh";
+$script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>/dev/null|cut -d: -f2")) : NULL;
+$fast_postread  = $script_version ? (strpos(file_get_contents($script_file), "fast_postread") ? TRUE : FALSE ) : FALSE;
+$notifications  = $script_version ? (strpos(file_get_contents($script_file), "notify_channels") ? TRUE : FALSE ) : FALSE;
 
 if (isset($_POST['display'])) $display = $_POST['display'];
 

@@ -63,11 +63,12 @@
 #                 default in the absence of "-A" or "-a" option.
 # Version 1.14  - Added text describing how -A and -a options are not used or needed on disks > 2.2TB.
 #                 Added additional logic to detect assigned drives in the newest of 5.0 releases.
-# Version 1.15  - a) Added PID to preclear_stat_sdX files and support for notifications - gfjardim
-#                 b) Add notification channel choice
-#                 c) Added support for fast post read (bjp999)
+# Version 1.15  - Added export of LC_CTYPE=C to prevent unicode use on 64 bit printf.
+#                 Added PID to preclear_stat_sdX files and support for notifications - gfjardim
+#                 Add notification channel choice - gfjardim
+#                 Added support for fast post read - bjp999
 #                 Remove /root/mdcmd dependency - gfjardim
-ver="1.15c"
+ver="1.15"
 
 progname=$0
 options=$*

@@ -6,6 +6,8 @@ Icon="preclear.disk.png"
 $plugin = "preclear.disk";
 $script_file = "/boot/config/plugins/preclear.disk/preclear_disk.sh";
 $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>/dev/null|cut -d: -f2")) : NULL;
+$fast_postread  = $script_version ? (strpos(file_get_contents($script_file), "fast_postread") ? TRUE : FALSE ) : FALSE;
+$notifications  = $script_version ? (strpos(file_get_contents($script_file), "notify_channels") ? TRUE : FALSE ) : FALSE;
 
 function tmux_is_session($name) {
   exec('/usr/bin/tmux ls 2>/dev/null|cut -d: -f1', $screens);
@@ -208,7 +210,7 @@ function tmux_is_session($name) {
         <select name="-c"><?for ($i=1; $i <= 20; $i++){echo "<option value='$i'>$i</option>";}?></select>
       </dd>
     </div>
-    <?if (preg_match("#\d+c$#", $script_version)):?>
+    <?if ($notifications):?>
     <div class='test_options'>
       <dt>Notifications:</dt>
       <dd>
@@ -250,7 +252,7 @@ function tmux_is_session($name) {
         <input type="checkbox" name="-W" class="switch" >
       </dd>
     </div>
-    <?if (preg_match("#\d+[bc]$#", $script_version)):?>
+    <?if ($fast_postread):?>
     <div class='test_options'>
       <dt>Fast post-read verify: </dt>
       <dd>
