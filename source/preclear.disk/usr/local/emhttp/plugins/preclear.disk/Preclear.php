@@ -17,7 +17,7 @@ function tmux_new_session($name) {
   if (! tmux_is_session($name)) {
     exec("/usr/bin/tmux new-session -d -x 140 -y 200 -s '${name}' 2>/dev/null");
     # Set TERM to xterm
-    tmux_send_command($name, "export TERM=xterm && tput clear");
+    // tmux_send_command($name, "export TERM=xterm && tput clear");
   }
 }
 function tmux_get_session($name) {
