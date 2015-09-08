@@ -63,8 +63,9 @@
 #                 default in the absence of "-A" or "-a" option.
 # Version 1.14  - Added text describing how -A and -a options are not used or needed on disks > 2.2TB.
 #                 Added additional logic to detect assigned drives in the newest of 5.0 releases.
-# Version 1.15  - a) Added PID to preclear_stat_sdX files and support for notifications - gfjardim
-#                 b) Add notification channel choice (-o option)
+# Version 1.15  - Added PID to preclear_stat_sdX files and support for notifications - gfjardim
+#                 Add notification channel choice (-o option) - gfjardim
+#                 Remove /root/mdcmd dependency - gfjardim
 ver="1.15b"
 
 progname=$0
@@ -307,8 +308,8 @@ send_mail() {
   description=$(echo ${2} | tr "'" '`' )
   message=$(echo ${3} | tr "'" '`' )
   recipient=${4}
-  if [ -f "/usr/local/sbin/notify" ]; then
-    /usr/local/sbin/notify -e "Preclear ${model} ${serial}" -s """${subject}""" -d """${description}""" -m """${message}""" -i "normal ${notify_channels}"
+  if [ -f "/usr/local/emhttp/plugins/dynamix/scripts/notify" ]; then
+    /usr/local/emhttp/plugins/dynamix/scripts/notify -e "Preclear ${model} ${serial}" -s """${subject}""" -d """${description}""" -m """${message}""" -i "normal ${notify_channels}"
   else
     echo -e "${message}" | mail -s "${subject}" "${recipient}"
   fi
@@ -1328,7 +1329,7 @@ exec </dev/tty
 # First, do some basic tests to ensure the disk  is not part of the arrray
 # and not mounted, and not in use in any way.
 #----------------------------------------------------------------------------------
-devices=`/root/mdcmd status | strings | grep rdevName | sed 's/\([^=]*\)=\([^=]\)/\/dev\/\2/'`
+devices=`cat /proc/mdcmd | strings | grep rdevName | sed 's/\([^=]*\)=\([^=]\)/\/dev\/\2/'`
 
 echo $devices | grep $theDisk >/dev/null 2>&1
 if [  $? = 0 ]
