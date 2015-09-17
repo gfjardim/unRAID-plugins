@@ -4,7 +4,7 @@
 <!ENTITY name      "unassigned.devices">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.09.17b">
+<!ENTITY version   "2015.09.17c">
 <!ENTITY launch    "Main/UnassignedDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -15,6 +15,9 @@
 ##&name;
 
 ###&version;
+- Fix: black CSS conformity
+
+2015.09.17b
 - Fix: UDEV killing long run scripts;
 
 ###2015.09.17a

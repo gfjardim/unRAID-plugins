@@ -28,14 +28,10 @@ function tmux_is_session($name) {
 <link type="text/css" rel="stylesheet" href="/webGui/styles/jquery.switchbutton.css">
 <?endif;?>
 
+<link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/style-<?=$display['theme'];?>.css">
+
 <style>
-  <?if ($display['theme'] == 'white'):?>
-  table.custom_head thead tr td{font-size:13px;font-weight:normal;background:-webkit-radial-gradient(#E0E0E0,#C0C0C0);background:linear-gradient(#E0E0E0,#C0C0C0);padding:5px 20px 5px 6px;white-space:nowrap;text-align:left;}
-  table.custom_head tbody tr.even{background-color:#F8F8F8;}
-  <?else:?>
-  table.custom_head thead tr td{font-size:13px;font-weight:normal;background:-webkit-radial-gradient(#101010,#202020);background:linear-gradient(#101010,#202020);padding:5px 20px 5px 6px;white-space:nowrap;text-align:left;}
-  table.custom_head tbody tr.even{background-color: #0C0C0C;}
-  <?endif;?>
+
   table.preclear {padding:0px;margin:-21px 0px 22px 0px;border-collapse:collapse;white-space:nowrap;}
   table.preclear thead tr>td{text-align:left;width:8%;padding-left:12px;}
   table.preclear thead tr>td+td{text-align:left;width:auto;padding-left:12px;}
@@ -75,11 +71,11 @@ function tmux_is_session($name) {
   }
   function start_preclear(device){
     var title = 'Start Preclear';
-    $( "#dialog-start" ).html("<dl><dt>Model Family:</dt><dd style='margin-bottom:0px;'><span style='color:#CC0000;font-weight:bold;'>"+getDiskInfo(device, 'family')+"</span></dd></dl>");
-    $( "#dialog-start" ).append("<dl><dt>Device Model:</dt><dd style='margin-bottom:0px;'><span style='color:#CC0000;font-weight:bold;'>"+getDiskInfo(device, 'model')+"</span></dd></dl>");
-    $( "#dialog-start" ).append("<dl><dt>Serial Number:</dt><dd style='margin-bottom:0px;'><span style='color:#CC0000;font-weight:bold;'>"+getDiskInfo(device, 'serial_short')+"</span></dd></dl>");
-    $( "#dialog-start" ).append("<dl><dt>Firmware Version:</dt><dd style='margin-bottom:0px;'><span style='color:#CC0000;font-weight:bold;'>"+getDiskInfo(device, 'firmware')+"</span></dd></dl>");
-    $( "#dialog-start" ).append("<dl><dt>Size:</dt><dd style='margin-bottom:0px;'><span style='color:#CC0000;font-weight:bold;'>"+getDiskInfo(device, 'size')+"</span></dd></dl><hr style='margin-left:12px;'>");
+    $( "#dialog-start" ).html("<dl><dt>Model Family:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(device, 'family')+"</span></dd></dl>");
+    $( "#dialog-start" ).append("<dl><dt>Device Model:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(device, 'model')+"</span></dd></dl>");
+    $( "#dialog-start" ).append("<dl><dt>Serial Number:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(device, 'serial_short')+"</span></dd></dl>");
+    $( "#dialog-start" ).append("<dl><dt>Firmware Version:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(device, 'firmware')+"</span></dd></dl>");
+    $( "#dialog-start" ).append("<dl><dt>Size:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(device, 'size')+"</span></dd></dl><hr style='margin-left:12px;'>");
     $( "#dialog-start" ).append($("#start-defaults").html());
     $( "#dialog-start" ).find(".switch").switchButton({labels_placement:"right",on_label:'YES',off_label:'NO'});
     $( "#dialog-start" ).find(".switch-button-background").css("margin-top", "6px");
@@ -112,10 +108,7 @@ function tmux_is_session($name) {
         }
       }
     });
-    $(".ui-dialog .ui-dialog-titlebar").addClass('menu');
-    $(".ui-dialog .ui-dialog-title").css('text-align','center').css( 'width', "100%");
-    $(".ui-dialog .ui-dialog-content").css('padding-top','15px').css('vertical-align','bottom');
-    $(".ui-button-text").css('padding','0px 5px');
+
   }
   function remove_session(device) {
     $.post(URL,{action:"stop_preclear",device:device}).always(function(){window.location=window.location.pathname+window.location.hash;});
@@ -142,10 +135,6 @@ function tmux_is_session($name) {
         }
       }
     });
-    $(".ui-dialog .ui-dialog-titlebar").addClass('menu');
-    $(".ui-dialog .ui-dialog-title").css('text-align','center').css( 'width', "100%");
-    $(".ui-dialog .ui-dialog-content").css('padding-top','15px').css('font-weight','bold');
-    $(".ui-button-text").css('padding','0px 5px');
   }
   function getVal(el, name) {
     el = $(el).find("*[name="+name+"]");

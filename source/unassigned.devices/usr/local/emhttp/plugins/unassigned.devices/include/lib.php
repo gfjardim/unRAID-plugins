@@ -93,7 +93,7 @@ function lsof($dir) {
 function get_temp($dev) {
   $tc = $GLOBALS["paths"]["hdd_temp"];
   $temps = is_file($tc) ? json_decode(file_get_contents($tc),TRUE) : array();
-  if (isset($temps[$dev]) && (time() - $temps[$dev]['timestamp']) < 60 ) {
+  if (isset($temps[$dev]) && (time() - $temps[$dev]['timestamp']) < 120 ) {
     return $temps[$dev]['temp'];
   } else if (is_disk_running($dev)) {
     $temp = trim(shell_exec("smartctl -A -d sat,12 $dev 2>/dev/null| grep -m 1 -i Temperature_Celsius | awk '{print $10}'"));

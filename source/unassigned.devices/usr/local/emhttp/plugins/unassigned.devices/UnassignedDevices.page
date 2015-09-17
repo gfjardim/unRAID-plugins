@@ -8,7 +8,6 @@ require_once("plugins/${plugin}/include/lib.php");
 if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/OpenDevices.page","plugins/dynamix/OpenDevices.page-");
 ?>
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/waitMe.min.css">
-<link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/automount.css">
 
 <?if (is_file("webGui/scripts/jquery.switchButton.js")): # Pre 6.1?>
 <script type="text/javascript" src="/webGui/scripts/jquery.switchButton.js"></script>
@@ -21,6 +20,7 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
 <?endif;?>
 
 <script type="text/javascript" src="/plugins/<?=$plugin;?>/assets/waitMe.min.js"></script>
+<link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/style-<?=$display['theme'];?>.css">
 
 <script type="text/javascript">
   var this_tab = $('input[name$="tabs"]').length;
@@ -47,13 +47,6 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
   });
 </script>
 <style>
-  <?if ($display['theme'] == 'white'):?>
-  table.custom_head thead tr td{font-size:13px;font-weight:normal;background:-webkit-radial-gradient(#E0E0E0,#C0C0C0);background:linear-gradient(#E0E0E0,#C0C0C0);padding:5px 20px 5px 6px;white-space:nowrap;text-align:left;}
-  table.custom_head tbody tr.even{background-color:#F8F8F8;}
-  <?else:?>
-  table.custom_head thead tr td{font-size:13px;font-weight:normal;background:-webkit-radial-gradient(#101010,#202020);background:linear-gradient(#101010,#202020);padding:5px 20px 5px 6px;white-space:nowrap;text-align:left;}
-  table.custom_head tbody tr.even{background-color: #0C0C0C;}
-  <?endif;?>
   table.usb_disks thead tr>td{text-align:left;width:8%;padding-left:12px;}
   table.usb_disks {padding:0px;margin:-21px 0px 22px 0px;border-collapse:collapse;white-space:nowrap;}
   table.usb_disks tr>td{text-align:left;width:8%;padding-left:12px;padding-right:0;white-space:nowrap;}
@@ -173,10 +166,6 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
         }
       }
     });
-    $(".ui-dialog .ui-dialog-titlebar").addClass('menu');
-    $(".ui-dialog .ui-dialog-title").css('text-align','center').css( 'width', "100%");
-    $(".ui-dialog .ui-dialog-content").css('padding-top','15px').css('font-weight','bold');
-    $(".ui-button-text").css('padding','0px 5px');
   }
   function remove_samba_config(device){
     var title = 'Removing SMB mount';
@@ -201,10 +190,6 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
         }
       }
     });
-    $(".ui-dialog .ui-dialog-titlebar").addClass('menu');
-    $(".ui-dialog .ui-dialog-title").css('text-align','center').css( 'width', "100%");
-    $(".ui-dialog .ui-dialog-content").css('padding-top','15px').css('font-weight','bold');
-    $(".ui-button-text").css('padding','0px 5px');
   }
   function showInput(){
     $(this).off('click');
@@ -242,10 +227,10 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
           $( this ).dialog( "close" );
           var opts = new Object();
           opts["action"] = "add_samba_mount";
-          opts["IP"] = getVal("#dialog-samba","IP");
-          opts["USER"] = getVal("#dialog-samba","USER");
-          opts["PASS"] = getVal("#dialog-samba","PASS");
-          opts["SHARE"] = getVal("#dialog-samba","SHARE");
+          opts["IP"]    = getVal(this,"IP");
+          opts["USER"]  = getVal(this,"USER");
+          opts["PASS"]  = getVal(this,"PASS");
+          opts["SHARE"] = getVal(this,"SHARE");
           if (opts.SHARE && opts.IP) {
             $.post(URL,opts).done(function(){usb_disks(tab_usbdisks);});
           }
@@ -255,10 +240,6 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
         }
       }
     });
-    $(".ui-dialog .ui-dialog-titlebar").addClass('menu');
-    $(".ui-dialog .ui-dialog-title").css('text-align','center').css( 'width', "100%");
-    $(".ui-dialog .ui-dialog-content").css('padding-top','15px').css('vertical-align','bottom');
-    $(".ui-button-text").css('padding','0px 5px');
   }
   function load_hosts(el) {
     old = $(el).html();
@@ -334,10 +315,6 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
         }
       }
     });
-    $(".ui-dialog .ui-dialog-titlebar").addClass('menu');
-    $(".ui-dialog .ui-dialog-title").css('text-align','center').css( 'width', "100%");
-    $(".ui-dialog .ui-dialog-content").css('padding-top','15px').css('font-weight','bold');
-    $(".ui-button-text").css('padding','0px 5px');
   }
   function sendLog() {
     $.post(URL,{'action':'send_log'}).always(function(){notifier();});
