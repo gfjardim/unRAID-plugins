@@ -29,7 +29,7 @@ jQuery UI adaptation to unRAID's style
   padding: 0px 5px;
 }
 .ui-dialog .ui-dialog-titlebar-close {
-  top:40%;
+  top:45%;
 }
 .ui-dialog .ui-button-text-only {
   margin: .5em .4em .5em 0;

@@ -4,9 +4,10 @@
 <!ENTITY name      "unassigned.devices">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.09.17c">
+<!ENTITY version   "2015.09.17d">
 <!ENTITY launch    "Main/UnassignedDevices">
-<!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
+<!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
+<!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
 ]>
 
 <PLUGIN name="&name;" author="&author;" launch="&launch;" version="&version;" pluginURL="&pluginURL;">
@@ -16,6 +17,7 @@
 
 ###&version;
 - Fix: black CSS conformity
+- Fix: not working on non-tabbed mode
 
 2015.09.17b
 - Fix: UDEV killing long run scripts;
@@ -168,10 +170,17 @@
 </CHANGES>
 
 <!--
-The 'bundle' file.
+The 'plugin' package file.
 -->
-<FILE Name="/boot/config/plugins/&name;/&name;-&version;.txz"  Run="upgradepkg --install-new">
-<URL>https://raw.github.com/gfjardim/unRAID-plugins/master/archive/&name;-&version;.txz</URL>
+<FILE Name="/boot/config/plugins/&name;/&name;-&version;.txz">
+<URL>&gitURL;/archive/&name;-&version;.txz</URL>
+</FILE>
+
+<!--
+The 'plugin' package MD5 hash.
+-->
+<FILE Name="/boot/config/plugins/&name;/&name;-&version;.md5">
+<URL>&gitURL;/archive/&name;-&version;.md5</URL>
 </FILE>
 
 <!--
@@ -186,7 +195,7 @@ ntfs-3g-2015.3.14-x86_64-1.txz
 exfat-utils-1.1.1-x86_64-1_SBo.tgz
 -->
 <FILE Name="/boot/config/plugins/&name;/exfat-utils-1.1.1-x86_64-1_SBo.tgz" Run="upgradepkg --install-new">
-<URL>https://raw.github.com/gfjardim/unRAID-plugins/master/source/packages/exfat-utils-1.1.1-x86_64-1_SBo.tgz</URL>
+<URL>&gitURL;/source/packages/exfat-utils-1.1.1-x86_64-1_SBo.tgz</URL>
 <MD5>4fb02d6580694edc762f2493dcb823f3</MD5>
 </FILE>
 
@@ -194,7 +203,7 @@ exfat-utils-1.1.1-x86_64-1_SBo.tgz
 fuse-exfat-1.1.0-x86_64-1_SBo.tgz
 -->
 <FILE Name="/boot/config/plugins/&name;/fuse-exfat-1.1.0-x86_64-1_SBo.tgz" Run="upgradepkg --install-new">
-<URL>https://raw.github.com/gfjardim/unRAID-plugins/master/source/packages/fuse-exfat-1.1.0-x86_64-1_SBo.tgz</URL>
+<URL>&gitURL;/source/packages/fuse-exfat-1.1.0-x86_64-1_SBo.tgz</URL>
 <MD5>ad8b518169c59eabed73263d36e56575</MD5>
 </FILE>
 
@@ -227,6 +236,17 @@ The 'post-install' script.
 -->
 <FILE Run="/bin/bash">
 <INLINE>
+# Verify and install plugin package
+sum1=$(/usr/bin/md5sum /boot/config/plugins/&name;/&name;-&version;.txz)
+sum2=$(/usr/bin/cat /boot/config/plugins/&name;/&name;-&version;.md5)
+if [ "${sum1:0:32}" != "${sum2:0:32}" ]; then
+  echo "Wrong 'plugin' package md5 hash."
+  rm /boot/config/plugins/&name;/&name;-&version;.txz
+  rm /boot/config/plugins/&name;/&name;-&version;.md5
+  exit 1
+else
+  upgradepkg --install-new /boot/config/plugins/&name;/&name;-&version;.txz
+fi
 
 # Create a symlink to rm.
 ln -s /bin/rm /usr/local/emhttp/plugins/&name;/scripts/
