@@ -4,7 +4,7 @@
 <!ENTITY name      "unassigned.devices">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.09.17">
+<!ENTITY version   "2015.09.17a">
 <!ENTITY launch    "Main/UnassignedDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -14,7 +14,7 @@
 <CHANGES>
 ##&name;
 
-###2015.09.17
+###2015.09.17a
 - Add: Settings Page;
 - Add: SMB security;
 - Add: NFS export;

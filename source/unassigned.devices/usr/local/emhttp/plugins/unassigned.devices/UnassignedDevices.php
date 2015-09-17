@@ -193,6 +193,7 @@ switch ($_POST['action']) {
     foreach ($disks as $disk) $disks_serials[] = $disk['partitions'][0]['serial'];
     $ct = "";
     foreach ($config as $serial => $value) {
+      if($serial == "Config") continue;
       if (! preg_grep("#${serial}#", $disks_serials)){
         $ct .= "<tr><td><img src='/webGui/images/green-blink.png'> missing</td><td>$serial</td><td><input type='checkbox' class='automount' serial='${serial}' ".( is_automount($serial) ? 'checked':'' )."></td><td colspan='7'><a style='cursor:pointer;' onclick='remove_disk_config(\"${serial}\")'>Remove</a></td></tr>";
       }
