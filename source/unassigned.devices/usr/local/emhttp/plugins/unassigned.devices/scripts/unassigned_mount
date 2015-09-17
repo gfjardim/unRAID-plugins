@@ -19,7 +19,6 @@ if (strpos($DEVNAME, "//") === 0 || $DEVNAME == "all") {
       debug("SMB share found with the following attributes: ".(implode(', ', array_map(function($v, $k){$v = (strpos($k, "pass") !== false) ? "*******" : $v; return "$k='$v'"; }, $info, array_keys($info)))));
       debug("Mounting SMB share '$drive' ...");
       if (do_mount( $info )) {
-        touch("/var/state/${plugin}");
         execute_script($info, "ADD");
       }
     }

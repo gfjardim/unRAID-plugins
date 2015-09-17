@@ -80,9 +80,10 @@ function make_mount_button($device) {
     $mounted = is_mounted($device['device']);
   }
   $button = "<span style='width:auto;text-align:right;'><button type='button' style='padding:2px 7px 2px 7px;' onclick=\"disk_op(this, '%s','${device[device]}');\" %s><i class='%s'></i>  %s</button></span>";
-  $is_mounting   = count(preg_grep("@/mounting_".basename($device['device'])."@i", listDir(dirname($paths['mounting']))));
-  $is_unmounting = count(preg_grep("@/unmounting_".basename($device['device'])."@i", listDir(dirname($paths['mounting']))));
-  $disable = ($is_mounting || $is_unmounting) ? "disabled" : "";
+  $is_mounting   = array_values(preg_grep("@/mounting_".basename($device['device'])."@i", listDir(dirname($paths['mounting']))))[0];
+  $is_mounting   = (time() - filemtime($is_mounting) < 300) ? TRUE : FALSE;
+  $is_unmounting = array_values(preg_grep("@/unmounting_".basename($device['device'])."@i", listDir(dirname($paths['mounting']))))[0];
+  $is_unmounting = (time() - filemtime($is_unmounting) < 300) ? TRUE : FALSE;
   if ($is_mounting) {
     $button = sprintf($button, 'umount', 'disabled', 'fa fa-circle-o-notch fa-spin', 'Mounting...');
   } elseif ($is_unmounting) {
@@ -234,10 +235,10 @@ switch ($_POST['action']) {
     </script>';
     break;
   case 'detect':
-    echo json_encode(array("reload" => is_file("/var/state/${plugin}/reload")));
+    echo json_encode(array("reload" => is_file($paths['reload'])));
     break;
   case 'remove_hook':
-    @unlink("/var/state/${plugin}/reload");
+    @unlink($paths['reload']);
     break;
   case 'automount':
     $serial = urldecode(($_POST['serial']));

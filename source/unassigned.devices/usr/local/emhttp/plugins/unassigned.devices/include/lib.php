@@ -10,7 +10,7 @@ $paths = array("smb_extra"       => "/boot/config/smb-extra.conf",
                "state"           => "/var/state/${plugin}/${plugin}.ini",
                "hdd_temp"        => "/var/state/${plugin}/hdd_temp.json",
                "samba_mount"     => "/boot/config/plugins/${plugin}/samba_mount.cfg",
-               "reload"          => "/var/state/${plugin}/reload",
+               "reload"          => "/var/state/${plugin}/reload.state",
                "unmounting"      => "/var/state/${plugin}/unmounting_%s.state",
                "mounting"        => "/var/state/${plugin}/mounting_%s.state",
                );

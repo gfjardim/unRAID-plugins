@@ -8,5 +8,5 @@ if (isset($_ENV['DEVLINKS'])) {
     get_udev_info($link, $_ENV, true);
   }
 }
-touch("/var/state/${plugin}/reload");
+touch($paths['reload']);
 ?>
