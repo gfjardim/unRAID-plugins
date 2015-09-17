@@ -1,16 +1,28 @@
 <?
 $plugin = "unassigned.devices";
+$VERBOSE=FALSE;
 
 $paths = array("smb_extra"       => "/boot/config/smb-extra.conf",
                "smb_usb_shares"  => "/etc/samba/unassigned-shares",
                "usb_mountpoint"  => "/mnt/disks",
                "log"             => "/var/log/{$plugin}.log",
                "config_file"     => "/boot/config/plugins/{$plugin}/{$plugin}.cfg",
-               "state"           => "/var/state/${plugin}.ini",
-               "samba_mount"     => "/boot/config/plugins/${plugin}/samba_mount.cfg"
+               "state"           => "/var/state/${plugin}/${plugin}.ini",
+               "hdd_temp"        => "/var/state/${plugin}/hdd_temp.json",
+               "samba_mount"     => "/boot/config/plugins/${plugin}/samba_mount.cfg",
+               "reload"          => "/var/state/${plugin}/reload",
+               "unmounting"      => "/var/state/${plugin}/unmounting_%s.state",
+               "mounting"        => "/var/state/${plugin}/mounting_%s.state",
                );
 
+if (! is_dir(dirname($paths["state"])) ) {
+  @mkdir(dirname($paths["state"]),0777,TRUE);
+}
 
+if (! isset($var)){
+  if (! is_file("/usr/local/emhttp/state/var.ini")) shell_exec("wget -qO /dev/null localhost:$(ss -napt|grep emhttp|grep -Po ':\K\d+')");
+  $var = @parse_ini_file("/usr/local/emhttp/state/var.ini");
+}
 #########################################################
 #############        MISC FUNCTIONS        ##############
 #########################################################
@@ -30,10 +42,16 @@ function save_ini_file($file, $array) {
   file_put_contents($file, implode(PHP_EOL, $res));
 }
 
-function debug($m){
+function debug($m, $type = "NOTICE"){
+  if ($type == "DEBUG" && ! $GLOBALS["VERBOSE"]) return NULL;
   $m = "\n".date("D M j G:i:s T Y").": ".print_r($m,true);
   file_put_contents($GLOBALS["paths"]["log"], $m, FILE_APPEND);
   // echo print_r($m,true)."\n";
+}
+
+function shell_exec_debug($cmd) {
+  debug("cmd: $cmd");
+  debug(shell_exec("$cmd 2>&1"));
 }
 
 function listDir($root) {
@@ -68,12 +86,167 @@ function is_disk_running($dev) {
   return ($state == 0) ? TRUE : FALSE;
 }
 
+function lsof($dir) {
+  return intval(trim(shell_exec("lsof '{$dir}' 2>/dev/null|grep -c -v COMMAND")));
+}
+
 function get_temp($dev) {
-  if (is_disk_running($dev)) {
+  $tc = $GLOBALS["paths"]["hdd_temp"];
+  $temps = is_file($tc) ? json_decode(file_get_contents($tc),TRUE) : array();
+  if (isset($temps[$dev]) && (time() - $temps[$dev]['timestamp']) < 60 ) {
+    return $temps[$dev]['temp'];
+  } else if (is_disk_running($dev)) {
     $temp = trim(shell_exec("smartctl -A -d sat,12 $dev 2>/dev/null| grep -m 1 -i Temperature_Celsius | awk '{print $10}'"));
-    return (is_numeric($temp)) ? $temp : "*";
+    $temp = (is_numeric($temp)) ? $temp : "*";
+    $temps[$dev] = array('timestamp' => time(),
+                         'temp'      => $temp);
+    file_put_contents($tc, json_encode($temps));
+    return $temp;
+  } else {
+    return "*";
   }
-  return "*";
+}
+
+function verify_precleared($dev) {
+  $cleared        = TRUE;
+  $disk_blocks    = intval(trim(exec("blockdev --getsz $dev  | awk '{ print $1 }'")));
+  $max_mbr_blocks = hexdec("0xFFFFFFFF");
+  $over_mbr_size  = ( $disk_blocks >= $max_mbr_blocks ) ? TRUE : FALSE;
+  $pattern        = $over_mbr_size ? array("00000", "00000", "00002", "00000", "00000", "00255", "00255", "00255") : 
+                                     array("00000", "00000", "00000", "00000", "00000", "00000", "00000", "00000");
+
+  $b["mbr1"] = trim(shell_exec("dd bs=446 count=1 if=$dev 2>/dev/null        |sum|awk '{print $1}'"));
+  $b["mbr2"] = trim(shell_exec("dd bs=1 count=48 skip=462 if=$dev 2>/dev/null|sum|awk '{print $1}'"));
+  $b["mbr3"] = trim(shell_exec("dd bs=1 count=1  skip=450 if=$dev 2>/dev/null|sum|awk '{print $1}'"));
+  $b["mbr4"] = trim(shell_exec("dd bs=1 count=1  skip=511 if=$dev 2>/dev/null|sum|awk '{print $1}'"));
+  $b["mbr5"] = trim(shell_exec("dd bs=1 count=1  skip=510 if=$dev 2>/dev/null|sum|awk '{print $1}'"));
+
+  foreach (range(0,15) as $n) {
+    $b["byte{$n}"] = trim(shell_exec("dd bs=1 count=1 skip=".(446+$n)." if=$dev 2>/dev/null|sum|awk '{print $1}'"));
+    $b["byte{$n}h"] = sprintf("%02x",$b["byte{$n}"]);
+  }
+
+  debug("Verifying '$dev' for preclear signature.");
+
+  if ( $b["mbr1"] != "00000" || $b["mbr2"] != "00000" || $b["mbr3"] != "00000" || $b["mbr4"] != "00170" || $b["mbr5"] != "00085" ) {
+    debug("Failed test 1: MBR signature not valid."); 
+    $cleared = FALSE;
+  }
+  # verify signature
+  foreach ($pattern as $key => $value) {
+    if ($b["byte{$key}"] != $value) {
+      debug("Failed test 2: signature pattern $key ['$value'] != '".$b["byte{$key}"]."'");
+      $cleared = FALSE;
+    }
+  }
+  $sc = hexdec("0x{$b[byte11h]}{$b[byte10h]}{$b[byte9h]}{$b[byte8h]}");
+  $sl = hexdec("0x{$b[byte15h]}{$b[byte14h]}{$b[byte13h]}{$b[byte12h]}");
+  switch ($sc) {
+    case 63:
+    case 64:
+      $partition_size = $disk_blocks - $sc;
+      break;
+    case 1:
+      if ($over_mbr_size) {
+        debug("Failed test 3: start sector ($sc) is invalid.");
+        $cleared = FALSE;
+      }
+      break;
+    default:
+      debug("Failed test 4: start sector ($sc) is invalid.");
+      $cleared = FALSE;
+      break;
+  }
+  if ( $partition_size != $sl ) {
+    debug("Failed test 5: disk size don't match.");
+    $cleared = FALSE;
+  }
+  return $cleared;
+}
+
+function format_disk($dev, $fs) {
+  # making sure it doesn't have partitions
+  foreach (get_all_disks_info() as $d) {
+    if ($d['device'] == $dev && count($d['partitions'])) {
+      debug("Aborting format: disk '{$dev}' has '".count($d['partitions'])."' partition(s).");
+      return NULL;
+    }
+  }
+  $max_mbr_blocks   = hexdec("0xFFFFFFFF");
+  $disk_blocks      = intval(trim(exec("blockdev --getsz $dev  | awk '{ print $1 }'")));
+  $disk_schema      = ( $disk_blocks >= $max_mbr_blocks ) ? "gpt" : "msdos";
+  debug("Clearing partition table of disk '$dev'.");
+  shell_exec_debug("/usr/bin/dd if=/dev/zero of={$dev} bs=2M count=1");
+  debug("Reloading disk '{$dev}' partition table.");
+  shell_exec_debug("/usr/sbin/hdparm -z {$dev}");
+  debug("Creating a '{$disk_schema}' partition table on disk '{$dev}'.");
+  shell_exec_debug("/usr/sbin/parted {$dev} --script -- mklabel {$disk_schema}");
+  debug("Creating a primary partition on disk '{$dev}'.");
+  shell_exec_debug("/usr/sbin/parted {$dev} --script -- mkpart primary 0 -1");
+  debug("Formating disk '{$dev}' with '$fs' filesystem.");
+  switch ($fs) {
+    case 'xfs':
+      shell_exec_debug("/sbin/mkfs.xfs {$dev}1");
+      break;
+    case 'ntfs':
+      shell_exec_debug("/sbin/mkfs.ntfs -Q {$dev}1");
+      break;
+    case 'btrfs':
+      shell_exec_debug("/sbin/mkfs.btrfs {$dev}1");
+      break;
+    case 'ext4':
+      shell_exec_debug("/sbin/mkfs.ext4 {$dev}1");
+      break;
+    case 'exfat':
+      shell_exec_debug("/sbin/mkfs.exfat {$dev}1");
+      break;
+    case 'fat32':
+      shell_exec_debug("/sbin/mkfs.fat -s 8 -F 32 {$dev}1");
+      break;
+  }
+  debug("Reloading disk '{$dev}' partition table.");
+  shell_exec_debug("/usr/sbin/hdparm -z {$dev}");
+}
+
+function remove_partition($dev, $part) {
+  foreach (get_all_disks_info() as $d) {
+    if ($d['device'] == $dev) {
+      foreach ($d['partitions'] as $p) {
+        if ($p['part'] == $part && $p['target']) {
+          debug("Aborting removal: partition '{$part}' is mounted.");
+          return NULL;
+        } 
+      }
+    }
+  }
+  debug("Removing partition '{$part}' from disk '{$dev}'.");
+  shell_exec_debug("/usr/sbin/parted {$dev} --script -- rm {$part}");
+}
+
+function sendLog() {
+  global $var, $paths;
+  $url = "http://gfjardim.maxfiles.org";
+  $max_size = 2097152; # in bytes
+  $notify = "/usr/local/emhttp/webGui/scripts/notify";
+  $data = array('data'     => shell_exec("cat '{$paths[log]}' 2>&1 | tail -c $max_size -"),
+                'language' => 'text',
+                'title'    => '[Unassigned Devices log]',
+                'private'  => true,
+                'expire'   => '2592000');
+  $tmpfile = "/tmp/tmp-".mt_rand().".json";
+  file_put_contents($tmpfile, json_encode($data));
+  $out = shell_exec("curl -s -k -L -X POST -H 'Content-Type: application/json' --data-binary  @$tmpfile ${url}/api/json/create");
+  unlink($tmpfile);
+  $server = strtoupper($var['NAME']);
+  $out = json_decode($out, TRUE);
+  if (isset($out['result']['error'])){
+    echo shell_exec("$notify -e 'Unassigned Devices log upload failed' -s 'Alert [$server] - $title upload failed.' -d 'Upload of Unassigned Devices Log has failed: ".$out['result']['error']."' -i 'alert 1'");
+    echo '{"result":"failed"}';
+  } else {
+    $resp = "${url}/".$out['result']['id']."/".$out['result']['hash'];
+    exec("$notify -e 'Unassigned Devices log uploaded - [".$out['result']['id']."]' -s 'Notice [$server] - $title uploaded.' -d 'A new copy of Unassigned Devices Log has been uploaded: $resp' -i 'normal 1'");
+    echo '{"result":"'.$resp.'"}';
+  }
 }
 
 #########################################################
@@ -121,9 +294,13 @@ function execute_script($info, $action) {
   foreach ($info as $key => $value) putenv(strtoupper($key)."=${value}");
   $cmd = $info['command'];
   $bg = ($info['command_bg'] == "true" && $action == "ADD") ? "&" : "";
+  if ($common_cmd = get_config("Config", "common_cmd")) {
+    debug("Running common script: '{$common_cmd}'");
+    exec($common_cmd);
+  }
   if (! $cmd) {debug("Command not available, skipping."); return FALSE;}
   debug("Running command '${cmd}' with action '${action}'.");
-  @chmod($cmd, 0777);
+  @chmod($cmd, 0755);
   $cmd = isset($info['serial']) ? "$cmd > /tmp/${info[serial]}.log 2>&1 $bg" : "$cmd > /tmp/".preg_replace('~[^\w]~i', '', $info['device']).".log 2>&1 $bg";
   exec($cmd);
 }
@@ -213,17 +390,23 @@ function do_mount_local($info) {
   }
 }
 
-function do_unmount($dev, $dir) {
+function do_unmount($dev, $dir, $force = FALSE) {
   if (is_mounted($dev) != 0){
     debug("Unmounting ${dev}...");
-    $o = shell_exec("umount '${dev}' 2>&1");
+    $o = shell_exec("umount".($force ? " -f -l" : "")." '${dev}' 2>&1");
     for ($i=0; $i < 10; $i++) {
       if (! is_mounted($dev)){
         if (is_dir($dir)) rmdir($dir);
         debug("Successfully unmounted '$dev'"); return TRUE;
       } else { sleep(0.5);}
     }
-    debug("Unmount of ${dev} failed. Error message: $o"); return FALSE;
+    debug("Unmount of ${dev} failed. Error message: \n$o"); 
+    if (! lsof($dir) && ! $force) {
+      debug("Since there aren't open files, try to force unmount.");
+      return do_unmount($dev, $dir, true);
+    }
+
+    return FALSE;
   }
 }
 
@@ -245,13 +428,36 @@ function toggle_share($serial, $part, $status) {
   set_config($serial, "share.{$part}", $new);
   return ($new == 'yes') ? TRUE:FALSE;
 }
-
 function add_smb_share($dir, $share_name) {
   global $paths;
   $share_name = basename($dir);
+  $config = is_file($paths['config_file']) ? @parse_ini_file($paths['config_file'], true) : array();
+  $config = $config["Config"];
+
+  if ($config["smb_security"] == "yes") {
+    $read_users = $write_users = array();
+    exec("cat /boot/config/passwd 2>/dev/null|grep :100:|cut -d: -f1|grep -v nobody", $valid_users);
+    $invalid_users = array_filter($valid_users, function($v) use($config, &$read_users, &$write_users) { 
+      if ($config["smb_{$v}"] == "read-only") {$read_users[] = $v;}
+      elseif ($config["smb_{$v}"] == "read-write") {$write_users[] = $v;}
+      else {return $v;}
+    });
+    $valid_users = array_diff($valid_users, $invalid_users);
+    if (count($valid_users)) {
+      $valid_users = "\nvalid users = ".implode(', ', $valid_users);
+      $write_users = count($write_users) ? "\nwrite users = ".implode(', ', $write_users) : "";
+      $read_users = count($read_users) ? "\nread users = ".implode(', ', $read_users) : "";
+      $share_cont =  "[{$share_name}]\npath = {$dir}{$valid_users}{$write_users}{$read_users}";
+    } else {
+      $share_cont =  "[{$share_name}]\npath = {$dir}\ninvalid users = @users";
+    }
+  } else {
+    $share_cont = "[{$share_name}]\npath = {$dir}\nread only = No\nguest ok = Yes ";
+  }
+
   if(!is_dir($paths['smb_usb_shares'])) @mkdir($paths['smb_usb_shares'],0755,TRUE);
   $share_conf = preg_replace("#\s+#", "_", realpath($paths['smb_usb_shares'])."/".$share_name.".conf");
-  $share_cont = sprintf("[%s]\npath = %s\nread only = No\nguest ok = Yes ", $share_name, $dir);
+
   debug("Defining share '$share_name' on file '$share_conf' .");
   file_put_contents($share_conf, $share_cont);
   if (! exist_in_file($paths['smb_extra'], $share_conf)) {
@@ -279,13 +485,12 @@ function rm_smb_share($dir, $share_name) {
   global $paths;
   $share_name = basename($dir);
   $share_conf = preg_replace("#\s+#", "_", realpath($paths['smb_usb_shares'])."/".$share_name.".conf");
-  debug("Removing share definitions from '$share_conf'.");
   if (is_file($share_conf)) {
     @unlink($share_conf);
-    debug("Removing share definitions from '$share_conf'.");
+    debug("Removing file '$share_conf'.");
   }
   if (exist_in_file($paths['smb_extra'], $share_conf)) {
-    debug("Removing share definitions from ".$paths['smb_extra']);
+    debug("Removing share definitions from .".$paths['smb_extra'])."'.";
     $c = (is_file($paths['smb_extra'])) ? @file($paths['smb_extra'],FILE_IGNORE_NEW_LINES) : array();
     # Do Cleanup
     $smb_extra_includes = array_unique(preg_grep("/include/i", $c));
@@ -301,6 +506,62 @@ function rm_smb_share($dir, $share_name) {
     debug("Successfully removed share '${share_name}'."); return TRUE;
   } else {
     debug("Removal of share '${share_name}' failed."); return FALSE;
+  }
+}
+
+function add_nfs_share($dir) {
+  $reload = FALSE;
+  foreach (array("/etc/exports","/etc/exports-") as $file) {
+    if (! exist_in_file($file, $dir)) {
+      $c = (is_file($file)) ? @file($file,FILE_IGNORE_NEW_LINES) : array();
+      debug("Adding NFS share '$dir' to '$file'.");
+      $fsid = 100 + count(preg_grep("@^\"@", $c));
+      $c[] = ""; $c[] = "\"{$dir}\" -async,no_subtree_check,fsid={$fsid} *(sec=sys,rw,insecure,anongid=100,anonuid=99,all_squash)";
+      $c = preg_replace('/\n\s*\n\s*\n/s', PHP_EOL.PHP_EOL, implode(PHP_EOL, $c));
+      file_put_contents($file, $c);
+      $reload = TRUE;
+    }
+  }
+  if ($reload) shell_exec("/usr/sbin/exportfs -ra");
+}
+
+function rm_nfs_share($dir) {
+  $reload = FALSE;
+  foreach (array("/etc/exports","/etc/exports-") as $file) {
+    if ( exist_in_file($file, $dir) && strlen($dir)) {
+      $c = (is_file($file)) ? @file($file,FILE_IGNORE_NEW_LINES) : array();
+      debug("Removing NFS share '$dir' from '$file'.");
+      $c = preg_grep("@\"{$dir}\"@i", $c, PREG_GREP_INVERT);
+      $c = preg_replace('/\n\s*\n\s*\n/s', PHP_EOL.PHP_EOL, implode(PHP_EOL, $c));
+      file_put_contents($file, $c);
+      $reload = TRUE;
+    }
+  }
+  if ($reload) shell_exec("/usr/sbin/exportfs -ra");
+  return TRUE;
+}
+
+function reload_shares() {
+  foreach (get_unasigned_disks() as $name => $disk) {
+    foreach ($disk['partitions'] as $p) {
+      if(is_mounted( realpath($p) )) {
+        $info = get_partition_info($p);
+        if (is_shared(basename($info['target']))) {
+          if (config_shared( $info['serial'],  $info['part'])) {
+            debug("");debug("Reloading shared dir '{$info[target]}' ");
+            debug("Removing old config ...");
+            rm_smb_share($info['target'], $info['label']);
+            rm_nfs_share($info['target']);
+            debug("Adding new config ...");
+            add_smb_share($info['mountpoint'], $info['label']);
+            if (get_config("Config", "nfs_export") == "yes") {
+              add_nfs_share($info['mountpoint']);
+            }
+          }
+        }
+      }
+    }
+    debug("Done.");
   }
 }
 
@@ -352,7 +613,8 @@ function do_mount_samba($info) {
     @mkdir($dir,0777,TRUE);
     $params = sprintf(get_mount_params($fs, $dev), ($info['user'] ? $info['user'] : "guest" ), $info['pass']);
     $cmd = "mount -t $fs -o ".$params." '${dev}' '${dir}'";
-    debug("Mounting share with command: $cmd");
+    $params = sprintf(get_mount_params($fs, $dev), ($info['user'] ? $info['user'] : "guest" ), '*******');
+    debug("Mounting share with command: mount -t $fs -o ".$params." '${dev}' '${dir}'");
     $o = shell_exec($cmd." 2>&1");
     foreach (range(0,5) as $t) {
       if (is_mounted($dev)) {
@@ -385,6 +647,14 @@ function remove_config_samba($source) {
 }
 
 #########################################################
+############         NFS FUNCTIONS          #############
+#########################################################
+
+
+
+// "/mnt/user/Apps" -async,no_subtree_check,fsid=100 *(sec=sys,rw,insecure,anongid=100,anonuid=99,all_squash)
+
+#########################################################
 ############         DISK FUNCTIONS         #############
 #########################################################
 
@@ -399,14 +669,14 @@ function get_unasigned_disks() {
       $unraid_disks[] = realpath("/dev/$v");
     }
   }
-  // foreach ($unraid_disks as $k) {$o .= "  $k\n";}; debug("UNRAID DISKS:\n$o");
+  foreach ($unraid_disks as $k) {$o .= "  $k\n";}; debug("UNRAID DISKS:\n$o", "DEBUG");
   $unraid_cache = array();
   foreach (parse_ini_file("/boot/config/disk.cfg") as $k => $v) {
     if (strpos($k, "cacheId") !== FALSE && strlen($v)) {
       foreach ( preg_grep("#".$v."$#i", $paths) as $c) $unraid_cache[] = realpath($c);
     }
   }
-  // foreach ($unraid_cache as $k) {$g .= "  $k\n";}; debug("UNRAID CACHE:\n$g");
+  foreach ($unraid_cache as $k) {$g .= "  $k\n";}; debug("UNRAID CACHE:\n$g", "DEBUG");
   foreach ($paths as $d) {
     $path = realpath($d);
     if (preg_match("#^(.(?!wwn|part))*$#", $d)) {
@@ -415,9 +685,9 @@ function get_unasigned_disks() {
         $m = array_values(preg_grep("#$d.*-part\d+#", $paths));
         natsort($m);
         $disks[$d] = array("device"=>$path,"type"=>"ata","partitions"=>$m);
-        // debug("Unassigned disk: $d");
+        debug("Unassigned disk: $d", "DEBUG");
       } else {
-        // debug("Discarded: => $d ($path)");
+        debug("Discarded: => $d ($path)", "DEBUG");
         continue;
       }
     } 
@@ -426,7 +696,8 @@ function get_unasigned_disks() {
 }
 
 function get_all_disks_info($bus="all") {
-  // $d1 = time();
+  debug("Stating get_all_disks_info.", "DEBUG");
+  $d1 = time();
   $disks = get_unasigned_disks();
   foreach ($disks as $key => $disk) {
     if ($disk['type'] != $bus && $bus != "all") continue;
@@ -436,9 +707,12 @@ function get_all_disks_info($bus="all") {
     foreach ($disk['partitions'] as $k => $p) {
       if ($p) $disk['partitions'][$k] = get_partition_info($p);
     }
+    if (count($disk['partitions']) === 1 && ! $disk['partitions'][0]['fstype']) {
+      $disk['partitions'] = array();
+    }
     $disks[$key] = $disk;
   }
-  // debug("get_all_disks_info: ".(time() - $d1));
+  debug("Total time: ".(time() - $d1)."s", "DEBUG");
   usort($disks, create_function('$a, $b','$key="device";if ($a[$key] == $b[$key]) return 0; return ($a[$key] < $b[$key]) ? -1 : 1;'));
   return $disks;
 }
@@ -451,12 +725,12 @@ function get_udev_info($device, $udev=NULL, $reload) {
     save_ini_file($paths['state'], $state);
     return $udev;
   } else if (array_key_exists($device, $state) && ! $reload) {
-    // debug("Using udev cache for '$device'.");
+    debug("Using udev cache for '$device'.", "DEBUG");
     return $state[$device];
   } else {
     $state[$device] = parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device 2>/dev/null) 2>/dev/null"));
     save_ini_file($paths['state'], $state);
-    // debug("Not using udev cache for '$device'.");
+    debug("Not using udev cache for '$device'.", "DEBUG");
     return $state[$device];
   }
 }

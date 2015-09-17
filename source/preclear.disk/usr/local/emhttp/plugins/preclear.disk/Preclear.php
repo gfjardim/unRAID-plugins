@@ -3,8 +3,7 @@ $plugin = "preclear.disk";
 require_once ("webGui/include/Helpers.php");
 $script_file    = "/boot/config/plugins/preclear.disk/preclear_disk.sh";
 $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>/dev/null|cut -d: -f2")) : NULL;
-$fast_postread  = $script_version ? (strpos(file_get_contents($script_file), "fast_postread") ? TRUE : FALSE ) : FALSE;
-$notifications  = $script_version ? (strpos(file_get_contents($script_file), "notify_channels") ? TRUE : FALSE ) : FALSE;
+$noprompt       = $script_version ? (strpos(file_get_contents($script_file), "noprompt") ? TRUE : FALSE ) : FALSE;
 
 if (isset($_POST['display'])) $display = $_POST['display'];
 
@@ -119,11 +118,20 @@ function is_disk_running($dev) {
   return ($state == 0) ? TRUE : FALSE;
 }
 function get_temp($dev) {
-  if (is_disk_running($dev)) {
+  $tc = "/var/state/hdd_temp.json";
+  $temps = is_file($tc) ? json_decode(file_get_contents($tc),TRUE) : array();
+  if (isset($temps[$dev]) && (time() - $temps[$dev]['timestamp']) < 60 ) {
+    return $temps[$dev]['temp'];
+  } else if (is_disk_running($dev)) {
     $temp = trim(shell_exec("smartctl -A -d sat,12 $dev 2>/dev/null| grep -m 1 -i Temperature_Celsius | awk '{print $10}'"));
-    return (is_numeric($temp)) ? $temp : "*";
+    $temp = (is_numeric($temp)) ? $temp : "*";
+    $temps[$dev] = array('timestamp' => time(),
+                         'temp'      => $temp);
+    file_put_contents($tc, json_encode($temps));
+    return $temp;
+  } else {
+    return "*";
   }
-  return "*";
 }
 
 switch ($_POST['action']) {
@@ -189,22 +197,23 @@ switch ($_POST['action']) {
     $write_sz = (isset($_POST['-w']) && $_POST['-w'] != 0) ? " -w ".urldecode($_POST['-w']) : "";
     $pre_read = (isset($_POST['-W']) && $_POST['-W'] == "on") ? " -W" : "";
     $fast_read = (isset($_POST['-f']) && $_POST['-f'] == "on") ? " -f" : "";
+    $noprompt = $noprompt ? " -J" : "";
     $wait_confirm = (! $op || $op == " -z" || $op == " -V") ? TRUE : FALSE;
     if (! $op ){
-      $cmd = "$script_file {$op}{$mail}{$notify}{$passes}{$read_sz}{$write_sz}{$pre_read}{$fast_read} /dev/$device";
+      $cmd = "$script_file {$op}{$mail}{$notify}{$passes}{$read_sz}{$write_sz}{$pre_read}{$fast_read}{$noprompt} /dev/$device";
       @file_put_contents("/tmp/preclear_stat_{$device}","{$device}|NN|Starting...");
     } else if ($op == " -V"){
-      $cmd = "$script_file {$op}{$fast_read}{$mail}{$notify} /dev/$device";
+      $cmd = "$script_file {$op}{$fast_read}{$mail}{$notify}{$noprompt} /dev/$device";
       @file_put_contents("/tmp/preclear_stat_{$device}","{$device}|NN|Starting...");
     } else {
-      $cmd = "$script_file {$op} /dev/$device";
+      $cmd = "$script_file {$op}{$noprompt} /dev/$device";
     }
     // echo $cmd;
     // exit();
     tmux_kill_window("preclear_disk_{$device}");
     tmux_new_session("preclear_disk_{$device}");
     tmux_send_command("preclear_disk_{$device}", $cmd);
-    if ($wait_confirm) {
+    if ($wait_confirm && ! $noprompt) {
       foreach(range(0, 30) as $x) {
         if ( strpos(tmux_get_session("preclear_disk_{$device}"), "Answer Yes to continue") ) {
           sleep(1);

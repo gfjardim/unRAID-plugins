@@ -118,7 +118,7 @@ function tmux_is_session($name) {
     $(".ui-button-text").css('padding','0px 5px');
   }
   function remove_session(device) {
-    $.post(URL,{action:"stop_preclear",device:device}).always(function(){location.reload();});
+    $.post(URL,{action:"stop_preclear",device:device}).always(function(){window.location=window.location.pathname+window.location.hash;});
   }
   function stop_preclear(serial, device){
     var title = 'Stop Preclear';

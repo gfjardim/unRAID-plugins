@@ -82,6 +82,7 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
   i.partition{margin-left: 18px;}
   .exec{cursor: pointer;}
   i.glyphicon-append{margin:0px;font-size: 0.8em;position: relative; left:-0.3em;top:0.7em;}
+  .underline{text-decoration: underline;}
 
   .switch-wrapper {
     display: inline-block;
@@ -115,10 +116,22 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
     <?endif;?>
     $('.waitMe_content').css('top','55px');
   }
-  function disk_op(op, device){
-    startWaitMe('#usb_devices_list');
-    $.post(URL,{'action':op,'device':device}, function(data){console.log(data);});
-    setTimeout('$("#usb_devices_list").waitMe("hide")',15000);
+  function disk_op(el, op, device){
+    // add spinning and disable button
+    $(el).html("<i class='fa fa-circle-o-notch fa-spin'></i> "+(op == "mount" ? "Mounting" : "Unmounting")+" ...");
+    $(el).prop("disabled","true");
+    // disable partition buttons
+    td = $(el).closest('td');
+    tr = td.closest('tr');
+    part = tr.is('.toggle-parts');
+    disk = tr.find('span[hdd]').attr("hdd");
+    if (disk) {
+      tr.siblings('tr.toggle-'+disk).find('.mount').html(td.html());
+    } else if (part) {
+      tr.prev('tr.toggle-disk').find('.mount').html(td.html());
+    }
+    $.post(URL,{'action':op,'device':device});
+    // setTimeout('$("#usb_devices_list").waitMe("hide")',15000);
   }
   function pin_tab(n) {
     $.removeCookie('one',{path:'/'});
@@ -295,6 +308,40 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
     el = $(el).find("*[name="+name+"]");
     return value = ( $(el).attr('type') == 'checkbox' ) ? ($(el).is(':checked') ? "on" : "off") : $(el).val();
   }
+  function format_disk(bt, device){
+    var title = 'Formatting Disk: '+device;
+    $( "#dialog-confirm" ).html($("#format_disk").html());
+    $( "#dialog-confirm" ).dialog({
+      title: title,
+      resizable: false,
+      width: 600,
+      modal: true,
+      show : {effect: 'fade' , duration: 250},
+      hide : {effect: 'fade' , duration: 250},
+      buttons: {
+        "Yes": function() {
+          if (getVal(this,"CONFIRM") != "Yes") {return false;}
+          var bc = $(bt).html();
+          $(bt).prop('disabled',true);
+          $(bt).html("<i class='fa fa-circle-o-notch fa-spin'></i> Formatting ...");
+          $( this ).dialog( "close" );
+          fs = getVal(this,"FS");
+          $.post(URL,{action:"format_disk",device:device,fs:fs},"json").always(function(){$(bt).html(bc);});
+        },
+        Cancel: function() {
+          $( this ).dialog( "close" );
+          $( this ).html("");
+        }
+      }
+    });
+    $(".ui-dialog .ui-dialog-titlebar").addClass('menu');
+    $(".ui-dialog .ui-dialog-title").css('text-align','center').css( 'width', "100%");
+    $(".ui-dialog .ui-dialog-content").css('padding-top','15px').css('font-weight','bold');
+    $(".ui-button-text").css('padding','0px 5px');
+  }
+  function sendLog() {
+    $.post(URL,{'action':'send_log'}).always(function(){notifier();});
+  }
 </script>
 <div style='display: inline; float: right; margin: -58px -14px;' id='unassigned_tabbed'></div>
 <div class="font_preload" style="opacity: 0"><span style="font-family: 'FontAwesome', Arial, sans-serif;"></span></div>
@@ -316,14 +363,36 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
     <dt>Password:</dt>
     <dd><input type="password" name="PASS"></dd>
     <dt>Share:</dt>
-    <dd><span class="samba_shares"><input type='text' name='SHARES'></span></dd>
+    <dd><span class="samba_shares"><input type='text' name='SHARE'></span></dd>
     <dt>&nbsp;</dt>
     <dd><button type="button" onclick="load_shares();">Load Shares</button></dd>
   </dl>  
 </div>
+<div id="format_disk" style="display:none;">
+  <dl>
+    <dt>Filesystem:</dt>
+    <dd>
+      <select name="FS">
+        <option value="xfs">XFS</option>
+        <option value="btrfs">BTRFS</option>
+        <option value="ntfs">NTFS</option>
+        <option value="ext4">EXT4</option>
+        <option value="exfat">exFAT</option>
+        <option value="fat32">FAT32</option>
+      </select>
+    </dd>
+    <dt>Type <span class="red">Yes</span> to confirm:</dt>
+    <dd><input type="text" name="CONFIRM" style="width: 60px"></dd>
+  </dl>
+</div>
+
+
 <div id="usb_devices_list">
   <table class='usb_disks' id='usb_table'>
     <thead><tr><td>Device</td><td>Identification</td><td></td><td>Temp</td><td>FS</td><td>Size</td><td>Used</td><td>Free</td><td>Open files</td><td>Auto mount</td><td>Script</td></tr></thead>
     <tbody><tr><td colspan='12' style='text-align:center;font-weight:bold;'></td></tr></tbody>
   </table>
 </div>
+
+<blockquote class='inline_help'>
+  <p>Click <a class="exec underline" onclick="openWindow('/webGui/scripts/tail_log&arg1=unassigned.devices.log','Log Information',600,900);">here</a> to see the log. Alternatively, you can upload a copy of the log by clicking <a class="underline exec" onclick="sendLog();">here</a>.

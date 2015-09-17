@@ -312,8 +312,8 @@ send_mail() {
   description=$(echo ${2} | tr "'" '`' )
   message=$(echo ${3} | tr "'" '`' )
   recipient=${4}
-  if [ -f "/usr/local/emhttp/plugins/dynamix/scripts/notify" ]; then
-    /usr/local/emhttp/plugins/dynamix/scripts/notify -e "Preclear ${model} ${serial}" -s """${subject}""" -d """${description}""" -m """${message}""" -i "normal ${notify_channels}"
+  if [ -f "$notify_script" ]; then
+    $notify_script -e "Preclear ${model} ${serial}" -s """${subject}""" -d """${description}""" -m """${message}""" -i "normal ${notify_channels}"
   else
     echo -e "${message}" | mail -s "${subject}" "${recipient}"
   fi
@@ -618,8 +618,21 @@ fi
 # Check to see if Mail exists if m or M parameter is used.
 if [ $use_mail -gt 0 ] || [ ! -z $mail_rcpt ]
     then
+    if [ -f "/usr/local/sbin/notify" ]
+    then
+      # unRAID 6.0
+      notify_script="/usr/local/sbin/notify"
+    elif [ -f "/usr/local/emhttp/plugins/dynamix/scripts/notify" ]
+    then
+      # unRAID 6.1
+      notify_script="/usr/local/emhttp/plugins/dynamix/scripts/notify"
+    else
+      # unRAID pre 6.0
+      notify_script=""
+    fi
+    
     no_mail=`which mail 2>&1 | awk '{print $2}'`
-    if [ "$no_mail" = "no" && ! -f "/usr/local/sbin/notify" ]
+    if [ "$no_mail" = "no" && ! -f "$notify_script" ]
     then
         echo "error: \"mail\" program does not exist." >&2
         usage >&2
@@ -1769,7 +1782,8 @@ then
   if [ "$ans" = "Yes" ]
   then
     echo "zeroing MBR only"
-    dd if=/dev/zero bs=512 count=1 of=$theDisk
+    dd if=/dev/zero bs=2M count=1 of=$theDisk
+    hdparm -z $theDisk # Reload partition table
     echo "zeroing MBR complete."
     echo "Verification of MBR zero starting."
     read_mbr

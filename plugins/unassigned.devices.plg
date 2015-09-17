@@ -4,7 +4,7 @@
 <!ENTITY name      "unassigned.devices">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.09.07a">
+<!ENTITY version   "2015.09.17">
 <!ENTITY launch    "Main/UnassignedDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -14,12 +14,22 @@
 <CHANGES>
 ##&name;
 
+###2015.09.17
+- Add: Settings Page;
+- Add: SMB security;
+- Add: NFS export;
+- Add: common script that will be executed prior to disk script;
+- Add: format empty disk;
+- Add: log view and upload when Help is on;
+- Fix: "Add SMB mount" not working with hidden shares;
+- Fix: webGui hanging while mounting/unmounting.
+
 ###2015.09.07a
 - Fix: SMB mount not working.
 - Fix: mount path change not working.
 - Fix: division by zero if SMB mount fail.
 - Add: search for SMB hosts in the current workgroup.
-- Improvment: better integration with Preclear Disk.
+- Improvement: better integration with Preclear Disk.
 
 ###2015.09.04
 - Fix: 6.1 compatibility.
@@ -163,6 +173,7 @@ ntfs-3g-2015.3.14-x86_64-1.txz
 -->
 <FILE Name="/boot/config/plugins/&name;/ntfs-3g-2015.3.14-x86_64-1.txz" Run="upgradepkg --install-new">
 <URL>http://slackbuilds.org/mirror/slackware/slackware64-current/slackware64/a/ntfs-3g-2015.3.14-x86_64-1.txz</URL>
+<MD5>eb146c115f0272944695f116cfb6105d</MD5>
 </FILE>
 
 <!--
@@ -170,6 +181,7 @@ exfat-utils-1.1.1-x86_64-1_SBo.tgz
 -->
 <FILE Name="/boot/config/plugins/&name;/exfat-utils-1.1.1-x86_64-1_SBo.tgz" Run="upgradepkg --install-new">
 <URL>https://raw.github.com/gfjardim/unRAID-plugins/master/source/packages/exfat-utils-1.1.1-x86_64-1_SBo.tgz</URL>
+<MD5>4fb02d6580694edc762f2493dcb823f3</MD5>
 </FILE>
 
 <!--
@@ -177,13 +189,15 @@ fuse-exfat-1.1.0-x86_64-1_SBo.tgz
 -->
 <FILE Name="/boot/config/plugins/&name;/fuse-exfat-1.1.0-x86_64-1_SBo.tgz" Run="upgradepkg --install-new">
 <URL>https://raw.github.com/gfjardim/unRAID-plugins/master/source/packages/fuse-exfat-1.1.0-x86_64-1_SBo.tgz</URL>
+<MD5>ad8b518169c59eabed73263d36e56575</MD5>
 </FILE>
 
 <!--
-hfsprogs-332.25-i486-1sl.txz
+hfsprogs-332.25-x86_64-2sl.txz
 -->
 <FILE Name="/boot/config/plugins/&name;/hfsprogs-332.25-x86_64-2sl.txz" Run="upgradepkg --install-new">
 <URL>http://slackware.org.uk/slacky/slackware64-14.1/system/hfsprogs/332.25/hfsprogs-332.25-x86_64-2sl.txz</URL>
+<MD5>9ddd7cb7e0782e9fb7756b1946808228</MD5>
 </FILE>
 
 <!--
@@ -191,6 +205,15 @@ libbsd-0.6.0-x86_64-1sl.txz
 -->
 <FILE Name="/boot/config/plugins/&name;/libbsd-0.6.0-x86_64-1sl.txz" Run="upgradepkg --install-new">
 <URL>http://slackware.org.uk/slacky/slackware64-14.1/libraries/libbsd/0.6.0/libbsd-0.6.0-x86_64-1sl.txz</URL>
+<MD5>1d403a59c467a37f040de3fde2c23518</MD5>
+</FILE>
+
+<!--
+parted-3.1-x86_64-1.txz
+-->
+<FILE Name="/boot/config/plugins/&name;/parted-3.1-x86_64-1.txz" Run="upgradepkg --install-new">
+<URL>http://slackware.osuosl.org/slackware64-14.1/slackware64/l/parted-3.1-x86_64-1.txz</URL>
+<MD5>140283cca20483fcacd805201b33798a</MD5>
 </FILE>
 
 <!--
@@ -288,6 +311,7 @@ removepkg fuse-exfat-1.1.0-x86_64-1_SBo
 removepkg exfat-utils-1.1.1-x86_64-1_SBo
 removepkg hfsprogs-332.25-x86_64-2sl
 removepkg libbsd-0.6.0-x86_64-1sl
+removepkg parted-3.1-x86_64-1
 
 # Restore original Dynamix page
 mv -f /usr/local/emhttp/plugins/dynamix/OpenDevices.page- /usr/local/emhttp/plugins/dynamix/OpenDevices.page

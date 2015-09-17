@@ -16,8 +16,8 @@ if (strpos($DEVNAME, "//") === 0 || $DEVNAME == "all") {
         debug("SMB mount '${info[device]}' auto mount is disabled, aborting.");
         continue;
       }
-      debug("Drive found with the following attributes: ".(implode(', ', array_map(function($v, $k){$v = (strpos($k, "pass") !== false) ? "*******" : $v; return "$k='$v'"; }, $info, array_keys($info)))));
-      debug("Adding disk $drive ...");
+      debug("SMB share found with the following attributes: ".(implode(', ', array_map(function($v, $k){$v = (strpos($k, "pass") !== false) ? "*******" : $v; return "$k='$v'"; }, $info, array_keys($info)))));
+      debug("Mounting SMB share '$drive' ...");
       if (do_mount( $info )) {
         touch("/var/state/${plugin}");
         execute_script($info, "ADD");
@@ -39,19 +39,24 @@ foreach(get_unasigned_disks() as $name => $disk) {
       }
       debug("Drive found with the following attributes: ".(implode(', ', array_map(function($v, $k){$v = (strpos($k, "pass") !== false) ? "*******" : $v; return "$k='$v'"; }, $info, array_keys($info)))));
       debug("Adding disk $drive ...");
+      @touch(sprintf($paths['mounting'],basename($info['device'])));
       if (do_mount( $info )) {
-        touch("/var/state/${plugin}");
         if (config_shared( $info['serial'],  $info['part'])) {
           add_smb_share($info['mountpoint'], $info['label']);
+          if (get_config("Config", "nfs_export") == "yes") {
+            add_nfs_share($info['mountpoint']);
+          }
         } else {
           debug("Partition '{$info[label]}' marked as not sharable, skipping.");
         }
         execute_script($info, "ADD");
         setSleepTime($device);
       }
+      @unlink(sprintf($paths['mounting'],basename($info['device'])));
       debug("Disk ${info[label]} shared successfully.");
     }
   }
 }
-touch("/var/state/${plugin}");
+
+touch($paths['reload']);
 ?>
