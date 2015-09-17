@@ -24,8 +24,9 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
 
 <script type="text/javascript">
   var this_tab = $('input[name$="tabs"]').length;
+  var URL = '/plugins/<?=$plugin;?>/UnassignedDevices.php';
   $(function() {
-    var content= "<div class='switch-wrapper'><input type='checkbox' class='complete-switch'></div><button type='button' onclick='$.post(\"/update.php\",{\"#command\":\"/plugins/unassigned.devices/scripts/udevadm\",\"#arg[1]\":\"trigger\",\"#arg[2]\":\"--action=change\"});' value='Rescan Disks'>Rescan Disks</button></div>";
+    var content= "<div class='switch-wrapper'><input type='checkbox' class='complete-switch'></div><button type='button' onclick='$.post(\""+URL+"\",{\"action\":\"rescan_disks\"});' value='Rescan Disks'>Rescan Disks</button></div>";
   <?if (!$tabbed):?>
     $("#unassigned_tabbed").html(content);
   <?else:?>
@@ -90,7 +91,6 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
   }
 </style>
 <script type="text/javascript">
-  var URL = '/plugins/<?=$plugin;?>/UnassignedDevices.php';
   var display = <?=json_encode($display);?>;
   var tab_usbdisks = $('input[name$="tabs"]').length;
   $('#tab'+tab_usbdisks).bind({click:function() {pin_tab(tab_usbdisks); detect_usb_disk_change(tab_usbdisks);}});
@@ -114,10 +114,9 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
     <?endif;?>
     $('.waitMe_content').css('top','55px');
   }
-  function usb_mount(cmd, args){
-    el = $('#usb_devices_list');
-    startWaitMe(el);
-    $.post('/update.php',{'#command':cmd,'#arg[1]':args});
+  function disk_op(op, device){
+    startWaitMe('#usb_devices_list');
+    $.post(URL,{'action':op,'device':device}, function(data){console.log(data);});
     setTimeout('$("#usb_devices_list").waitMe("hide")',15000);
   }
   function pin_tab(n) {

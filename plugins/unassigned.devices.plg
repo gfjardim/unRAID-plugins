@@ -4,7 +4,7 @@
 <!ENTITY name      "unassigned.devices">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.08.29">
+<!ENTITY version   "2015.09.04">
 <!ENTITY launch    "Main/UnassignedDevices">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/master/plugins/&name;.plg">
 ]>
@@ -14,8 +14,8 @@
 <CHANGES>
 ##&name;
 
-###2015.08.29
-- Fix: 6.1-rc6 compatibility.
+###2015.09.04
+- Fix: 6.1 compatibility.
 - Add: Move unassigned.devices scripts from /usr/local/sbin to usr/local/emhttp/plugins/&name;/scripts.
 - Add: Create symlinks to /usr/local/sbin for backwards compatibility.
 - Fix: Fixed package removal issues.
@@ -147,8 +147,8 @@
 <!--
 The 'bundle' file.
 -->
-<FILE Name="/boot/config/plugins/&name;/&name;-&version;.tgz">
-<URL>https://raw.github.com/gfjardim/unRAID-plugins/master/archive/&name;-&version;.tgz</URL>
+<FILE Name="/boot/config/plugins/&name;/&name;-&version;.txz"  Run="upgradepkg --install-new">
+<URL>https://raw.github.com/gfjardim/unRAID-plugins/master/archive/&name;-&version;.txz</URL>
 </FILE>
 
 <!--
@@ -191,11 +191,6 @@ The 'post-install' script.
 -->
 <FILE Run="/bin/bash">
 <INLINE>
-# Install the 'bundle'.
-tar -xf /boot/config/plugins/&name;/&name;-&version;.tgz -C /usr/local/emhttp/plugins
-
-# Create a symlink to udevadm.
-ln -s /sbin/udevadm /usr/local/emhttp/plugins/&name;/scripts/
 
 # Create a symlink to rm.
 ln -s /bin/rm /usr/local/emhttp/plugins/&name;/scripts/
@@ -269,6 +264,7 @@ rm -f /var/state/&name;.ini
 rm -f /var/state/&name;
 
 # Remove all plugin files.
+removepkg &name;-&version;
 rm -f -r /usr/local/emhttp/plugins/&name;
 
 # Remove symlink to unassigned_mount.
