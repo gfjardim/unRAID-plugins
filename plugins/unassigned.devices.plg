@@ -237,8 +237,6 @@ ln -s /usr/local/emhttp/plugins/&name;/scripts/unassigned_mount /usr/local/sbin
 # Create a symlink to unassigned_umount.
 ln -s /usr/local/emhttp/plugins/&name;/scripts/unassigned_umount /usr/local/sbin
 
-ls -lah /usr/local/emhttp/plugins/&name;/scripts/
-
 # create mount point
 mkdir -p /mnt/disks
 
