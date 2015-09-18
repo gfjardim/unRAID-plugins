@@ -27,7 +27,7 @@ if (! isset($var)){
 #############        MISC FUNCTIONS        ##############
 #########################################################
 
-$echo = function($m) { echo "<pre>".print_r($m,TRUE)."</pre>";}; 
+function _echo($m) { echo "<pre>".print_r($m,TRUE)."</pre>";}; 
 
 function save_ini_file($file, $array) {
   $res = array();
@@ -126,16 +126,16 @@ function verify_precleared($dev) {
     $b["byte{$n}h"] = sprintf("%02x",$b["byte{$n}"]);
   }
 
-  debug("Verifying '$dev' for preclear signature.");
+  debug("Verifying '$dev' for preclear signature.", "DEBUG");
 
   if ( $b["mbr1"] != "00000" || $b["mbr2"] != "00000" || $b["mbr3"] != "00000" || $b["mbr4"] != "00170" || $b["mbr5"] != "00085" ) {
-    debug("Failed test 1: MBR signature not valid."); 
+    debug("Failed test 1: MBR signature not valid.", "DEBUG"); 
     $cleared = FALSE;
   }
   # verify signature
   foreach ($pattern as $key => $value) {
     if ($b["byte{$key}"] != $value) {
-      debug("Failed test 2: signature pattern $key ['$value'] != '".$b["byte{$key}"]."'");
+      debug("Failed test 2: signature pattern $key ['$value'] != '".$b["byte{$key}"]."'", "DEBUG");
       $cleared = FALSE;
     }
   }
@@ -148,20 +148,58 @@ function verify_precleared($dev) {
       break;
     case 1:
       if ($over_mbr_size) {
-        debug("Failed test 3: start sector ($sc) is invalid.");
+        debug("Failed test 3: start sector ($sc) is invalid.", "DEBUG");
         $cleared = FALSE;
       }
       break;
     default:
-      debug("Failed test 4: start sector ($sc) is invalid.");
+      debug("Failed test 4: start sector ($sc) is invalid.", "DEBUG");
       $cleared = FALSE;
       break;
   }
   if ( $partition_size != $sl ) {
-    debug("Failed test 5: disk size don't match.");
+    debug("Failed test 5: disk size don't match.", "DEBUG");
     $cleared = FALSE;
   }
   return $cleared;
+}
+
+function get_format_cmd($dev, $fs) {
+  switch ($fs) {
+    case 'xfs':
+      return "/sbin/mkfs.xfs {$dev}";
+      break;
+    case 'ntfs':
+      return "/sbin/mkfs.ntfs -Q {$dev}";
+      break;
+    case 'btrfs':
+      return "/sbin/mkfs.btrfs {$dev}";
+      break;
+    case 'ext4':
+      return "/sbin/mkfs.ext4 {$dev}";
+      break;
+    case 'exfat':
+      return "/sbin/mkfs.exfat {$dev}";
+      break;
+    case 'fat32':
+      return "/sbin/mkfs.fat -s 8 -F 32 {$dev}";
+      break;
+    default:
+      return false;
+      break;
+  }
+}
+
+function format_partition($partition, $fs) {
+  $part = get_partition_info($partition);
+  if ( $part['fstype'] && $part['fstype'] != "precleared" ) {
+    debug("Aborting format: partition '{$partition}' is already formatted with '{$part[fstype]}' filesystem.");
+    return NULL;
+  }
+  debug("Formatting partition '{$partition}' with '$fs' filesystem.");
+  shell_exec_debug(get_format_cmd($partition, $fs));
+  $disk = preg_replace("@\d+@", "", $partition);
+  shell_exec_debug("/usr/sbin/hdparm -z {$disk}");
 }
 
 function format_disk($dev, $fs) {
@@ -183,27 +221,8 @@ function format_disk($dev, $fs) {
   shell_exec_debug("/usr/sbin/parted {$dev} --script -- mklabel {$disk_schema}");
   debug("Creating a primary partition on disk '{$dev}'.");
   shell_exec_debug("/usr/sbin/parted -a optimal {$dev} --script -- mkpart primary 0% 100%");
-  debug("Formating disk '{$dev}' with '$fs' filesystem.");
-  switch ($fs) {
-    case 'xfs':
-      shell_exec_debug("/sbin/mkfs.xfs {$dev}1");
-      break;
-    case 'ntfs':
-      shell_exec_debug("/sbin/mkfs.ntfs -Q {$dev}1");
-      break;
-    case 'btrfs':
-      shell_exec_debug("/sbin/mkfs.btrfs {$dev}1");
-      break;
-    case 'ext4':
-      shell_exec_debug("/sbin/mkfs.ext4 {$dev}1");
-      break;
-    case 'exfat':
-      shell_exec_debug("/sbin/mkfs.exfat {$dev}1");
-      break;
-    case 'fat32':
-      shell_exec_debug("/sbin/mkfs.fat -s 8 -F 32 {$dev}1");
-      break;
-  }
+  debug("Formatting disk '{$dev}' with '$fs' filesystem.");
+  shell_exec_debug(get_format_cmd("{$dev}1", $fs));
   debug("Reloading disk '{$dev}' partition table.");
   shell_exec_debug("/usr/sbin/hdparm -z {$dev}");
 }
@@ -707,9 +726,6 @@ function get_all_disks_info($bus="all") {
     foreach ($disk['partitions'] as $k => $p) {
       if ($p) $disk['partitions'][$k] = get_partition_info($p);
     }
-    if (count($disk['partitions']) === 1 && ! $disk['partitions'][0]['fstype']) {
-      $disk['partitions'] = array();
-    }
     $disks[$key] = $disk;
   }
   debug("Total time: ".(time() - $d1)."s", "DEBUG");
@@ -770,6 +786,7 @@ function get_partition_info($device, $reload=FALSE){
       $disk['label']  = (count(preg_grep("%".$matches[1][0]."%i", $all_disks)) > 2) ? $disk['label']."-part".$matches[2][0] : $disk['label'];
     }
     $disk['fstype'] = safe_name($attrs['ID_FS_TYPE']);
+    $disk['fstype'] = (! $disk['fstype'] && verify_precleared($disk['device'])) ? "precleared" : $disk['fstype'];
     $disk['target'] = str_replace("\\040", " ", trim(shell_exec("cat /proc/mounts 2>&1|grep ${device}|awk '{print $2}'")));
     $disk['size']   = intval(trim(shell_exec("blockdev --getsize64 ${device} 2>/dev/null")));
     $disk['used']   = intval(trim(shell_exec("df --output=used,source 2>/dev/null|grep -v 'Filesystem'|grep ${device}|awk '{print $1}'")))*1024;

@@ -74,7 +74,15 @@ if (count($_POST)) {
 Common Script:
 : <input type="text" name="common_cmd" onclick="openFileBrowser(this,'/boot/config/plugins/<?=$plugin?>/','sh',false,true,true);" value="<?=$cfg['Config']['common_cmd'];?>">
 
-> If set, this script will run <span class="red" style="font-weight: bold">before</span> any other defined script.
+> If set, this script will run<span class="red" style="font-weight: bold">before</span>any other defined script.
+
+Destructive Mode:
+: <select name="destructive_mode" size="1">
+  <?=mk_option($cfg["Config"]["destructive_mode"], "disabled", "Disabled");?>
+  <?=mk_option($cfg["Config"]["destructive_mode"], "enabled", "Enabled");?>
+  </select>
+
+> If enabled, this will allow users to<span class="red" style="font-weight: bold">erase and format partitions</span>using Unassigned Devices. Be careful.
 
 &nbsp;
 : <input type="submit" name="#apply" value="Apply"><input type="button" value="Done" onclick="done()">

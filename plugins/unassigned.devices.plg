@@ -4,7 +4,7 @@
 <!ENTITY name      "unassigned.devices">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.09.18d">
+<!ENTITY version   "2015.09.18e">
 <!ENTITY launch    "Main/UnassignedDevices">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -16,6 +16,7 @@
 ##&name;
 
 ###&version;
+- Add: Destructive Mode selection on Settings, allowing users to delete and format disk/partitions.
 - Fix: >2TB partitions not correctly aligned on format.
 - Fix: Areca disks not appearing correctly.
 - Fix: errors appearing on console if a symlinks already exist.
