@@ -50,7 +50,7 @@ function render_partition($disk, $partition) {
 
   $mpoint = "<div>{$fscheck}<i class='glyphicon glyphicon-arrow-right'></i>";
   if ($mounted) {
-    $mpoint .= "<a href='/Shares/Browse?dir={$partition[mountpoint]}' target='_blank'>{$partition[mountpoint]}</a></div>";
+    $mpoint .= "<a href='/Shares/Browse?dir={$partition[mountpoint]}'>{$partition[mountpoint]}</a></div>";
   } else {
     $mpoint .= "<form method='POST' action='/plugins/${plugin}/UnassignedDevices.php?action=change_mountpoint&serial={$partition[serial]}&partition={$partition[part]}' target='progressFrame' style='display:inline;margin:0;padding:0;'><span class='text exec'><a>{$partition[mountpoint]}</a></span><input class='input' type='text' name='mountpoint' value='{$partition[mountpoint]}' hidden /></form></div>";
   }

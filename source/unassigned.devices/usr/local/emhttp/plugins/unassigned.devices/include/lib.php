@@ -749,10 +749,12 @@ function get_partition_info($device, $reload=FALSE){
   global $_ENV, $paths;
   $disk = array();
   $attrs = (isset($_ENV['DEVTYPE'])) ? get_udev_info($device, $_ENV, $reload) : get_udev_info($device, NULL, $reload);
+  // $GLOBALS["echo"]($attrs);
   $device = realpath($device);
   if ($attrs['DEVTYPE'] == "partition") {
     $disk['serial']       = $attrs['ID_SERIAL'];
-    $disk['serial_short'] = $attrs['ID_SERIAL_SHORT'];
+    $disk['serial_short'] = isset($attrs["ID_SCSI_SERIAL"]) ? $attrs["ID_SCSI_SERIAL"] : $attrs['ID_SERIAL_SHORT'];
+    $disk['serial']       = "{$attrs[ID_MODEL]}_{$disk[serial_short]}";
     $disk['device']       = $device;
     // Grab partition number
     preg_match_all("#(.*?)(\d+$)#", $device, $matches);
