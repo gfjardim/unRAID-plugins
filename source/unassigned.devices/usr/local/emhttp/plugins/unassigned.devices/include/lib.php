@@ -182,7 +182,7 @@ function format_disk($dev, $fs) {
   debug("Creating a '{$disk_schema}' partition table on disk '{$dev}'.");
   shell_exec_debug("/usr/sbin/parted {$dev} --script -- mklabel {$disk_schema}");
   debug("Creating a primary partition on disk '{$dev}'.");
-  shell_exec_debug("/usr/sbin/parted {$dev} --script -- mkpart primary 0 -1");
+  shell_exec_debug("/usr/sbin/parted {$dev} --script -- mkpart primary 0% 100%");
   debug("Formating disk '{$dev}' with '$fs' filesystem.");
   switch ($fs) {
     case 'xfs':
