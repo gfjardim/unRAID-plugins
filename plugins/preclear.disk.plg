@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.09.17b">
+<!ENTITY version   "2015.09.18">
 <!ENTITY launch    "Settings/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -16,6 +16,9 @@
 ##&name;
 
 ###&version;
+- Fix: Areca disks not appearing correctly.
+
+###2015.09.17b
 - Fix: black CSS conformity
 
 ###2015.09.17

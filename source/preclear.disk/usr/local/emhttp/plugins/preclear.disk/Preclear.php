@@ -105,8 +105,8 @@ function get_disk_info($device, $reload=FALSE){
   $attrs = parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device ) 2>/dev/null"));
   exec("smartctl -i -d sat,12 $device 2>/dev/null", $smartInfo);
   $device = realpath($device);
-  $disk['serial']       = $attrs['ID_SERIAL'];
-  $disk['serial_short'] = $attrs['ID_SERIAL_SHORT'];
+  $disk['serial_short'] = isset($attrs["ID_SCSI_SERIAL"]) ? $attrs["ID_SCSI_SERIAL"] : $attrs['ID_SERIAL_SHORT'];
+  $disk['serial']       = "{$attrs[ID_MODEL]}_{$disk[serial_short]}";
   $disk['device']       = $device;
   $disk['family']       = trim(split(":", array_values(preg_grep("#Model Family#", $smartInfo))[0])[1]);
   $disk['model']        = trim(split(":", array_values(preg_grep("#Device Model#", $smartInfo))[0])[1]);
