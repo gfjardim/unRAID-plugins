@@ -252,16 +252,16 @@ else
 fi
 
 # Create a symlink to rm.
-ln -s /bin/rm /usr/local/emhttp/plugins/&name;/scripts/
+ln -s /bin/rm /usr/local/emhttp/plugins/&name;/scripts/ 2>/dev/null
 
 # fix permissions of executable files
 chmod +x /usr/local/emhttp/plugins/&name;/scripts/* /usr/local/emhttp/plugins/&name;/event/*
 
 # Create a symlink to unassigned_mount.
-ln -s /usr/local/emhttp/plugins/&name;/scripts/unassigned_mount /usr/local/sbin
+ln -s /usr/local/emhttp/plugins/&name;/scripts/unassigned_mount /usr/local/sbin 2>/dev/null
 
 # Create a symlink to unassigned_umount.
-ln -s /usr/local/emhttp/plugins/&name;/scripts/unassigned_umount /usr/local/sbin
+ln -s /usr/local/emhttp/plugins/&name;/scripts/unassigned_umount /usr/local/sbin 2>/dev/null
 
 # create mount point
 mkdir -p /mnt/disks
