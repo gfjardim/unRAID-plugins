@@ -739,8 +739,8 @@ function get_disk_info($device, $reload=FALSE){
   $disk = array();
   $attrs = (isset($_ENV['DEVTYPE'])) ? get_udev_info($device, $_ENV, $reload) : get_udev_info($device, NULL, $reload);
   $device = realpath($device);
-  $disk['serial']       = $attrs['ID_SERIAL'];
-  $disk['serial_short'] = $attrs['ID_SERIAL_SHORT'];
+  $disk['serial_short'] = isset($attrs["ID_SCSI_SERIAL"]) ? $attrs["ID_SCSI_SERIAL"] : $attrs['ID_SERIAL_SHORT'];
+  $disk['serial']       = "{$attrs[ID_MODEL]}_{$disk[serial_short]}";
   $disk['device']       = $device;
   return $disk;
 }
@@ -752,7 +752,6 @@ function get_partition_info($device, $reload=FALSE){
   // $GLOBALS["echo"]($attrs);
   $device = realpath($device);
   if ($attrs['DEVTYPE'] == "partition") {
-    $disk['serial']       = $attrs['ID_SERIAL'];
     $disk['serial_short'] = isset($attrs["ID_SCSI_SERIAL"]) ? $attrs["ID_SCSI_SERIAL"] : $attrs['ID_SERIAL_SHORT'];
     $disk['serial']       = "{$attrs[ID_MODEL]}_{$disk[serial_short]}";
     $disk['device']       = $device;

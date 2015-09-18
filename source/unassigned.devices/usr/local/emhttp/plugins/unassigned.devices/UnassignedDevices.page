@@ -107,7 +107,7 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
     <?else:?>
     $(el).waitMe({effect:'ios',text:' ',bg:'rgba(0,0,0,0.9)',color:'#FFF',sizeW:'',sizeH:'',source:''});
     <?endif;?>
-    $('.waitMe_content').css('top','55px');
+    $('.waitMe_content').css('top','40px');
   }
   function disk_op(el, op, device){
     // add spinning and disable button

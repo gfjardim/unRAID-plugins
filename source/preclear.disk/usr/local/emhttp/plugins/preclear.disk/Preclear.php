@@ -29,7 +29,7 @@ function tmux_send_command($name, $cmd) {
 }
 function tmux_kill_window($name) {
   if (tmux_is_session($name)) {
-    exec("/usr/bin/tmux kill-session -t '${name}' 2>/dev/null");
+    exec("/usr/bin/tmux kill-session -t '${name}' >/dev/null 2>&1");
   }
 }
 function reload_partition($name) {
