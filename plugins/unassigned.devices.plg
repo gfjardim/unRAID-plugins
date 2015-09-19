@@ -4,7 +4,7 @@
 <!ENTITY name      "unassigned.devices">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.09.18e">
+<!ENTITY version   "2015.09.19">
 <!ENTITY launch    "Main/UnassignedDevices">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -16,6 +16,9 @@
 ##&name;
 
 ###&version;
+- Fix: DVD/BluRay drives being included
+
+###2015.09.18e
 - Add: Destructive Mode selection on Settings, allowing users to delete and format disk/partitions.
 - Fix: >2TB partitions not correctly aligned on format.
 - Fix: Areca disks not appearing correctly.

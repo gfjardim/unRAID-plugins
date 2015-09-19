@@ -48,35 +48,37 @@ function listDir($root) {
   return $paths;
 }
 function get_unasigned_disks() {
-  $disks = array();
-  $paths = listDir("/dev/disk/by-id");
+  $disks = $paths = $unraid_disks = $unraid_cache = array();
+  foreach (listDir("/dev/disk/by-id") as $p) {
+    $r = realpath($p);
+    if (!is_bool(strpos($r, "/dev/sd")) || !is_bool(strpos($r, "/dev/hd"))) {
+      $paths[$r] = $p;
+    }
+  }
   natsort($paths);
   $unraid_flash = realpath("/dev/disk/by-label/UNRAID");
-  $unraid_disks = array();
   foreach (parse_ini_string(shell_exec("/usr/bin/cat /proc/mdcmd 2>/dev/null")) as $k => $v) {
     if (strpos($k, "rdevName") !== FALSE && strlen($v)) {
       $unraid_disks[] = realpath("/dev/$v");
     }
   }
-  // foreach ($unraid_disks as $k) {$o .= "  $k\n";}; debug("UNRAID DISKS:\n$o");
-  $unraid_cache = array();
+  foreach ($unraid_disks as $k) {$o .= "  $k\n";}; //debug("UNRAID DISKS:\n$o", "DEBUG");
   foreach (parse_ini_file("/boot/config/disk.cfg") as $k => $v) {
     if (strpos($k, "cacheId") !== FALSE && strlen($v)) {
       foreach ( preg_grep("#".$v."$#i", $paths) as $c) $unraid_cache[] = realpath($c);
     }
   }
-  // foreach ($unraid_cache as $k) {$g .= "  $k\n";}; debug("UNRAID CACHE:\n$g");
-  foreach ($paths as $d) {
-    $path = realpath($d);
+  foreach ($unraid_cache as $k) {$g .= "  $k\n";}; //debug("UNRAID CACHE:\n$g", "DEBUG");
+  foreach ($paths as $path => $d) {
     if (preg_match("#^(.(?!wwn|part))*$#", $d)) {
       if (! in_array($path, $unraid_disks) && ! in_array($path, $unraid_cache) && strpos($unraid_flash, $path) === FALSE) {
         if (in_array($path, array_map(function($ar){return $ar['device'];},$disks)) ) continue;
         $m = array_values(preg_grep("#$d.*-part\d+#", $paths));
         natsort($m);
         $disks[$d] = array("device"=>$path,"type"=>"ata","partitions"=>$m);
-        // debug("Unassigned disk: $d");
+        //debug("Unassigned disk: $d", "DEBUG");
       } else {
-        // debug("Discarded: => $d ($path)");
+        //debug("Discarded: => $d ($path)", "DEBUG");
         continue;
       }
     } 

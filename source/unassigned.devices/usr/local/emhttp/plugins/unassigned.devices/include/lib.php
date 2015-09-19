@@ -1,6 +1,6 @@
 <?
 $plugin = "unassigned.devices";
-$VERBOSE=FALSE;
+// $VERBOSE=TRUE;
 
 $paths = array("smb_extra"       => "/boot/config/smb-extra.conf",
                "smb_usb_shares"  => "/etc/samba/unassigned-shares",
@@ -200,14 +200,16 @@ function format_partition($partition, $fs) {
   shell_exec_debug(get_format_cmd($partition, $fs));
   $disk = preg_replace("@\d+@", "", $partition);
   shell_exec_debug("/usr/sbin/hdparm -z {$disk}");
+  sleep(3);
+  @touch($GLOBALS['paths']['reload']);
 }
 
 function format_disk($dev, $fs) {
   # making sure it doesn't have partitions
   foreach (get_all_disks_info() as $d) {
-    if ($d['device'] == $dev && count($d['partitions'])) {
+    if ($d['device'] == $dev && count($d['partitions']) && $d['partitions'][0]['fstype'] != "precleared") {
       debug("Aborting format: disk '{$dev}' has '".count($d['partitions'])."' partition(s).");
-      return NULL;
+      return FALSE;
     }
   }
   $max_mbr_blocks   = hexdec("0xFFFFFFFF");
@@ -225,6 +227,8 @@ function format_disk($dev, $fs) {
   shell_exec_debug(get_format_cmd("{$dev}1", $fs));
   debug("Reloading disk '{$dev}' partition table.");
   shell_exec_debug("/usr/sbin/hdparm -z {$dev}");
+  sleep(3);
+  @touch($GLOBALS['paths']['reload']);
 }
 
 function remove_partition($dev, $part) {
@@ -233,7 +237,7 @@ function remove_partition($dev, $part) {
       foreach ($d['partitions'] as $p) {
         if ($p['part'] == $part && $p['target']) {
           debug("Aborting removal: partition '{$part}' is mounted.");
-          return NULL;
+          return FALSE;
         } 
       }
     }
@@ -678,26 +682,28 @@ function remove_config_samba($source) {
 #########################################################
 
 function get_unasigned_disks() {
-  $disks = array();
-  $paths = listDir("/dev/disk/by-id");
+  $disks = $paths = $unraid_disks = $unraid_cache = array();
+  foreach (listDir("/dev/disk/by-id") as $p) {
+    $r = realpath($p);
+    if (!is_bool(strpos($r, "/dev/sd")) || !is_bool(strpos($r, "/dev/hd"))) {
+      $paths[$r] = $p;
+    }
+  }
   natsort($paths);
   $unraid_flash = realpath("/dev/disk/by-label/UNRAID");
-  $unraid_disks = array();
   foreach (parse_ini_string(shell_exec("/usr/bin/cat /proc/mdcmd 2>/dev/null")) as $k => $v) {
     if (strpos($k, "rdevName") !== FALSE && strlen($v)) {
       $unraid_disks[] = realpath("/dev/$v");
     }
   }
   foreach ($unraid_disks as $k) {$o .= "  $k\n";}; debug("UNRAID DISKS:\n$o", "DEBUG");
-  $unraid_cache = array();
   foreach (parse_ini_file("/boot/config/disk.cfg") as $k => $v) {
     if (strpos($k, "cacheId") !== FALSE && strlen($v)) {
       foreach ( preg_grep("#".$v."$#i", $paths) as $c) $unraid_cache[] = realpath($c);
     }
   }
   foreach ($unraid_cache as $k) {$g .= "  $k\n";}; debug("UNRAID CACHE:\n$g", "DEBUG");
-  foreach ($paths as $d) {
-    $path = realpath($d);
+  foreach ($paths as $path => $d) {
     if (preg_match("#^(.(?!wwn|part))*$#", $d)) {
       if (! in_array($path, $unraid_disks) && ! in_array($path, $unraid_cache) && strpos($unraid_flash, $path) === FALSE) {
         if (in_array($path, array_map(function($ar){return $ar['device'];},$disks)) ) continue;
@@ -774,6 +780,7 @@ function get_partition_info($device, $reload=FALSE){
     // Grab partition number
     preg_match_all("#(.*?)(\d+$)#", $device, $matches);
     $disk['part']   =  $matches[2][0];
+    $disk['disk']   =  $matches[1][0];
     if (isset($attrs['ID_FS_LABEL'])){
       $disk['label'] = safe_name($attrs['ID_FS_LABEL_ENC']);
     } else {
@@ -786,7 +793,7 @@ function get_partition_info($device, $reload=FALSE){
       $disk['label']  = (count(preg_grep("%".$matches[1][0]."%i", $all_disks)) > 2) ? $disk['label']."-part".$matches[2][0] : $disk['label'];
     }
     $disk['fstype'] = safe_name($attrs['ID_FS_TYPE']);
-    $disk['fstype'] = (! $disk['fstype'] && verify_precleared($disk['device'])) ? "precleared" : $disk['fstype'];
+    $disk['fstype'] = (! $disk['fstype'] && verify_precleared($disk['disk'])) ? "precleared" : $disk['fstype'];
     $disk['target'] = str_replace("\\040", " ", trim(shell_exec("cat /proc/mounts 2>&1|grep ${device}|awk '{print $2}'")));
     $disk['size']   = intval(trim(shell_exec("blockdev --getsize64 ${device} 2>/dev/null")));
     $disk['used']   = intval(trim(shell_exec("df --output=used,source 2>/dev/null|grep -v 'Filesystem'|grep ${device}|awk '{print $1}'")))*1024;

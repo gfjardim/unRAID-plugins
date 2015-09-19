@@ -39,7 +39,7 @@ function render_used_and_free($partition) {
 
 function render_partition($disk, $partition) {
   global $plugin, $paths, $echo;
-  if (! isset($partition['device'])) return '';
+  if (! isset($partition['device'])) return array();
   $out = array();
   $mounted = is_mounted($partition['device']);
   if ( (! $mounted &&  $partition['fstype'] != 'btrfs') || ($mounted && $partition['fstype'] == 'btrfs') ) {
@@ -48,7 +48,7 @@ function render_partition($disk, $partition) {
     $fscheck = "<i class='glyphicon glyphicon-th-large partition'></i>{$partition[part]}";
   }
 
-  $rm_partition = (get_config("Config", "destructive_mode") == "enabled") ? "<span class='exec' style='color:#CC0000;font-weight:bold;' onclick='rm_partition(this,\"{$disk[device]}\",\"{$partition[part]}\");'><i class='glyphicon glyphicon-remove hdd'></i></span>" : "";
+  $rm_partition = (get_config("Config", "destructive_mode") == "enabled") ? "<span title='Remove Partition' class='exec' style='color:#CC0000;font-weight:bold;' onclick='rm_partition(this,\"{$disk[device]}\",\"{$partition[part]}\");'><i class='glyphicon glyphicon-remove hdd'></i></span>" : "";
   $mpoint = "<div>{$fscheck}<i class='glyphicon glyphicon-arrow-right'></i>";
   if ($mounted) {
     $mpoint .= "<a href='/Shares/Browse?dir={$partition[mountpoint]}'>{$partition[mountpoint]}</a></div>";
@@ -79,12 +79,12 @@ function make_mount_button($device) {
   if (isset($device['partitions'])) {
     $mounted = in_array(TRUE, array_map(function($ar){return is_mounted($ar['device']);}, $device['partitions']));
     $disable = count(array_filter($device['partitions'], function($p){ if (! empty($p['fstype']) && $p['fstype'] != "precleared") return TRUE;})) ? "" : "disabled";
-    $format = (isset($device['partitions']) && ! count($device['partitions'])) ? true : false;
+    $format = (isset($device['partitions']) && ! count($device['partitions'])) || $device['partitions'][0]['fstype'] == "precleared" ? true : false;
     $context = "disk";
   } else {
     $mounted = is_mounted($device['device']);
     $disable = (! empty($device['fstype']) && $device['fstype'] != "precleared") ? "" : "disabled";
-    $format = (isset($device['fstype']) && empty($device['fstype'])) ? true : false;
+    $format = ((isset($device['fstype']) && empty($device['fstype'])) || $device['fstype'] == "precleared") ? true : false;
     $context = "partition";
   }
   $is_mounting   = array_values(preg_grep("@/mounting_".basename($device['device'])."@i", listDir(dirname($paths['mounting']))))[0];
@@ -115,11 +115,12 @@ switch ($_POST['action']) {
     if ( count($disks) ) {
       $odd="odd";
       foreach ($disks as $disk) {
-        $mounted = in_array(TRUE, array_map(function($ar){return is_mounted($ar['device']);}, $disk['partitions']));
-        $temp = my_temp($disk['temperature']);
-        $disk_name = basename($disk['device']);
-        $p = (count($disk['partitions']) <= 1) ? render_partition($disk, $disk['partitions'][0]) : FALSE;
-        $preclearing = is_file("/tmp/preclear_stat_{$disk_name}");
+        $mounted       = in_array(TRUE, array_map(function($ar){return is_mounted($ar['device']);}, $disk['partitions']));
+        $temp          = my_temp($disk['temperature']);
+        $disk_name     = basename($disk['device']);
+        $p             = (count($disk['partitions']) <= 1) ? render_partition($disk, $disk['partitions'][0]) : FALSE;
+        $preclearing   = is_file("/tmp/preclear_stat_{$disk_name}");
+        $is_precleared = ($disk['partitions'][0]['fstype'] == "precleared") ? true : false;
 
         $mbutton = make_mount_button($disk);
 
@@ -130,6 +131,8 @@ switch ($_POST['action']) {
         }
         if ($p === FALSE) {
           $hdd_serial = "<span class='exec toggle-hdd' hdd='{$disk_name}'><i class='glyphicon glyphicon-hdd hdd'></i><i class='glyphicon glyphicon-plus-sign glyphicon-append'></i>{$disk[serial]}</span>{$preclear_link}<div id='preclear_{$disk_name}'></div>";
+        } elseif($is_precleared) {
+          $hdd_serial = "<span class='toggle-hdd' hdd='{$disk_name}'><i class='glyphicon glyphicon-hdd hdd'></i><span style='margin:4px;'></span>{$disk[serial]}</span>{$preclear_link}<div id='preclear_{$disk_name}'></div>";
         } else {
           $hdd_serial = "<span class='exec toggle-hdd' hdd='{$disk_name}'><i class='glyphicon glyphicon-hdd hdd'></i><span style='margin:4px;'></span>{$disk[serial]}</span>{$preclear_link}<div id='preclear_{$disk_name}'></div>";
         }
@@ -150,7 +153,7 @@ switch ($_POST['action']) {
         echo ($p)?$p[10]:"<td>-</td>";
         echo ($p)?$p[11]:"<td>-</td>";
         echo "</tr>";
-        if (! $p || $p) {
+        if (! $is_precleared) {
           foreach ($disk['partitions'] as $partition) {
             foreach (render_partition($disk, $partition) as $l) echo str_replace("__SHOW__", (count($disk['partitions']) >1 ? "display:none;":"display:none;" ), $l );
           }
@@ -301,12 +304,12 @@ switch ($_POST['action']) {
   case 'format_disk':
     $device = urldecode($_POST['device']);
     $fs = urldecode($_POST['fs']);
-    format_disk($device, $fs);
+    echo json_encode(array( 'result' => format_disk($device, $fs)));
     break;
   case 'format_partition':
     $device = urldecode($_POST['device']);
     $fs = urldecode($_POST['fs']);
-    format_partition($device, $fs);
+    echo json_encode(array( 'result' => format_partition($device, $fs)));
     break;
 
   case 'list_samba_shares':
