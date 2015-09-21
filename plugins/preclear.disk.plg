@@ -124,7 +124,7 @@ libevent-2.0.21-x86_64-1.txz
 <!--
 ncurses-5.9-x86_64-2.txz
 -->
-<FILE Name="/boot/config/plugins/&name;/ncurses-5.9-x86_64-2.txz" Run="upgradepkg --install-new">
+<FILE Name="/boot/extra/ncurses-5.9-x86_64-2.txz" Run="upgradepkg">
 <URL>http://slackware.osuosl.org/slackware64-14.1/slackware64/l/ncurses-5.9-x86_64-2.txz</URL>
 <MD5>9134fa31097ee352a1f1662e3f6bcb3f</MD5>
 </FILE>
@@ -156,6 +156,7 @@ chmod 644 $(awk '/\.(htm|php|js|page|css|png|plg|gif|cfg|md)$/ {print "/"$0}' /v
 
 # Cleaning old source files
 find /boot/config/plugins/&name;/ -type f -iname "&name;*.txz" ! -iname "*&version;*" -delete
+find /boot/config/plugins/&name;/ -type f -iname "&name;*.md5" ! -iname "*&version;*" -delete
 
 echo ""
 echo "-----------------------------------------------------------"
@@ -176,14 +177,11 @@ The 'remove' script.
 
 # Remove plugin related files
 rm -rf /boot/config/plugins/&name;
-rm -f /tmp/plugins/&name;.plg /boot/readvz /root/.tmux.conf
+rm -f /tmp/plugins/&name;.plg \
+      /boot/extra/ncurses-5.9-x86_64-2.txz
 
-# Uninstall the 'source' package
-removepkg &name;-&version;
-
-removepkg libevent-2.0.21-x86_64-1
-removepkg tmux-1.8-x86_64-1
-removepkg aaa_terminfo-5.8-x86_64-1
+# Remove installed packages
+find "/boot/config/plugins/&name;/" type f -iname "*.txz" \( -exec removepkg '{}' \; -false -o -exec rm '{}' \; \)
 
 </INLINE>
 </FILE>

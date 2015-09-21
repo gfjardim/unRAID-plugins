@@ -290,6 +290,7 @@ fi
 
 # Cleaning old plugin packages
 find /boot/config/plugins/&name;/ -type f -iname "&name;*.txz" ! -iname "*&version;*" -delete
+find /boot/config/plugins/&name;/ -type f -iname "&name;*.md5" ! -iname "*&version;*" -delete
 
 # reload udev rules
 udevadm control --reload-rules
