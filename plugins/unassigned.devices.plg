@@ -317,7 +317,7 @@ The 'remove' script.
 rmdir /mnt/disks
 
 # Remove installed packages
-find "/boot/config/plugins/&name;/" type f -iname "*.txz" \( -exec removepkg '{}' \; -false -o -exec rm '{}' \; \)
+find "/boot/config/plugins/&name;/" -type f -iname "*.txz" \( -exec removepkg '{}' \; -false -o -exec rm '{}' \; \)
 
 # Remove possible leftovers
 rm -rf /usr/local/emhttp/plugins/&name; \

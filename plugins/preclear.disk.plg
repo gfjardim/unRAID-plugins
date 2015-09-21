@@ -181,8 +181,8 @@ rm -f /tmp/plugins/&name;.plg \
       /boot/extra/ncurses-5.9-x86_64-2.txz
 
 # Remove installed packages
-find "/boot/config/plugins/&name;/" type f -iname "*.txz" \( -exec removepkg '{}' \; -false -o -exec rm '{}' \; \)
-
+find "/boot/config/plugins/&name;/" -type f -iname "*.txz" \( -exec removepkg '{}' \; -false -o -exec rm '{}' \; \)
+exit 0
 </INLINE>
 </FILE>
 
