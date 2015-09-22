@@ -473,7 +473,7 @@ function rm_smb_share($dir, $share_name) {
     debug("Removing file '$share_conf'.");
   }
   if (! exist_in_file($paths['smb_extra'], $share_conf)) {
-    return null;
+    return true;
   }
   debug("Removing share definitions from ".$paths['smb_extra'])."'.";
   $c = (is_file($paths['smb_extra'])) ? @file($paths['smb_extra'],FILE_IGNORE_NEW_LINES) : array();

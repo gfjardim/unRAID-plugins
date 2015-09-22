@@ -133,7 +133,7 @@ class SMB {
 
   public function is_automount($source, $usb=false) {
     $auto = $this->get_config($source, "automount");
-    return ( ($auto) ? ( ($auto == "yes") ? TRUE : FALSE ) : TRUE);
+    return ( ($auto) ? ( ($auto == "yes") ? TRUE : FALSE ) : FALSE);
   }
 
   public function get_mounts() {
@@ -241,7 +241,7 @@ class NFS {
 
   public function is_automount($source, $usb=false) {
     $auto = $this->get_config($source, "automount");
-    return ( ($auto) ? ( ($auto == "yes") ? TRUE : FALSE ) : TRUE);
+    return ( ($auto) ? ( ($auto == "yes") ? TRUE : FALSE ) : FALSE);
   }
 
   public function get_mounts() {
