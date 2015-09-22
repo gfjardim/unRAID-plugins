@@ -140,14 +140,6 @@ function tmux_is_session($name) {
   function clear_preclear(device) {
     $.post(URL,{action:"clear_preclear",device:device}).always(function(){window.location=window.location.pathname+window.location.hash;});
   }
-  function startWaitMe(el) {
-    <?if ($display['theme'] == 'white'):?>
-    $(el).waitMe({effect:'ios',text:'Please wait...',bg:'rgba(255,255,255,0.9)',color:'#000',sizeW:'',sizeH:'',source:''});
-    <?else:?>
-    $(el).waitMe({effect:'ios',text:'Please wait...',bg:'rgba(0,0,0,0.9)',color:'#FFF',sizeW:'',sizeH:'',source:''});
-    <?endif;?>
-    $('.waitMe_content').css('top','55px');
-  }
   function toggleSettings(el) {
     if(el.selectedIndex > 0 && el.selectedIndex != 5){
       $(el).parent().siblings('.clear_options').css('display','none');
@@ -272,7 +264,7 @@ function tmux_is_session($name) {
   </tbody>
 </table>
 <script type="text/javascript">
-  startWaitMe('#unassigned_devices_list');get_content();
+  get_content();
   <?if (isset($_GET['disk']) && ! tmux_is_session("preclear_disk_{$_GET[disk]}") && is_file($script_file)) {
     echo "startDisk = '{$_GET[disk]}'";
   }
