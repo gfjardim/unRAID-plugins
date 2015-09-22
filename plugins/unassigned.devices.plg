@@ -4,7 +4,7 @@
 <!ENTITY name      "unassigned.devices">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.09.22a">
+<!ENTITY version   "2015.09.22b">
 <!ENTITY launch    "Main/UnassignedDevices">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -307,7 +307,7 @@ if [[ -e /usr/local/emhttp/plugins/dynamix/OpenDevices.page ]]; then
 fi
 
 # Cleaning old plugin packages
-find /boot/config/plugins/&name; -type f -iname "*.txz" -delete
+find /boot/config/plugins/&name; -maxdepth 1 -type f -iname "*.t*z" -delete
 find &packages; -type f -iname "&name;*.txz" ! -iname "*&version;*" -delete
 find &packages; -type f -iname "&name;*.md5" ! -iname "*&version;*" -delete
 
