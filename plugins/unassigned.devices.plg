@@ -307,7 +307,7 @@ if [[ -e /usr/local/emhttp/plugins/dynamix/OpenDevices.page ]]; then
 fi
 
 # Cleaning old plugin packages
-find /boot/config/plugins/&name;/ -type f -iname *.txz" -delete
+find /boot/config/plugins/&name; -type f -iname *.txz" -delete
 find &packages; -type f -iname "&name;*.txz" ! -iname "*&version;*" -delete
 find &packages; -type f -iname "&name;*.md5" ! -iname "*&version;*" -delete
 
@@ -322,6 +322,7 @@ echo " Copyright 2015, gfjardim"
 echo " Version: &version;"
 echo "-----------------------------------------------------------"
 echo ""
+
 </INLINE>
 </FILE>
 
