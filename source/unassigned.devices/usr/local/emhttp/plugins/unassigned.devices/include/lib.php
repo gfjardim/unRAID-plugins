@@ -1,5 +1,6 @@
 <?
 $plugin = "unassigned.devices";
+require_once("/usr/local/emhttp/plugins/${plugin}/include/classes.php");
 // $VERBOSE=TRUE;
 
 $paths = array("smb_extra"       => "/boot/config/smb-extra.conf",
@@ -9,14 +10,14 @@ $paths = array("smb_extra"       => "/boot/config/smb-extra.conf",
                "config_file"     => "/boot/config/plugins/{$plugin}/{$plugin}.cfg",
                "state"           => "/var/state/${plugin}/${plugin}.ini",
                "hdd_temp"        => "/var/state/${plugin}/hdd_temp.json",
-               "samba_mount"     => "/boot/config/plugins/${plugin}/samba_mount.cfg",
+               "remote_config"   => "/boot/config/plugins/${plugin}/remote_config.cfg",
                "reload"          => "/var/state/${plugin}/reload.state",
                "unmounting"      => "/var/state/${plugin}/unmounting_%s.state",
                "mounting"        => "/var/state/${plugin}/mounting_%s.state",
                );
 
 if (! is_dir(dirname($paths["state"])) ) {
-  @mkdir(dirname($paths["state"]),0777,TRUE);
+  @mkdir(dirname($paths["state"]),0755,TRUE);
 }
 
 if (! isset($var)){
@@ -93,7 +94,7 @@ function lsof($dir) {
 function get_temp($dev) {
   $tc = $GLOBALS["paths"]["hdd_temp"];
   $temps = is_file($tc) ? json_decode(file_get_contents($tc),TRUE) : array();
-  if (isset($temps[$dev]) && (time() - $temps[$dev]['timestamp']) < 120 ) {
+  if (isset($temps[$dev]) && (time() - $temps[$dev]['timestamp']) < 180 ) {
     return $temps[$dev]['temp'];
   } else if (is_disk_running($dev)) {
     $temp = trim(shell_exec("smartctl -A -d sat,12 $dev 2>/dev/null| grep -m 1 -i Temperature_Celsius | awk '{print $10}'"));
@@ -276,38 +277,24 @@ function sendLog() {
 ############        CONFIG FUNCTIONS        #############
 #########################################################
 
-function get_config($sn, $var) {
-  $config_file = $GLOBALS["paths"]["config_file"];
-  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
-  return (isset($config[$sn][$var])) ? html_entity_decode($config[$sn][$var]) : FALSE;
+function get_config($protocol, $sec, $var) {
+  $class = get_proc_class($protocol);
+  return $class->get_config($sec, $var);
 }
 
-function set_config($sn, $var, $val) {
-  $config_file = $GLOBALS["paths"]["config_file"];
-  if (! is_file($config_file)) @mkdir(dirname($config_file),0666,TRUE);
-  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
-  $config[$sn][$var] = htmlentities($val, ENT_COMPAT);
-  save_ini_file($config_file, $config);
-  return (isset($config[$sn][$var])) ? $config[$sn][$var] : FALSE;
+function set_config($protocol, $sec, $var, $val) {
+  $class = get_proc_class($protocol);
+  return $class->set_config($sec, $var, $val);
 }
 
-function is_automount($sn, $usb=true) {
-  $auto = get_config($sn, "automount");
-  return ( ($auto) ? ( ($auto == "yes") ? TRUE : FALSE ) : TRUE);
+function is_automount($protocol, $sec, $usb=false) {
+  $class = get_proc_class($protocol);
+  return $class->is_automount($sec, $usb);
 }
 
-function is_automount_2($sn, $usb=FALSE) {
-  $auto = get_config($sn, "automount");
-  return ($auto == "yes" || ( ! $auto && $usb !== FALSE ) ) ? TRUE : FALSE; 
-}
-
-function toggle_automount($sn, $status) {
-  $config_file = $GLOBALS["paths"]["config_file"];
-  if (! is_file($config_file)) @mkdir(dirname($config_file),0777,TRUE);
-  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
-  $config[$sn]["automount"] = ($status == "true") ? "yes" : "no";
-  save_ini_file($config_file, $config);
-  return ($config[$sn]["automount"] == "yes") ? TRUE : FALSE;
+function toggle_automount($protocol, $sec, $status) {
+  $class = get_proc_class($protocol);
+  return $class->toggle_automount($sec, $status);
 }
 
 function execute_script($info, $action) { 
@@ -317,7 +304,7 @@ function execute_script($info, $action) {
   foreach ($info as $key => $value) putenv(strtoupper($key)."=${value}");
   $cmd = $info['command'];
   $bg = ($info['command_bg'] == "true" && $action == "ADD") ? "&" : "";
-  if ($common_cmd = get_config("Config", "common_cmd")) {
+  if ($common_cmd = get_config("LOCAL", "Config", "common_cmd")) {
     debug("Running common script: '{$common_cmd}'");
     exec($common_cmd);
   }
@@ -328,23 +315,11 @@ function execute_script($info, $action) {
   exec($cmd);
 }
 
-function set_command($sn, $cmd) {
-  $config_file = $GLOBALS["paths"]["config_file"];
-  if (! is_file($config_file)) @mkdir(dirname($config_file),0666,TRUE);
-  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
-  $config[$sn]["command"] = htmlentities($cmd, ENT_COMPAT);
-  save_ini_file($config_file, $config);
-  return (isset($config[$sn]["command"])) ? TRUE : FALSE;
+function remove_config($protocol, $sec) {
+  $class = get_proc_class($protocol);
+  return $class->remove_config($sec);
 }
 
-function remove_config_disk($sn) {
-  $config_file = $GLOBALS["paths"]["config_file"];
-  if (! is_file($config_file)) @mkdir(dirname($config_file),0666,TRUE);
-  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
-  unset($config[$sn]);
-  save_ini_file($config_file, $config);
-  return (isset($config[$sn])) ? TRUE : FALSE;
-}
 
 #########################################################
 ############        MOUNT FUNCTIONS        ##############
@@ -352,6 +327,7 @@ function remove_config_disk($sn) {
 
 function is_mounted($dev) {
   return (shell_exec("mount 2>&1|grep -c '${dev} '") == 0) ? FALSE : TRUE;
+  // return (shell_exec("mount 2>&1|grep -c '${dev} '") == 0) ? FALSE : TRUE;
 }
 
 function get_mount_params($fs, $dev) {
@@ -374,6 +350,9 @@ function get_mount_params($fs, $dev) {
     case 'cifs':
       return "rw,nounix,iocharset=utf8,_netdev,file_mode=0777,dir_mode=0777,username=%s,password=%s";
       break;
+    case 'nfs':
+      return "defaults";
+      break;
     default:
       return "auto,async,noatime,nodiratime";
       break;
@@ -381,35 +360,16 @@ function get_mount_params($fs, $dev) {
 }
 
 function do_mount($info) {
-  if ($info['fstype'] == "cifs") {
-    return do_mount_samba($info);
-  } else {
-    return do_mount_local($info);
-  }
-}
-
-function do_mount_local($info) {
-  $dev = $info['device'];
-  $dir = $info['mountpoint'];
-  $fs  = $info['fstype'];
-  if (! is_mounted($dev) || ! is_mounted($dir)) {
-    if ($fs){
-      @mkdir($dir,0777,TRUE);
-      $cmd = "mount -t $fs -o ".get_mount_params($fs, $dev)." '${dev}' '${dir}'";
-      debug("Mounting drive with command: $cmd");
-      $o = shell_exec($cmd." 2>&1");
-      foreach (range(0,5) as $t) {
-        if (is_mounted($dev)) {
-          @chmod($dir, 0777);@chown($dir, 99);@chgrp($dir, 100);
-          debug("Successfully mounted '${dev}' on '${dir}'"); return TRUE;
-        } else { sleep(0.5);}
-      }
-      debug("Mount of ${dev} failed. Error message: $o"); return FALSE;
-    }else {
-      debug("No filesystem detected, aborting.");
-    }
-  } else {
-    debug("Drive '$dev' already mounted");
+  switch ($info['fstype']) {
+    case 'cifs':
+      $class = get_proc_class("SMB");
+      return $class->mount($info);
+      break;
+    
+    default:
+      $class = get_proc_class("LOCAL");
+      return $class->mount($info);
+      break;
   }
 }
 
@@ -442,13 +402,13 @@ function is_shared($name) {
 }
 
 function config_shared($sn, $part) {
-  $share = get_config($sn, "share.{$part}");
+  $share = get_config("LOCAL", $sn, "share.{$part}");
   return ($share == "yes" || ! $share) ? TRUE : FALSE; 
 }
 
 function toggle_share($serial, $part, $status) {
   $new = ($status == "true") ? "yes" : "no";
-  set_config($serial, "share.{$part}", $new);
+  set_config("LOCAL", $serial, "share.{$part}", $new);
   return ($new == 'yes') ? TRUE:FALSE;
 }
 function add_smb_share($dir, $share_name) {
@@ -512,16 +472,17 @@ function rm_smb_share($dir, $share_name) {
     @unlink($share_conf);
     debug("Removing file '$share_conf'.");
   }
-  if (exist_in_file($paths['smb_extra'], $share_conf)) {
-    debug("Removing share definitions from .".$paths['smb_extra'])."'.";
-    $c = (is_file($paths['smb_extra'])) ? @file($paths['smb_extra'],FILE_IGNORE_NEW_LINES) : array();
-    # Do Cleanup
-    $smb_extra_includes = array_unique(preg_grep("/include/i", $c));
-    foreach($smb_extra_includes as $key => $inc) if(! is_file(parse_ini_string($inc)['include'])) unset($smb_extra_includes[$key]); 
-    $c = array_merge(preg_grep("/include/i", $c, PREG_GREP_INVERT), $smb_extra_includes);
-    $c = preg_replace('/\n\s*\n\s*\n/s', PHP_EOL.PHP_EOL, implode(PHP_EOL, $c));
-    file_put_contents($paths['smb_extra'], $c);
+  if (! exist_in_file($paths['smb_extra'], $share_conf)) {
+    return null;
   }
+  debug("Removing share definitions from ".$paths['smb_extra'])."'.";
+  $c = (is_file($paths['smb_extra'])) ? @file($paths['smb_extra'],FILE_IGNORE_NEW_LINES) : array();
+  # Do Cleanup
+  $smb_extra_includes = array_unique(preg_grep("/include/i", $c));
+  foreach($smb_extra_includes as $key => $inc) if(! is_file(parse_ini_string($inc)['include'])) unset($smb_extra_includes[$key]); 
+  $c = array_merge(preg_grep("/include/i", $c, PREG_GREP_INVERT), $smb_extra_includes);
+  $c = preg_replace('/\n\s*\n\s*\n/s', PHP_EOL.PHP_EOL, implode(PHP_EOL, $c));
+  file_put_contents($paths['smb_extra'], $c);
   debug("Reloading Samba configuration. ");
   shell_exec("/usr/bin/smbcontrol $(cat /var/run/smbd.pid 2>/dev/null) close-share '${share_name}' 2>&1");
   shell_exec("/usr/bin/smbcontrol $(cat /var/run/smbd.pid 2>/dev/null) reload-config 2>&1");
@@ -535,11 +496,12 @@ function rm_smb_share($dir, $share_name) {
 function add_nfs_share($dir) {
   $reload = FALSE;
   foreach (array("/etc/exports","/etc/exports-") as $file) {
-    if (! exist_in_file($file, $dir)) {
+    if (! exist_in_file($file, "\"{$dir}\"")) {
       $c = (is_file($file)) ? @file($file,FILE_IGNORE_NEW_LINES) : array();
       debug("Adding NFS share '$dir' to '$file'.");
       $fsid = 100 + count(preg_grep("@^\"@", $c));
-      $c[] = ""; $c[] = "\"{$dir}\" -async,no_subtree_check,fsid={$fsid} *(sec=sys,rw,insecure,anongid=100,anonuid=99,all_squash)";
+      $c[] = "\"{$dir}\" -async,no_subtree_check,fsid={$fsid} *(sec=sys,rw,insecure,anongid=100,anonuid=99,all_squash)";
+      $c[] = "";
       $c = preg_replace('/\n\s*\n\s*\n/s', PHP_EOL.PHP_EOL, implode(PHP_EOL, $c));
       file_put_contents($file, $c);
       $reload = TRUE;
@@ -577,7 +539,7 @@ function reload_shares() {
             rm_nfs_share($info['target']);
             debug("Adding new config ...");
             add_smb_share($info['mountpoint'], $info['label']);
-            if (get_config("Config", "nfs_export") == "yes") {
+            if (get_config("LOCAL", "Config", "nfs_export") == "yes") {
               add_nfs_share($info['mountpoint']);
             }
           }
@@ -589,100 +551,12 @@ function reload_shares() {
 }
 
 #########################################################
-############        SAMBA FUNCTIONS         #############
-#########################################################
-
-function get_samba_config($source, $var) {
-  $config_file = $GLOBALS["paths"]["samba_mount"];
-  if (! is_file($config_file)) @mkdir(dirname($config_file),0666,TRUE);
-  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
-  return (isset($config[$source][$var])) ? $config[$source][$var] : FALSE;
-}
-
-function set_samba_config($source, $var, $val) {
-  $config_file = $GLOBALS["paths"]["samba_mount"];
-  if (! is_file($config_file)) @mkdir(dirname($config_file),0666,TRUE);
-  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
-  $config[$source][$var] = $val;
-  save_ini_file($config_file, $config);
-  return (isset($config[$source][$var])) ? $config[$source][$var] : FALSE;
-}
-
-function get_samba_mounts() {
-  global $paths;
-  $o = array();
-  $config_file = $GLOBALS["paths"]["samba_mount"];
-  $samba_mounts = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
-  foreach ($samba_mounts as $device => $mount) {
-    $mount['device'] = $device;
-    $mount['target'] = trim(shell_exec("cat /proc/mounts 2>&1|grep '".str_replace(" ", '\\\040', $device)."'|awk '{print $2}'"));
-    $mount['fstype'] = "cifs";
-    $mount['size']   = intval(trim(shell_exec("df --output=size,source 2>/dev/null|grep -v 'Filesystem'|grep '${device}'|awk '{print $1}'")))*1024;
-    $mount['used']   = intval(trim(shell_exec("df --output=used,source 2>/dev/null|grep -v 'Filesystem'|grep '${device}'|awk '{print $1}'")))*1024;
-    $mount['avail']  = $mount['size'] - $mount['used'];
-    if (! $mount["mountpoint"]) {
-      $mount["mountpoint"] = $mount['target'] ? $mount['target'] : preg_replace("%\s+%", "_", "{$paths[usb_mountpoint]}/{$mount[ip]}_{$mount[share]}");
-    }
-    $o[] = $mount;
-  }
-  return $o;
-}
-
-function do_mount_samba($info) {
-  $dev = $info['device'];
-  $dir = $info['mountpoint'];
-  $fs  = $info['fstype'];
-  if (! is_mounted($dev) || ! is_mounted($dir)) {
-    @mkdir($dir,0777,TRUE);
-    $params = sprintf(get_mount_params($fs, $dev), ($info['user'] ? $info['user'] : "guest" ), $info['pass']);
-    $cmd = "mount -t $fs -o ".$params." '${dev}' '${dir}'";
-    $params = sprintf(get_mount_params($fs, $dev), ($info['user'] ? $info['user'] : "guest" ), '*******');
-    debug("Mounting share with command: mount -t $fs -o ".$params." '${dev}' '${dir}'");
-    $o = shell_exec($cmd." 2>&1");
-    foreach (range(0,5) as $t) {
-      if (is_mounted($dev)) {
-        @chmod($dir, 0777);@chown($dir, 99);@chgrp($dir, 100);
-        debug("Successfully mounted '${dev}' on '${dir}'"); return TRUE;
-      } else { sleep(0.5);}
-    }
-    debug("Mount of ${dev} failed. Error message: $o"); return FALSE;
-  } else {
-    debug("Share '$dev' already mounted.");
-  }
-}
-
-function toggle_samba_automount($source, $status) {
-  $config_file = $GLOBALS["paths"]["samba_mount"];
-  if (! is_file($config_file)) @mkdir(dirname($config_file),0777,TRUE);
-  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
-  $config[$source]["automount"] = ($status == "true") ? "yes" : "no";
-  save_ini_file($config_file, $config);
-  return ($config[$source]["automount"] == "yes") ? TRUE : FALSE;
-}
-
-function remove_config_samba($source) {
-  $config_file = $GLOBALS["paths"]["samba_mount"];
-  if (! is_file($config_file)) @mkdir(dirname($config_file),0666,TRUE);
-  $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
-  unset($config[$source]);
-  save_ini_file($config_file, $config);
-  return (isset($config[$source])) ? TRUE : FALSE;
-}
-
-#########################################################
-############         NFS FUNCTIONS          #############
-#########################################################
-
-
-
-// "/mnt/user/Apps" -async,no_subtree_check,fsid=100 *(sec=sys,rw,insecure,anongid=100,anonuid=99,all_squash)
-
-#########################################################
 ############         DISK FUNCTIONS         #############
 #########################################################
 
 function get_unasigned_disks() {
   $disks = $paths = $unraid_disks = $unraid_cache = array();
+  $unraid_flash = realpath("/dev/disk/by-label/UNRAID");
   foreach (listDir("/dev/disk/by-id") as $p) {
     $r = realpath($p);
     if (!is_bool(strpos($r, "/dev/sd")) || !is_bool(strpos($r, "/dev/hd"))) {
@@ -690,7 +564,6 @@ function get_unasigned_disks() {
     }
   }
   natsort($paths);
-  $unraid_flash = realpath("/dev/disk/by-label/UNRAID");
   foreach (parse_ini_string(shell_exec("/usr/bin/cat /proc/mdcmd 2>/dev/null")) as $k => $v) {
     if (strpos($k, "rdevName") !== FALSE && strlen($v)) {
       $unraid_disks[] = realpath("/dev/$v");
@@ -726,6 +599,7 @@ function get_all_disks_info($bus="all") {
   $disks = get_unasigned_disks();
   foreach ($disks as $key => $disk) {
     if ($disk['type'] != $bus && $bus != "all") continue;
+    $disk['disk'] = realpath($key);
     $disk['temperature'] = get_temp($key);
     $disk['size'] = intval(trim(shell_exec("blockdev --getsize64 ${key} 2>/dev/null")));
     $disk = array_merge($disk, get_disk_info($key));
@@ -741,16 +615,18 @@ function get_all_disks_info($bus="all") {
 
 function get_udev_info($device, $udev=NULL, $reload) {
   global $paths;
+  $whitelist = array("DEVPATH","DEVTYPE","ID_FS_LABEL_ENC","ID_FS_TYPE","ID_MODEL","ID_SCSI_SERIAL","ID_SERIAL","ID_SERIAL_SHORT","ID_VENDOR");
   $state = is_file($paths['state']) ? @parse_ini_file($paths['state'], true) : array();
   if ($udev) {
-    $state[$device] = $udev;
+    $state[$device] = array_intersect_key($udev, array_flip($whitelist));
     save_ini_file($paths['state'], $state);
     return $udev;
   } else if (array_key_exists($device, $state) && ! $reload) {
     debug("Using udev cache for '$device'.", "DEBUG");
     return $state[$device];
   } else {
-    $state[$device] = parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device 2>/dev/null) 2>/dev/null"));
+    $udev = parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device 2>/dev/null) 2>/dev/null"));
+    $state[$device] = array_intersect_key($udev, array_flip($whitelist));
     save_ini_file($paths['state'], $state);
     debug("Not using udev cache for '$device'.", "DEBUG");
     return $state[$device];
@@ -771,9 +647,9 @@ function get_partition_info($device, $reload=FALSE){
   global $_ENV, $paths;
   $disk = array();
   $attrs = (isset($_ENV['DEVTYPE'])) ? get_udev_info($device, $_ENV, $reload) : get_udev_info($device, NULL, $reload);
-  // $GLOBALS["echo"]($attrs);
   $device = realpath($device);
   if ($attrs['DEVTYPE'] == "partition") {
+    // _echo($attrs);
     $disk['serial_short'] = isset($attrs["ID_SCSI_SERIAL"]) ? $attrs["ID_SCSI_SERIAL"] : $attrs['ID_SERIAL_SHORT'];
     $disk['serial']       = "{$attrs[ID_MODEL]}_{$disk[serial_short]}";
     $disk['device']       = $device;
@@ -781,7 +657,7 @@ function get_partition_info($device, $reload=FALSE){
     preg_match_all("#(.*?)(\d+$)#", $device, $matches);
     $disk['part']   =  $matches[2][0];
     $disk['disk']   =  $matches[1][0];
-    if (isset($attrs['ID_FS_LABEL'])){
+    if (isset($attrs['ID_FS_LABEL_ENC'])){
       $disk['label'] = safe_name($attrs['ID_FS_LABEL_ENC']);
     } else {
       if (isset($attrs['ID_VENDOR']) && isset($attrs['ID_MODEL'])){
@@ -798,17 +674,18 @@ function get_partition_info($device, $reload=FALSE){
     $disk['size']   = intval(trim(shell_exec("blockdev --getsize64 ${device} 2>/dev/null")));
     $disk['used']   = intval(trim(shell_exec("df --output=used,source 2>/dev/null|grep -v 'Filesystem'|grep ${device}|awk '{print $1}'")))*1024;
     $disk['avail']  = $disk['size'] - $disk['used'];
-    if ( $disk['mountpoint'] = get_config($disk['serial'], "mountpoint.{$disk[part]}") ) {
+    if ( $disk['mountpoint'] = get_config("LOCAL", $disk['serial'], "mountpoint.{$disk[part]}") ) {
       if (! $disk['mountpoint'] ) goto empty_mountpoint;
     } else {
       empty_mountpoint:
       $disk['mountpoint'] = $disk['target'] ? $disk['target'] : preg_replace("%\s+%", "_", sprintf("%s/%s", $paths['usb_mountpoint'], $disk['label']));
     }
     $disk['owner'] = (isset($_ENV['DEVTYPE'])) ? "udev" : "user";
-    $disk['automount'] = is_automount_2($disk['serial'],strpos($attrs['DEVPATH'],"usb"));
+    $is_usb = (!is_bool(strpos($attrs['DEVPATH'], "usb"))) ? TRUE : FALSE;
+    $disk['automount'] = is_automount("LOCAL", $disk['serial'], $is_usb);
     $disk['shared'] = ($disk['target']) ? is_shared(basename($disk['mountpoint'])) : config_shared($disk['serial'], $disk['part']);
-    $disk['command'] = get_config($disk['serial'], "command.{$disk[part]}");
-    $disk['command_bg'] = get_config($disk['serial'], "command_bg.{$disk[part]}");
+    $disk['command'] = get_config("LOCAL", $disk['serial'], "command.{$disk[part]}");
+    $disk['command_bg'] = get_config("LOCAL", $disk['serial'], "command_bg.{$disk[part]}");
     return $disk;
   }
 }

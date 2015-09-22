@@ -8,6 +8,8 @@ require_once("plugins/${plugin}/include/lib.php");
 if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/OpenDevices.page","plugins/dynamix/OpenDevices.page-");
 ?>
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/waitMe.min.css">
+<link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/glyphicons.css">
+<script type="text/javascript" src="/plugins/<?=$plugin;?>/assets/waitMe.min.js"></script>
 
 <?if (is_file("webGui/scripts/jquery.switchButton.js")): # Pre 6.1?>
 <script type="text/javascript" src="/webGui/scripts/jquery.switchButton.js"></script>
@@ -19,7 +21,6 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
 <link type="text/css" rel="stylesheet" href="/webGui/styles/jquery.switchbutton.css">
 <?endif;?>
 
-<script type="text/javascript" src="/plugins/<?=$plugin;?>/assets/waitMe.min.js"></script>
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/style-<?=$display['theme'];?>.css">
 
 <script type="text/javascript">
@@ -54,8 +55,9 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
   table.usb_disks tr>td+td+td{min-width:0px;}
   table.usb_disks tr>td+td+td+td{text-align:center;padding-left:0;padding-right:12px;width:auto;min-width:0px;}
   table.usb_disks tr>td+td+td+td+td+td{text-align:right;padding-left:0;padding-right:12px;width:auto;}
-  table.usb_disks tr>td+td+td+td+td+td+td+td+td+td{text-align:left;padding:0px 0px 0px 12px;width: 75px;}
-  table.usb_disks tr>td+td+td+td+td+td+td+td+td+td+td+td{text-align:right;padding-left:0;padding-right:12px;}
+  table.usb_disks tr>td+td+td+td+td+td+td+td{text-align:left;padding:0px 0px 0px 12px;width: 75px;}
+  table.usb_disks tr>td+td+td+td+td+td+td+td+td+td{text-align:right;padding-left:12px;padding-right:0px;width:auto;}
+  table.usb_disks tr>td+td+td+td+td+td+td+td+td+td+td+td{text-align:right;padding-left:0px;padding-right:7px;width:auto;}
 
   table.usb_absent thead tr>td{text-align:left;width:8%;padding-left:12px;}
   table.usb_absent tr>td{text-align:left;width:8%;padding-left:12px;padding-right:0;white-space:nowrap;}
@@ -70,6 +72,7 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
 
 
   button[type=button].mount {margin:0px 14px 0 14px;}
+  img.icon {height: 16px}
   i.glyphicon{margin:0px 5px 0 5px;}
   i.hdd{margin:0px; 0px;font-size: 1.1em}
   i.partition{margin-left: 18px;}
@@ -89,8 +92,19 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
   var display = <?=json_encode($display);?>;
   var vars = <?=json_encode($var);?>;
   var tab_usbdisks = $('input[name$="tabs"]').length;
+  var reload_interval = 2000;
+  var spinner = "<tr><td colspan='12' style='text-align:center;font-weight:bold;'><center><i class='fa fa-spinner fa-spin'></i>&nbsp;<em>Please wait... retrieving information!</em></center></td></tr>";
   $('#tab'+tab_usbdisks).bind({click:function() {pin_tab(tab_usbdisks); detect_usb_disk_change(tab_usbdisks);}});
   $(function(){usb_disks(tab_usbdisks);detect_usb_disk_change(tab_usbdisks);});
+
+  if (!String.prototype.format) {
+    String.prototype.format = function() {
+      var args = arguments;
+      return this.replace(/{(\d+)}/g, function(match, number) {
+        return typeof args[number] != 'undefined' ? args[number] : match;
+      });
+    };
+  }
 
   function openWindow_fsck(cmd,title,height,width) {
     var run = cmd;
@@ -99,8 +113,13 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
     var options = 'resizeable=yes,scrollbars=yes,height='+height+',width='+width+',top='+top+',left='+left;
     window.open(run, 'log', options);
   }
-  function get_preclear(device) {
-    $.post(URL,{action:"get_preclear",device:device},function(data){if(data.preclear){$('#preclear_'+device).html(data.preclear);}},"json").always(function(){setTimeout('get_preclear("'+device+'")',5000);});
+  function get_preclear() {
+    $(".preclear_status").each(function(){
+      var el = $(this);
+      $.post(URL,{action:"get_preclear",device:el.attr("disk")},function(data) {
+        el.html(data);
+      });
+    });
   }
   function startWaitMe(el) {
     <?if ($display['theme'] == 'white'):?>
@@ -132,22 +151,48 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
     $.cookie('tab','tab'+n,{path:'/'});
   }
   function usb_disks(tabnum) {
-    startWaitMe('#usb_devices_list');
-    $.post(URL,{action:"get_content",display:display},function(data) {if (data) $('#usb_devices_list').html(data);});
+    $.post(URL,{action:"get_content",display:display},function(data) {
+      if (data.disks) $('#disk-table-body').html(data.disks);
+      if (data.remotes) $('#remotes-table-body').html(data.remotes);
+      if (data.misc) $('#misc-div-body').html(data.misc);
+    },"json").always(function() {
+      $(".automount").each(toggleFunctions.prepare_automount);
+      $(".toggle_share").each(toggleFunctions.prepare_toggle_share);
+      $(".toggle-hdd").click(toggleFunctions.toggle_hdd);
+      $(".text").click(showInput);$(".input").blur(hideInput);
+      $(".show-complete").css("display", $(".complete-switch").is(":checked") ? "block" : "none");
+      $("button[role=mount]").add("button[role=umount]").click(function(){disk_op(this, $(this).attr("role"), $(this).attr("device"));});
+      $("button[role=format]").click(function(){format_disk(this, $(this).attr("context"), $(this).attr("device"));});
+    });
   }
   function detect_usb_disk_change(tabnum) {
     if ($('#tab'+tabnum).is(':checked')) {
       clearTimeout(timers.usbdisks);
-      $.post(URL,{action:"detect"},function(data){if(data.reload){usb_disks(tabnum);$.post(URL,{action:"remove_hook"});}},"json").always(function(){timers.usbdisks=setTimeout('detect_usb_disk_change('+tabnum+')',5000);});
+      get_preclear();
+      $.post(URL,{action:"detect"},function(data){if(data.reload){
+        usb_disks(tabnum);
+        $.post(URL,{action:"remove_hook"});}},"json").always(
+        function(){
+          timers.usbdisks=setTimeout('detect_usb_disk_change('+tabnum+')',reload_interval);
+        });
     } else {
       clearTimeout(timers.usbdisks);
     }
     return false;
   }
-  function remove_disk_config(serial){
-    var title = 'Remove config';
-    $( "#dialog-confirm" ).html(serial);
-    $( "#dialog-confirm" ).append( "<br><br><span style='color: #E80000;'>Are you sure?</span>" );
+  function remove_config(el, context) {
+    var info = JSON.parse($(el).parents("tr").attr("info"));
+    line = "<dl><dt>{0}</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>{1}</span></dd></dl>";
+    if (typeof info.protocol == "undefined") {
+      title = "Remove disk:";
+      content = line.format("Disk Serial:", info.serial);
+    } else {
+      title = "Remove "+info.protocol+" share:";
+      content = line.format("Server:", info.ip);
+      content += line.format("Share:", info.share);
+    }
+    $( "#dialog-confirm" ).html(content);
+    $( "#dialog-confirm" ).append( line.format("<p><span style='color: #EF3D47;'>Are you sure?</span></p>","") );
     $( "#dialog-confirm" ).dialog({
       title: title,
       resizable: false,
@@ -158,31 +203,8 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
       buttons: {
         "Yes": function() {
           $( this ).dialog( "close" );
-          $.post(URL,{action:"remove_config",serial:serial},"json");
-          usb_disks(tab_usbdisks);
-        },
-        Cancel: function() {
-          $( this ).dialog( "close" );
-          $( this ).html("");
-        }
-      }
-    });
-  }
-  function remove_samba_config(device){
-    var title = 'Remove SMB mount';
-    $( "#dialog-confirm" ).html("<dl><dt>Source:</dt><dd>"+device+"</dd></dl>");
-    $( "#dialog-confirm" ).append( "<dl><dt><span style='color: #E80000;'>Are you sure?</span></dd></dl>" );
-    $( "#dialog-confirm" ).dialog({
-      title: title,
-      resizable: false,
-      width: 500,
-      modal: true,
-      show : {effect: 'fade' , duration: 250},
-      hide : {effect: 'fade' , duration: 250},
-      buttons: {
-        "Yes": function() {
-          $( this ).dialog( "close" );
-          $.post(URL,{action:"remove_samba_config",device:device},"json");
+          $('#remotes-table-body').html(spinner);
+          $.post(URL,{"action":"remove_config","device":info.serial,"context":context},"json");
           usb_disks(tab_usbdisks);
         },
         Cancel: function() {
@@ -211,12 +233,12 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
     var options = 'resizeable=yes,scrollbars=yes,height=600,width=900,top='+top+',left='+left;
     window.open('/plugins/preclear.disk/Preclear.php?action=show_preclear&device='+device, 'Preclear', options);
   }
-  function add_samba(){
-    var title = 'Add SMB share';
-    $( "#dialog-samba" ).html($("#add_samba-defaults").html());
-    $( "#dialog-samba" ).find(".switch").switchButton({labels_placement:"right",on_label:'YES',off_label:'NO'});
-    $( "#dialog-samba" ).find(".switch-button-background").css("margin-top", "6px");
-    $( "#dialog-samba" ).dialog({
+  function add_remote_share(){
+    var title = 'Add Remote Share';
+    $( "#dialog-confirm" ).html($("#add-remote-defaults").html());
+    $( "#dialog-confirm" ).find(".switch").switchButton({labels_placement:"right",on_label:'YES',off_label:'NO'});
+    $( "#dialog-confirm" ).find(".switch-button-background").css("margin-top", "6px");
+    $( "#dialog-confirm" ).dialog({
       title: title,
       resizable: false,
       width: 600,
@@ -227,11 +249,13 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
         "Add": function() {
           $( this ).dialog( "close" );
           var opts = new Object();
-          opts["action"] = "add_samba_mount";
-          opts["IP"]    = getVal(this,"IP");
-          opts["USER"]  = getVal(this,"USER");
-          opts["PASS"]  = getVal(this,"PASS");
-          opts["SHARE"] = getVal(this,"SHARE");
+          opts["action"]   = "add_remote_share";
+          opts["PROTOCOL"] = getVal(this,"PROTOCOL");
+          opts["IP"]       = getVal(this,"IP");
+          opts["USER"]     = getVal(this,"USER");
+          opts["PASS"]     = getVal(this,"PASS");
+          opts["SHARE"]    = getVal(this,"SHARE");
+          $('#remotes-table-body').html(spinner);
           if (opts.SHARE && opts.IP) {
             $.post(URL,opts).done(function(){usb_disks(tab_usbdisks);});
           }
@@ -242,10 +266,11 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
       }
     });
   }
-  function load_hosts(el) {
-    old = $(el).html();
+  function load_hosts(el, action) {
+    var target = $(el).parents("div").find("*[name='IP']");
+    var old = $(el).html();
     $(el).html("<i class='fa fa-circle-o-notch fa-spin'></i> Searching ...");
-    $.post(URL,{'action':'list_samba_hosts','var':vars}).done(function(data){
+    $.post(URL,{'action':action,'var':vars}).done(function(data){
       $(el).html(old);
       if (data) {
         var hosts = data.split('\n');
@@ -256,19 +281,20 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
               add += "<option value='"+hosts[i]+"'>"+hosts[i]+"</option>";
             }
           }
-          $("#dialog-samba").find(".samba_hosts").html(add+"</select>");
+          target.replaceWith(add+"</select>")
         }
       }
     });
   }
-  function load_shares(el) {
-    old = $(el).html();
+  function load_shares(el, action) {
+    var old = $(el).html();
+    var target = $(el).parents("div").find("*[name='SHARE']");
     $(el).html("<i class='fa fa-circle-o-notch fa-spin'></i> Loading ...");
     var opts = new Object();
-    opts["action"] = "list_samba_shares";
-    opts["IP"] = getVal("#dialog-samba","IP");
-    opts["USER"] = getVal("#dialog-samba","USER");
-    opts["PASS"] = getVal("#dialog-samba","PASS");
+    opts["action"] = action;
+    opts["IP"] = getVal("#dialog-confirm","IP");
+    opts["USER"] = getVal("#dialog-confirm","USER");
+    opts["PASS"] = getVal("#dialog-confirm","PASS");
     if (! opts.IP.length) return false;
     $.post(URL,opts).done(function(data){
       $(el).html(old);
@@ -281,18 +307,19 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
               add += "<option value='"+shares[i]+"'>"+shares[i]+"</option>";
             }
           }
-          $("#dialog-samba").find(".samba_shares").html(add+"</select>");
+          target.replaceWith(add+"</select>")
         }
       }
     });
   }
   function getVal(el, name) {
     el = $(el).find("*[name="+name+"]");
+    if (! el.length) return null;
     return value = ( $(el).attr('type') == 'checkbox' ) ? ($(el).is(':checked') ? "on" : "off") : $(el).val();
   }
   function format_disk(bt, type, device){
     var title = 'Formatting '+type+': '+device;
-    $( "#dialog-confirm" ).html($("#format_disk").html());
+    $( "#dialog-confirm" ).html($("#format-disk-defaults").html());
     $( "#dialog-confirm" ).dialog({
       title: title,
       resizable: false,
@@ -319,7 +346,7 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
   }
   function rm_partition(bt, device, partition){
     var title = 'Remove partition '+partition+' from disk '+device;
-    $( "#dialog-confirm" ).html($("#rm_partition").html());
+    $( "#dialog-confirm" ).html($("#rm-partition-defaults").html());
     $( "#dialog-confirm" ).dialog({
       title: title,
       resizable: false,
@@ -347,6 +374,51 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
   function sendLog() {
     $.post(URL,{'action':'send_log'}).always(function(){notifier();});
   }
+  var toggleFunctions = {
+    prepare_automount : function() {
+      checked = $(this).is(":checked");
+      $(this).switchButton({labels_placement: "right", checked:checked});
+      $(this).change(toggleFunctions.automount);
+    },
+    automount: function() {
+      serial  = $(this).attr("serial");
+      status  = $(this).is(":checked");
+      context = $(this).attr("context");
+      $.post(URL,{"action":"automount","serial":serial,"status":status,"context":context},function(data){$(this).prop("checked",data.automount);},"json");
+    },
+    prepare_toggle_share : function() {
+      checked = $(this).is(":checked");
+      $(this).switchButton({labels_placement: "right", checked:checked});
+      $(this).change(toggleFunctions.toggle_share);
+    },
+    toggle_share: function() {
+      $.post(URL,{action:"toggle_share",info:$(this).attr("info"),status:$(this).is(":checked")},function(data){$(this).prop("checked",data.result);},"json");
+    }, 
+    toggle_hdd: function(e) {
+      el = $(this);
+      el.disableSelection();
+      disk = el.attr("hdd");
+      $(".toggle-"+disk).slideToggle(0,function(){
+        toggle = el.find(".glyphicon-append");
+        if ( $("tr.toggle-"+disk+":first").is(":visible") ){
+          toggle.addClass("glyphicon-minus-sign").removeClass("glyphicon-plus-sign");
+        } else {
+          toggle.removeClass("glyphicon-minus-sign").addClass("glyphicon-plus-sign");
+        }
+      });
+    }
+  };
+  function rm_preclear(dev) {
+    $.post(URL,{action:"rm_preclear",device:dev}).always(function(){usb_disks(tab_usbdisks)});
+  }
+  function load_remote_opts(el) {
+    p = $(el).parents("div").find(".options");
+    if ($(el).val() == "SMB") {
+      p.html($("#add-samba-defaults").html());
+    } else {
+      p.html($("#add-nfs-defaults").html());
+    }
+  }
 </script>
 <div style='display: inline; float: right; margin: -58px -14px;' id='unassigned_tabbed'></div>
 <div class="font_preload" style="opacity: 0"><span style="font-family: 'FontAwesome', Arial, sans-serif;"></span></div>
@@ -354,26 +426,52 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
   <input type="hidden" id="cmdUsbMount" name="#command" value="" />
 </form>
 <div id="dialog-confirm" style="display:none;" title="Dialog Title"></div>
-<div id="dialog-samba" style="display:none;" title=""></div>
-<div id="add_samba-defaults" style="display:none;">
+
+<div id="add-remote-defaults" style="display:none;">
+  <dl>
+    <dt>Protocol:</dt>
+    <dd>
+      <select name="PROTOCOL" onchange="load_remote_opts(this);">
+        <option>Choose</option>
+        <option value="SMB">SMB</option>
+        <option value="NFS">NFS</option>
+      </select>
+    </dd>
+  </dl>
+  <div class="options"></div>
+</div>
+
+<div id="add-nfs-defaults" style="display:none;">
   <dl>
     <dt>IP/Host:</dt>
     <dd><span class="samba_hosts"><input type="text" name="IP"></span></dd>
     <dt>&nbsp;</dt>
-    <dd>
-      <button type="button" onclick="load_hosts(this);">Search for hosts in <?=$var['WORKGROUP'];?></button>
-    </dd>
+    <dd><button type="button" onclick="load_hosts(this, 'list_nfs_hosts');">Search for local NFS servers</button></dd>
+    <dt>Share:</dt>
+    <dd><span class="samba_shares"><input type='text' name='SHARE'></span></dd>
+    <dt>&nbsp;</dt>
+    <dd><button type="button" onclick="load_shares(this, 'list_nfs_shares');">Load Shares</button></dd>
+  </dl>
+</div>
+
+<div id="add-samba-defaults" style="display:none;">
+  <dl>
+    <dt>IP/Host:</dt>
+    <dd><input type="text" name="IP"></dd>
+    <dt>&nbsp;</dt>
+    <dd><button type="button" onclick="load_hosts(this, 'list_samba_hosts');">Search for servers in <?=$var['WORKGROUP'];?></button></dd>
     <dt>Username:</dt>
     <dd><input type="text" name="USER"></dd>
     <dt>Password:</dt>
     <dd><input type="password" name="PASS"></dd>
     <dt>Share:</dt>
-    <dd><span class="samba_shares"><input type='text' name='SHARE'></span></dd>
+    <dd><input type='text' name='SHARE'></dd>
     <dt>&nbsp;</dt>
-    <dd><button type="button" onclick="load_shares();">Load Shares</button></dd>
+    <dd><button type="button" onclick="load_shares(this, 'list_samba_shares');">Load Shares</button></dd>
   </dl>  
 </div>
-<div id="format_disk" style="display:none;">
+
+<div id="format-disk-defaults" style="display:none;">
   <dl>
     <dt>Filesystem:</dt>
     <dd>
@@ -390,19 +488,67 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
     <dd><input type="text" name="CONFIRM" style="width: 60px"></dd>
   </dl>
 </div>
-<div id="rm_partition" style="display:none;">
+
+<div id="rm-partition-defaults" style="display:none;">
   <dl>
     <dt>Type<span class="red">Yes</span>to confirm:</dt>
     <dd><input type="text" name="CONFIRM" style="width: 60px"></dd>
   </dl>
 </div>
 
-<div id="usb_devices_list">
-  <table class='usb_disks' id='usb_table'>
-    <thead><tr><td>Device</td><td>Identification</td><td></td><td>Temp</td><td>FS</td><td>Size</td><td>Used</td><td>Free</td><td>Open files</td><td>Auto mount</td><td>Script</td></tr></thead>
-    <tbody><tr><td colspan='12' style='text-align:center;font-weight:bold;'></td></tr></tbody>
+<table class='usb_disks custom_head'>
+  <thead>
+    <tr>
+      <td>Device</td>
+      <td>Identification</td>
+      <td></td>
+      <td>Temp</td>
+      <td>FS</td>
+      <td>Size</td>
+      <td>Open files</td>
+      <td>Auto mount</td>
+      <td>Share</td>
+      <td>Used</td>
+      <td>Free</td>
+      <td>Script</td>
+    </tr>
+  </thead>
+  <tbody id="disk-table-body">
+    <tr><td colspan='12' style='text-align:center;font-weight:bold;'>
+      <center><i class='fa fa-spinner fa-spin'></i>&nbsp;<em>Please wait... retrieving information!</em></center>
+    </td></tr>
+  </tbody>
+</table>
+
+<div id='smb_tab' class='show-complete'>
+  <div id='title'><span class='left'><img src='/plugins/<?=$plugin;?>/icons/remoteshare.png' class='icon'>Remote Shares</span></div>
+  <table class='samba_mounts custom_head'>
+    <thead>
+      <tr>
+        <td>Device</td>
+        <td>Source</td>
+        <td>Mount point</td>
+        <td></td>
+        <td>Size</td>
+        <td>Used</td>
+        <td>Free</td>
+        <td>Auto mount</td>
+        <td>Script</td>
+        <td>Remove</td>
+      </tr>
+    </thead>
+    <tbody id="remotes-table-body">
+      <tr><td colspan='12' style='text-align:center;font-weight:bold;'>
+        <center><i class='fa fa-spinner fa-spin'></i>&nbsp;<em>Please wait... retrieving information!</em></center>
+      </td></tr>
+    </tbody>
   </table>
+  <button type='button' onclick='add_remote_share();'>Add Remote Share</button>
+  <div id="misc-div-body"></div>
 </div>
+<script type="text/javascript">
+  $(".show-complete").css("display", $(".complete-switch").is(":checked") ? "block" : "none");
+</script>
 
 <blockquote class='inline_help'>
   <p>Click <a class="exec underline" onclick="openWindow('/webGui/scripts/tail_log&arg1=unassigned.devices.log','Log Information',600,900);">here</a> to see the log. Alternatively, you can upload a copy of the log by clicking <a class="underline exec" onclick="sendLog();">here</a>.

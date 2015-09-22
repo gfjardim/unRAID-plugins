@@ -8,11 +8,12 @@ $DEVNAME = (isset($_ENV['DEVNAME'])) ? $_ENV['DEVNAME'] : ( isset($argv[1]) ? $a
 $DEVNAME = (file_exists($DEVNAME)) ? realpath($DEVNAME) : $DEVNAME;
 if (! $DEVNAME) die("Fail: disk device not informed.\n");
 
-# Deal with SMB shares
-if (strpos($DEVNAME, "//") === 0 || $DEVNAME == "all") {
-  foreach (get_samba_mounts() as $info) {
+# Deal with remote shares
+if (! file_exists($DEVNAME)|| $DEVNAME == "all") {
+  $mounts = get_remote_shares();
+  foreach ($mounts as $info) {
     $device = $info['device'];
-    if ( preg_match("#".$DEVNAME."#i", $device) || $DEVNAME == "all" ) {
+    if ( preg_match("#".$DEVNAME."$#i", $device) || $DEVNAME == "all" ) {
       if (! $info['automount'] && $DEVNAME == "all" ) {
         debug("Disk with serial '${info[serial]}' auto mount is disabled, aborting.");
         continue;

@@ -5,7 +5,9 @@ require_once("/usr/local/emhttp/plugins/${plugin}/include/lib.php");
 
 if (isset($_ENV['DEVLINKS'])) {
   foreach (explode(" ", $_ENV['DEVLINKS']) as $link) {
-    get_udev_info($link, $_ENV, true);
+    if (strpos($link, "by-id") && strpos($link, "wwn-") === false) {
+      get_udev_info($link, $_ENV, true);
+    }
   }
 }
 touch($paths['reload']);

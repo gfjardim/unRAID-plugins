@@ -9,16 +9,21 @@ function safe_filename($string) {
   return preg_replace('~[ ]~i', '_', $string);
 }
 
-if (isset($_GET['s'])) {
-  $serial = $_GET['s'];
-  $partition = $_GET['p'];
-  $file = get_config($serial,"command.{$partition}");
-  $background = (get_config($serial,"command_bg.{$partition}") == "true" ) ? "checked" : "";
+$serial = urldecode($_GET['s']);
+$local  = get_proc_class("LOCAL");
+$config_file   = $local->get_config_file();
+
+if (array_key_exists($serial, $config_file)) {
+  $partition = ".".$_GET['p'];
+  $file = get_config("LOCAL", $serial, "command{$partition}");
+  $context = "LOCAL";
   if (! $file ) $file = "/boot/config/plugins/${plugin}/".( preg_replace("%\s+%", "_", urldecode($_GET['l'])) ).".sh";
-} else if (isset($_GET['d'])) {
-  $device = $_GET['d'];
-  $file = get_samba_config($device,"command");
-  $background = (get_samba_config($device,"command_bg") == "true" ) ? "checked" : "";
+} else {
+  $remote = get_proc_class("SMB");
+  $remote_config = $remote->get_config_file()[$serial];
+  $partition = "";
+  $file = $remote_config["command"];
+  $context = $remote_config["protocol"];
   if (! $file ) $file = "/boot/config/plugins/${plugin}/".( preg_replace("%\s+%", "_", urldecode($_GET['l'])) ).".sh";
 }
 
@@ -40,11 +45,11 @@ PATH=/usr/local/sbin:/usr/sbin:/sbin:/usr/local/bin:/usr/bin:/bin
 
 case \$ACTION in
   'ADD' )
-    // do your stuff here
+    # do your stuff here
     echo "Added"
   ;;
   'REMOVE' )
-    // do your stuff here
+    # do your stuff here
     echo "Removed"
   ;;
 esac
@@ -93,8 +98,8 @@ $remove = is_file($file) ? "<img style='cursor:pointer;' src='/plugins/$plugin/i
 &nbsp;
 : <input type="text" name="#file" style="width:40%;" onclick="openFileBrowser(this,'/boot/config/plugins/<?=$plugin;?>/','sh',false,true);" autocomplete="off" value="<?=$file;?>"> <?=$remove;?><input type="submit" value="Save"/><input type="reset"/><button type="button" onclick="setDefault(this.form)">Default Script</button><button type="button" onclick="done('/')">Done</button>
 
-&nbsp;
-: <span class="switch-wrapper"><input type="checkbox" name="run_background" <?=$background;?>></span>
+<!-- &nbsp;
+: <span class="switch-wrapper"><input type="checkbox" name="run_background" <?=$background;?>></span> -->
 
 Script content:
 : <textarea spellcheck="false" cols="80" rows="22" name="text" style="font-family:bitstream;width:66%"><?=$text;?></textarea>
@@ -110,15 +115,16 @@ Script content:
 
 <script>
   $("input[name=run_background]").each(function(){var checked = $(this).is(":checked");$(this).switchButton({labels_placement: "right", checked:checked,on_label:"Run in background",off_label:"Run in background"});});
-  <?if (isset($_GET['s'])):?>
   $( "form" ).submit(function( event ) {
-    $.post("/plugins/<?=$plugin;?>/UnassignedDevices.php",{action:"set_command",serial:"<?=$serial;?>",command:$("input[name='#file']").val(),part:"<?=$partition;?>",background:$("input[name='run_background']").is(":checked")},function(data){event.preventDefault();},"json");
+    $.post("/plugins/<?=$plugin;?>/UnassignedDevices.php",{
+      action:"set_command",
+      serial:"<?=$serial;?>",
+      command:$("input[name='#file']").val(),
+      part:"<?=$partition;?>",
+      // background:$("input[name='run_background']").is(":checked"),
+      context:"<?=$context;?>"
+    },function(data){event.preventDefault();},"json");
   });
-  <?else:?>
-  $( "form" ).submit(function( event ) {
-    $.post("/plugins/<?=$plugin;?>/UnassignedDevices.php",{action:"set_samba_command",device:"<?=$device;?>",command:$("input[name='#file']").val(), background:$("input[name='run_background']").is(":checked")},function(data){event.preventDefault()},"json");
-  });  
-  <?endif;?>
 
   function setDefault(form) {
     form.elements['text'].value = <?=json_encode($default_text);?>;

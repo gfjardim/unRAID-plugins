@@ -18,18 +18,53 @@ function tmux_is_session($name) {
     return in_array($name, $screens);
   } else {return false;}
 }
+function get_preclear_status($disk) {
+  if (is_file("/tmp/preclear_stat_{$disk}")) {
+    $preclear   = explode("|", file_get_contents("/tmp/preclear_stat_{$disk}"));
+    $pid        = (count($preclear) > 3) ? trim($preclear[3]) : null;
+    $is_running = ($pid && file_exists( "/proc/{$pid}")) ? true : false;
+    if ($pid && $is_running) {
+      $status = "<span style='color:#478406;'>{$preclear[2]}</span>";
+    } elseif ($pid && ! $is_running) {
+      $status  = "<span style='color:#CC0000;'>{$preclear[2]} ";
+      $status .= "<a class='exec' style='color:#CC0000;font-weight:bold;' onclick='rm_preclear(\"{$disk}\");' title='Clear stats'> ";
+      $status .= "<i class='glyphicon glyphicon-remove hdd'></i></a></span>";
+    } else {
+      $status  = "{$preclear[2]}<a class='exec' style='color:#CC0000;font-weight:bold;' onclick='rm_preclear(\"{$disk}\");' title='Clear stats'> ";
+      $status .= "<i class='glyphicon glyphicon-remove hdd'></i></a>";
+    }
+    if (tmux_is_session("preclear_disk_{$disk}") && is_file("plugins/preclear.disk/Preclear.php")) {
+      $status = "$status<a class='openPreclear exec' onclick='openPreclear(\"{$disk}\");' title='Preview'><i class='glyphicon glyphicon-eye-open'></i></a>";
+    }
+    return "<i class='glyphicon glyphicon-dashboard hdd'></i><span style='margin:4px;'></span>{$status}";
+  }
+}
+
 function render_used_and_free($partition) {
   global $display;
   $o = "";
   if (strlen($partition['target'])) {
-    if (!$display['text']) {
+    switch ($display['text']) {
+    case 0:
+      $text1 = true; $text2 = true; break;
+    case 1: case 2:
+      $text1 = false; $text2 = false; break;
+    case 10: case 20:
+      $text1 = true; $text2 = false; break;
+    case 11: case 21:
+      $text1 = false; $text2 = true; break;
+    }
+    if ($text1) {
       $o .= "<td>".my_scale($partition['used'], $unit)." $unit</td>";
-      $o .= "<td>".my_scale($partition['avail'], $unit)." $unit</td>";
+    } else {
+      $used = $partition['size'] ? 100 - round(100*$partition['avail']/$partition['size']) : 0;
+      $o .= "<td><div class='usage-disk'><span style='margin:0;width:{$used}%' class='".usage_color($used,false)."'><span>".my_scale($partition['used'], $unit)." $unit</span></span></div></td>";
+    }
+    if ($text2) {
+      $o .= "<td>".my_scale($partition['avail']*1024, $unit)." $unit</td>";
     } else {
       $free = $partition['size'] ? round(100*$partition['avail']/$partition['size']) : 0;
-      $used = 100-$free;
-      $o .= "<td><div class='usage-disk'><span style='margin:0;width:{$used}%' class='".usage_color($used,false)."'><span>".my_scale($partition['used'], $unit)." $unit</span></span></div></td>";
-      $o .= "<td><div class='usage-disk'><span style='margin:0;width:{$free}%' class='".usage_color($free,true)."'><span>".my_scale($partition['avail'], $unit)." $unit</span></span></div></td>";
+      $o .=  "<td><div class='usage-disk'><span style='margin:0;width:{$free}%' class='".usage_color($free,true)."'><span>".my_scale($partition['avail'], $unit)." $unit</span></span></div></td>";
     }
   } else {
     $o .= "<td>-</td><td>-</td>";
@@ -48,15 +83,17 @@ function render_partition($disk, $partition) {
     $fscheck = "<i class='glyphicon glyphicon-th-large partition'></i>{$partition[part]}";
   }
 
-  $rm_partition = (get_config("Config", "destructive_mode") == "enabled") ? "<span title='Remove Partition' class='exec' style='color:#CC0000;font-weight:bold;' onclick='rm_partition(this,\"{$disk[device]}\",\"{$partition[part]}\");'><i class='glyphicon glyphicon-remove hdd'></i></span>" : "";
+  $rm_partition = (get_config("LOCAL", "Config", "destructive_mode") == "enabled") ? "<span title='Remove Partition' class='exec' style='color:#CC0000;font-weight:bold;' onclick='rm_partition(this,\"{$disk[device]}\",\"{$partition[part]}\");'><i class='glyphicon glyphicon-remove hdd'></i></span>" : "";
   $mpoint = "<div>{$fscheck}<i class='glyphicon glyphicon-arrow-right'></i>";
   if ($mounted) {
     $mpoint .= "<a href='/Shares/Browse?dir={$partition[mountpoint]}'>{$partition[mountpoint]}</a></div>";
   } else {
-    $mpoint .= "<form method='POST' action='/plugins/${plugin}/UnassignedDevices.php?action=change_mountpoint&serial={$partition[serial]}&partition={$partition[part]}' target='progressFrame' style='display:inline;margin:0;padding:0;'><span class='text exec'><a>{$partition[mountpoint]}</a></span><input class='input' type='text' name='mountpoint' value='{$partition[mountpoint]}' hidden /></form> {$rm_partition}</div>";
+    $action = "/plugins/${plugin}/UnassignedDevices.php?action=change_mountpoint&device={$partition[serial]}&name=mountpoint.{$partition[part]}&context=LOCAL";
+    $mpoint .= "<form method='POST' action='$action' target='progressFrame' style='display:inline;margin:0;padding:0;'><span class='text exec'>";
+    $mpoint .= "<a>{$partition[mountpoint]}</a></span><input class='input' type='text' name='mountpoint' value='{$partition[mountpoint]}' hidden />";
+    $mpoint .= "</form> {$rm_partition}</div>";
   }
   $mbutton = make_mount_button($partition);
-  
   $out[] = "<tr class='$outdd toggle-parts toggle-".basename($disk['device'])."' style='__SHOW__' >";
   $out[] = "<td></td>";
   $out[] = "<td>{$mpoint}</td>";
@@ -64,11 +101,11 @@ function render_partition($disk, $partition) {
   $out[] = "<td>-</td>";
   $out[] = "<td >".$partition['fstype']."</td>";
   $out[] = "<td><span>".my_scale($partition['size'], $unit)." $unit</span></td>";
-  $out[] = render_used_and_free($partition);
   $out[] = "<td>".(strlen($partition['target']) ? shell_exec("lsof '${partition[target]}' 2>/dev/null|grep -c -v COMMAND") : "-")."</td>";
   $out[] = "<td>-</td>";
   $out[] = "<td><input type='checkbox' class='toggle_share' info='".htmlentities(json_encode($partition))."' ".(($partition['shared']) ? 'checked':'')."></td>";
-  $out[] = "<td><a href='/Main/EditScript?s=".urlencode($partition['serial'])."&l=".urlencode(basename($partition['mountpoint']))."&p=".urlencode($partition['part'])."'><img src='/webGui/images/default.png' style='cursor:pointer;width:16px;".( (get_config($partition['serial'],"command.{$partition[part]}")) ? "":"opacity: 0.4;" )."'></a></td>";
+  $out[] = render_used_and_free($partition);
+  $out[] = "<td><a href='/Main/EditScript?s=".urlencode($partition['serial'])."&l=".urlencode(basename($partition['mountpoint']))."&p=".urlencode($partition['part'])."'><img src='/webGui/images/default.png' style='cursor:pointer;width:16px;".( (get_config("LOCAL",$partition['serial'],"command.{$partition[part]}")) ? "":"opacity: 0.4;" )."'></a></td>";
   $out[] = "<tr>";
   return $out;
 }
@@ -87,12 +124,13 @@ function make_mount_button($device) {
     $format = ((isset($device['fstype']) && empty($device['fstype'])) || $device['fstype'] == "precleared") ? true : false;
     $context = "partition";
   }
+  $preclearing   = is_file("/tmp/preclear_stat_".basename($device['disk']));
   $is_mounting   = array_values(preg_grep("@/mounting_".basename($device['device'])."@i", listDir(dirname($paths['mounting']))))[0];
   $is_mounting   = (time() - filemtime($is_mounting) < 300) ? TRUE : FALSE;
   $is_unmounting = array_values(preg_grep("@/unmounting_".basename($device['device'])."@i", listDir(dirname($paths['mounting']))))[0];
   $is_unmounting = (time() - filemtime($is_unmounting) < 300) ? TRUE : FALSE;
   if ($format) {
-    $disable = get_config("Config", "destructive_mode") == "enabled" ? "" : "disabled";
+    $disable = (get_config("LOCAL", "Config", "destructive_mode") == "enabled" && ! $preclearing) ? "" : "disabled";
     $button = sprintf($button, $context, 'format', $disable, 'glyphicon glyphicon-erase', 'Format');
   } elseif ($is_mounting) {
     $button = sprintf($button, $context, 'umount', 'disabled', 'fa fa-circle-o-notch fa-spin', 'Mounting...');
@@ -110,8 +148,6 @@ switch ($_POST['action']) {
   case 'get_content':
     $disks = get_all_disks_info();
     $preclear = "";
-    echo "<table class='usb_disks custom_head'><thead><tr><td>Device</td><td>Identification</td><td></td><td>Temp</td><td>FS</td><td>Size</td><td>Used</td><td>Free</td><td>Open files</td><td>Auto mount</td><td>Share</td><td>Script</td></tr></thead>";
-    echo "<tbody>";
     if ( count($disks) ) {
       $odd="odd";
       foreach ($disks as $disk) {
@@ -119,184 +155,160 @@ switch ($_POST['action']) {
         $temp          = my_temp($disk['temperature']);
         $disk_name     = basename($disk['device']);
         $p             = (count($disk['partitions']) <= 1) ? render_partition($disk, $disk['partitions'][0]) : FALSE;
-        $preclearing   = is_file("/tmp/preclear_stat_{$disk_name}");
+        $preclearing   = is_file("/tmp/preclear_stat_{$disk_name}") ? get_preclear_status($disk_name) : NULL;
         $is_precleared = ($disk['partitions'][0]['fstype'] == "precleared") ? true : false;
-
         $mbutton = make_mount_button($disk);
 
+        $preclear = $preclearing ? "<div class='preclear_status' disk='{$disk_name}'>".str_replace('%','%%',$preclearing)."</div>" : "";
         if (! $mounted && file_exists("plugins/preclear.disk/icons/precleardisk.png")) {
-          $preclear_link = " <a title='Preclear' class='exec green' href='/Settings/Preclear?disk={$disk_name}'><img src='/plugins/preclear.disk/icons/precleardisk.png'></a>";
-        } else {
-          $preclear_link = "";
-        }
-        if ($p === FALSE) {
-          $hdd_serial = "<span class='exec toggle-hdd' hdd='{$disk_name}'><i class='glyphicon glyphicon-hdd hdd'></i><i class='glyphicon glyphicon-plus-sign glyphicon-append'></i>{$disk[serial]}</span>{$preclear_link}<div id='preclear_{$disk_name}'></div>";
-        } elseif($is_precleared) {
-          $hdd_serial = "<span class='toggle-hdd' hdd='{$disk_name}'><i class='glyphicon glyphicon-hdd hdd'></i><span style='margin:4px;'></span>{$disk[serial]}</span>{$preclear_link}<div id='preclear_{$disk_name}'></div>";
-        } else {
-          $hdd_serial = "<span class='exec toggle-hdd' hdd='{$disk_name}'><i class='glyphicon glyphicon-hdd hdd'></i><span style='margin:4px;'></span>{$disk[serial]}</span>{$preclear_link}<div id='preclear_{$disk_name}'></div>";
+          $preclear = "<span style='margin:4px;'></span><a title='Preclear' href='/Settings/Preclear?disk={$disk_name}'><img src='/plugins/preclear.disk/icons/precleardisk.png'></a>{$preclear}";
         }
 
-        if ($preclearing) {
-          $preclear .= "get_preclear('{$disk_name}');";
+        $hdd_serial = "<span class='toggle-hdd %s' hdd='{$disk_name}'><i class='glyphicon glyphicon-hdd hdd'></i>%s{$disk[serial]}</span>{$preclear}";
+        if ($p === FALSE) {
+          $hdd_serial = sprintf($hdd_serial, "exec", "<i class='glyphicon glyphicon-plus-sign glyphicon-append'></i>");
+        } elseif(empty($p)) {
+          $hdd_serial = sprintf($hdd_serial, "", "<span style='margin:4px;'></span>");
+        } elseif ( $is_precleared || $preclearing) {
+          $hdd_serial = sprintf($hdd_serial, "", "<span style='margin:4px;'></span>");
+        } else {
+          $hdd_serial = sprintf($hdd_serial, "exec", "<i class='glyphicon glyphicon-plus-sign glyphicon-append'></i>");
         }
-        echo "<tr class='$odd toggle-disk'>";
-        echo "<td><img src='/webGui/images/".(is_disk_running($disk['device']) ? "green-on.png":"green-blink.png" )."'> {$disk_name}</td>";
-        echo "<td>{$hdd_serial}</td>";
-        echo "<td class='mount'>{$mbutton}</td>";
-        echo "<td>{$temp}</td>";
-        echo ($p)?$p[5]:"<td>-</td>";
-        echo "<td>".my_scale($disk['size'],$unit)." {$unit}</td>";
-        echo ($p)?$p[7]:"<td>-</td>";
-        echo ($p)?$p[8]:"<td>-</td><td>-</td>";
-        echo "<td><input type='checkbox' class='automount' serial='".$disk['partitions'][0]['serial']."' ".(($disk['partitions'][0]['automount']) ? 'checked':'')."></td>";
-        echo ($p)?$p[10]:"<td>-</td>";
-        echo ($p)?$p[11]:"<td>-</td>";
-        echo "</tr>";
-        if (! $is_precleared) {
+
+        $o_disks .= "<tr class='$odd toggle-disk'>";
+        $o_disks .= "<td><img src='/webGui/images/".(is_disk_running($disk['device']) ? "green-on.png":"green-blink.png" )."'> ";
+        $o_disks .= "<a href='/Main/Device?name={$disk_name}&file=/tmp/screen_buffer'>{$disk_name}</a></td>";
+        $o_disks .= "<td>{$hdd_serial}</td>";
+        $o_disks .= "<td class='mount'>{$mbutton}</td>";
+        $o_disks .= "<td>{$temp}</td>";
+        $o_disks .= ($p)?$p[5]:"<td>-</td>";
+        $o_disks .= "<td>".my_scale($disk['size'],$unit)." {$unit}</td>";
+        $o_disks .= ($p)?$p[7]:"<td>-</td><td>-</td>";
+        $o_disks .= "<td><input type='checkbox' class='automount' context='LOCAL' serial='".$disk['serial']."' ".(($disk['partitions'][0]['automount']) ? 'checked':'')."></td>";
+        $o_disks .= ($p)?$p[9]:"<td>-</td>";
+        $o_disks .= ($p)?$p[10]:"<td>-</td>";
+        $o_disks .= ($p)?$p[11]:"<td>-</td>";
+        $o_disks .= "</tr>";
+        if (! $is_precleared && ! $preclearing) {
           foreach ($disk['partitions'] as $partition) {
-            foreach (render_partition($disk, $partition) as $l) echo str_replace("__SHOW__", (count($disk['partitions']) >1 ? "display:none;":"display:none;" ), $l );
+            foreach (render_partition($disk, $partition) as $l) $o_disks .= str_replace("__SHOW__", (count($disk['partitions']) >1 ? "display:none;":"display:none;" ), $l );
           }
         }
         $odd = ($odd == "odd") ? "even" : "odd";
       }
     } else {
-      echo "<tr><td colspan='12' style='text-align:center;font-weight:bold;'>No unassigned disks available.</td></tr>";
+      $o_disks .= "<tr><td colspan='12' style='text-align:center;font-weight:bold;'>No unassigned disks available.</td></tr>";
     }
-    echo "</tbody></table>";
 
-    # SAMBA
-    $samba_mounts = get_samba_mounts();
-    echo "<div id='smb_tab' class='show-complete'>";
-    echo "<div id='title'><span class='left'><img src='/plugins/dynamix/icons/smbsettings.png' class='icon'>SMB Mounts</span></div>";
-    echo "<table class='samba_mounts custom_head'><thead><tr><td>Device</td><td>Source</td><td>Mount point</td><td></TD><td>Size</td><td>Used</td><td>Free</td><td>Auto mount</td><td>Script</td><td>Remove</td></tr></thead>";
-    echo "<tbody>";
-    if (count($samba_mounts)) {
+    # Remote
+    $mounts = get_remote_shares(); 
+    if (count($mounts)) {
       $odd="odd";
-      foreach ($samba_mounts as $mount) {
+      foreach ($mounts as $mount) {
         $mounted = is_mounted($mount['device']);
         $is_alive = (trim(exec("ping -c 1 -W 1 {$mount[ip]} >/dev/null 2>&1; echo $?")) == 0 ) ? TRUE : FALSE;
-        echo "<tr class='$odd'>";
-        printf( "<td><img src='/webGui/images/%s'> smb</td>", ( $is_alive ? "green-on.png":"green-blink.png" ));
-        echo "<td><div><i class='glyphicon glyphicon-globe hdd'></i><span style='margin:4px;'></span>{$mount[device]}</div></td>";
+        $protocol = $mount['protocol'];
+
+        $o_remotes .= "<tr class='$odd' info='".htmlentities(json_encode($mount))."'>";
+        $o_remotes .= sprintf( "<td><img src='/webGui/images/%s'> ".strtolower($protocol)."</td>", ( $is_alive ? "green-on.png":"green-blink.png" ));
+        $o_remotes .= "<td><div><img src='{$mount[icon]}'><span style='margin:4px;'></span>{$mount[device]}</div></td>";
         if ($mounted) {
-          echo "<td><i class='glyphicon glyphicon-save hdd'></i><span style='margin:4px;'><a href='/Shares/Browse?dir={$mount[mountpoint]}'>{$mount[mountpoint]}</a></td>";
+          $o_remotes .= "<td><span style='margin:4px;'><a href='/Shares/Browse?dir={$mount[mountpoint]}'>{$mount[mountpoint]}</a></td>";
         } else {
-          echo "<td><form method='POST' action='/plugins/${plugin}/UnassignedDevices.php?action=change_samba_mountpoint&device={$mount[device]}' target='progressFrame' style='display:inline;margin:0;padding:0;'>
-          <i class='glyphicon glyphicon-save hdd'></i><span style='margin:4px;'></span><span class='text exec'><a>{$mount[mountpoint]}</a></span>
-          <input class='input' type='text' name='mountpoint' value='{$mount[mountpoint]}' hidden />
-          </form></td>";
+          $action = "/plugins/${plugin}/UnassignedDevices.php?action=change_mountpoint&device={$mount[serial]}&name=mountpoint&context={$protocol}";
+          $o_remotes .= "<td><form method='POST' action='$action' target='progressFrame' style='display:inline;margin:0;padding:0;'><span class='text exec'>";
+          $o_remotes .= "<a>{$mount[mountpoint]}</a></span><input class='input' type='text' name='mountpoint' value='{$mount[mountpoint]}' hidden />";
+          $o_remotes .= "</form></td>";
         }
-        echo "<td><span style='width:auto;text-align:right;'>".($mounted ? "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"disk_op(this, 'umount','{$mount[device]}');\"><i class='glyphicon glyphicon-export'></i> Unmount</button>" : "<button type='button' style='padding:2px 7px 2px 7px;' onclick=\"disk_op(this, 'mount','{$mount[device]}');\"><i class='glyphicon glyphicon-import'></i>  Mount</button>")."</span></td>";
-        echo "<td><span>".my_scale($mount['size'], $unit)." $unit</span></td>";
-        echo render_used_and_free($mount);
-        echo "<td><input type='checkbox' class='samba_automount' device='{$mount[device]}' ".(($mount['automount']) ? 'checked':'')."></td>";
-        echo "<td><a href='/Main/EditScript?d=".urlencode($mount['device'])."&l=".urlencode(basename($mount['mountpoint']))."'><img src='/webGui/images/default.png' style='cursor:pointer;width:16px;".( (get_samba_config($mount['device'],"command")) ? "":"opacity: 0.4;" )."'></a></td>";
-        echo $mounted ? "<td><i class='glyphicon glyphicon-remove hdd'></i></td>" : "<td><a class='exec' style='color:#CC0000;font-weight:bold;' onclick='remove_samba_config(\"{$mount[device]}\");' title='Remove SMB mount'> <i class='glyphicon glyphicon-remove hdd'></i></a></td></tr>";
+        $mbutton =  "<td><span style='width:auto;text-align:right;'><button type='button' class='array' onclick=\"disk_op(this, '%s','{$mount[device]}');\">";
+        $mbutton .= "<i class='glyphicon glyphicon-%s'></i> %s</button></span></td>";
+        $o_remotes .= ($mounted) ? sprintf($mbutton, 'umount', 'export', 'Unmount') : 
+                          sprintf($mbutton, 'mount', 'import', 'Mount');
+
+        $o_remotes .= "<td><span>".my_scale($mount['size'], $unit)." $unit</span></td>";
+        $o_remotes .= render_used_and_free($mount);
+        $link = "<a href='/Main/EditScript?s=".urlencode($mount['serial'])."&l=".urlencode(basename($mount['mountpoint']))."'>";
+        $o_remotes .= "<td><input type='checkbox' class='automount' context='{$protocol}' serial='{$mount[serial]}' ".($mount['automount'] ? 'checked':'')."></td>";
+        $opacity = get_config($protocol, $mount['serial'],"command") ? "" : "opacity: 0.4;";
+        $o_remotes .= "<td>{$link}<img src='/webGui/images/default.png' style='cursor:pointer;width:16px;{$opacity}'></a></td>";
+        $o_remotes .= $mounted ? "<td><i class='glyphicon glyphicon-remove hdd'></i></td>" : 
+                        "<td><a class='exec' style='color:#CC0000;font-weight:bold;' onclick='remove_config(this,\"{$protocol}\");' title='Remove {$protocol} mount'>
+                        <i class='glyphicon glyphicon-remove hdd'></i></a></td>";
+        $o_remotes .= "</tr>";
         $odd = ($odd == "odd") ? "even" : "odd";
       }
     } else {
-      echo "<tr><td colspan='12' style='text-align:center;font-weight:bold;'>No SMB mounts configured.</td></tr>";
+      $o_remotes .= "<tr><td colspan='12' style='text-align:center;font-weight:bold;'>No remote shares configured.</td></tr>";
     }
-    echo "</tbody></table><button type='button' onclick='add_samba();'>Add SMB mount</button></div>";
 
     $config_file = $GLOBALS["paths"]["config_file"];
     $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
     $disks_serials = array();
-    foreach ($disks as $disk) $disks_serials[] = $disk['partitions'][0]['serial'];
+    foreach ($disks as $disk) $disks_serials[] = $disk['serial'];
     $ct = "";
     foreach ($config as $serial => $value) {
       if($serial == "Config") continue;
       if (! preg_grep("#${serial}#", $disks_serials)){
-        $ct .= "<tr><td><img src='/webGui/images/green-blink.png'> missing</td><td>$serial</td><td><input type='checkbox' class='automount' serial='${serial}' ".( is_automount($serial) ? 'checked':'' )."></td><td colspan='7'><a style='cursor:pointer;' onclick='remove_disk_config(\"${serial}\")'>Remove</a></td></tr>";
+
+        $ct .= "<tr info='".htmlentities(json_encode(array("serial" => $serial)))."'><td><img src='/webGui/images/green-blink.png'> missing</td><td>$serial</td><td><input type='checkbox' class='automount' serial='${serial}' ".( is_automount("LOCAL", $serial) ? 'checked':'' )."></td><td colspan='7'><a style='cursor:pointer;' onclick='remove_config(this,\"LOCAL\")'>Remove</a></td></tr>";
       }
     }
     if (strlen($ct)) {
-      echo "<div id='smb_tab' class='show-complete'><div id='title'><span class='left'><img src='/plugins/{$plugin}/icons/hourglass.png' class='icon'>Historical Devices</span></div>";
-      echo "<table class='usb_absent custom_head'><thead><tr><td>Device</td><td>Serial Number</td><td>Auto mount</td><td colspan='7'>Remove config</td></tr></thead><tbody>${ct}</tbody></table></div>";
+      $misc .= "<div id='title'><span class='left'><img src='/plugins/{$plugin}/icons/hourglass.png' class='icon'>Historical Devices</span></div>";
+      $misc .= "<table class='usb_absent custom_head'><thead><tr><td>Device</td><td>Serial Number</td><td>Auto mount</td><td colspan='7'>Remove config</td></tr></thead><tbody>${ct}</tbody></table>";
     }
 
-    echo 
-    '<script type="text/javascript">
-    '.$preclear.'
-    $(".automount").each(function(){var checked = $(this).is(":checked");$(this).switchButton({labels_placement: "right", checked:checked});});
-    $(".automount").change(function(){$.post(URL,{action:"automount",serial:$(this).attr("serial"),status:$(this).is(":checked")},function(data){$(this).prop("checked",data.automount);},"json");});
+    echo json_encode(array("disks" => $o_disks, "remotes" => $o_remotes, "misc" => $misc));
+    break;
 
-    $(".samba_automount").each(function(){var checked = $(this).is(":checked");$(this).switchButton({labels_placement: "right", checked:checked});});
-    $(".samba_automount").change(function(){$.post(URL,{action:"samba_automount",device:$(this).attr("device"),status:$(this).is(":checked")},function(data){$(this).prop("checked",data.automount);},"json");});
-
-    $(".toggle_share").each(function(){var checked = $(this).is(":checked");$(this).switchButton({labels_placement: "right", checked:checked});});
-    $(".toggle_share").change(function(){$.post(URL,{action:"toggle_share",info:$(this).attr("info"),status:$(this).is(":checked")},function(data){$(this).prop("checked",data.result);},"json");});
-    $(".text").click(showInput);$(".input").blur(hideInput);
-    $(function(){
-      $(".toggle-hdd").click(function(e) {
-        $(this).disableSelection();disk = $(this).attr("hdd");el = $(this);
-        $(".toggle-"+disk).slideToggle(0,function(){
-          if ( $("tr.toggle-"+disk+":first").is(":visible") ){
-            el.find(".glyphicon-append").addClass("glyphicon-minus-sign").removeClass("glyphicon-plus-sign");
-          } else {
-            el.find(".glyphicon-append").removeClass("glyphicon-minus-sign").addClass("glyphicon-plus-sign");
-          }
-        });
-      });
-    });
-    function rm_preclear(dev) {
-      $.post(URL,{action:"rm_preclear",device:dev}).always(function(){usb_disks(tab_usbdisks)});
-    }
-    $(".show-complete").css("display", $(".complete-switch").is(":checked") ? "block" : "none");
-    $("button[role=mount]").add("button[role=umount]").click(function(){disk_op(this, $(this).attr("role"), $(this).attr("device"));});
-    $("button[role=format]").click(function(){format_disk(this, $(this).attr("context"), $(this).attr("device"));});
-    </script>';
-    break;
-  case 'detect':
-    echo json_encode(array("reload" => is_file($paths['reload'])));
-    break;
-  case 'remove_hook':
-    @unlink($paths['reload']);
-    break;
+  /*  CONFIG  */
   case 'automount':
-    $serial = urldecode(($_POST['serial']));
-    $status = urldecode(($_POST['status']));
-    echo json_encode(array( 'automount' => toggle_automount($serial, $status) ));
+    $serial  = urldecode(($_POST['serial']) );
+    $status  = urldecode(($_POST['status'] ));
+    $context = urldecode(($_POST['context']));
+    echo json_encode(array( 'automount' => toggle_automount($context, $serial, $status) ));
   break;
   case 'get_command':
     $serial = urldecode(($_POST['serial']));
     $part   = urldecode(($_POST['part']));
-    echo json_encode(array( 'command' => get_config($serial, "command.{$part}"), "background" =>  get_config($serial, "command_bg.{$part}") ));
+    echo json_encode(array( 'command' => get_config("LOCAL", $serial, "command.{$part}"), "background" =>  get_config("LOCAL", $serial, "command_bg.{$part}") ));
   break;
   case 'set_command':
-    $serial = urldecode(($_POST['serial']));
-    $part = urldecode(($_POST['part']));
-    $cmd = urldecode(($_POST['command']));
-    set_config($serial, "command_bg.{$part}", urldecode($_POST['background']));
-    echo json_encode(array( 'result' => set_config($serial, "command.{$part}", $cmd)));
+    $serial  = urldecode($_POST['serial']);
+    $part    = urldecode($_POST['part']);
+    $cmd     = urldecode($_POST['command']);
+    $context = urldecode($_POST['context']);
+    debug(" set_config($context, $serial, 'command{$part}', $cmd);");
+    // set_config($context, $serial, "command_bg{$part}", urldecode($_POST['background']));
+    set_config($context, $serial, "command{$part}", $cmd);
   break;
   case 'remove_config':
-    $serial = urldecode(($_POST['serial']));
-    echo json_encode(array( 'result' => remove_config_disk($serial)));
+    $device = urldecode(($_POST['device']));
+    $context = urldecode(($_POST['context']));
+    echo json_encode(array( 'result' => remove_config($context, $device)));
   break;
   case 'toggle_share':
     $info = json_decode(html_entity_decode($_POST['info']), true);
     $status = urldecode(($_POST['status']));
-    $result = toggle_share($info['serial'], $info['part'],$status);
+    $result = toggle_share($info['serial'], $info['part'], $status);
     echo json_encode(array( 'result' => $result));
     if ($result && strlen($info['target'])) {
       add_smb_share($info['mountpoint'], $info['label']);
+      add_nfs_share($info['mountpoint']);
     } else {
       rm_smb_share($info['mountpoint'], $info['label']);
+      rm_nfs_share($info['mountpoint']);
     }
   break;
+
+  /*  DISK  */
   case 'mount':
     $device = urldecode($_POST['device']);
-    if (file_exists($device) || strpos($device, "//") === 0 ) {
-      exec("plugins/${plugin}/scripts/unassigned_mount $device >/dev/null 2>&1 &");
-    }
+    exec("plugins/${plugin}/scripts/unassigned_mount '$device' >/dev/null 2>&1 &");
   break;
   case 'umount':
     $device = urldecode($_POST['device']);
-    if (file_exists($device) || strpos($device, "//") === 0 ) {
-      echo exec("plugins/${plugin}/scripts/unassigned_umount $device >/dev/null 2>&1 &");
-    }
+    echo exec("plugins/${plugin}/scripts/unassigned_umount '$device' >/dev/null 2>&1 &");
   break;
   case 'rescan_disks':
     exec("/sbin/udevadm trigger --action=change 2>&1");
@@ -311,7 +323,13 @@ switch ($_POST['action']) {
     $fs = urldecode($_POST['fs']);
     echo json_encode(array( 'result' => format_partition($device, $fs)));
     break;
+  case 'rm_partition':
+    $device = urldecode($_POST['device']);
+    $partition = urldecode($_POST['partition']);
+    remove_partition($device, $partition );
+    break;
 
+  /*  SAMBA  */
   case 'list_samba_shares':
     $ip = urldecode($_POST['IP']);
     $user = isset($_POST['USER']) ? urlencode($_POST['USER']) : NULL;
@@ -335,43 +353,36 @@ switch ($_POST['action']) {
     natsort($hosts);
     echo implode(PHP_EOL, array_unique($hosts));
     break;
-  case 'add_samba_mount':
+  case 'add_remote_share':
+    unset($_POST['action']);
+    $protocol = urldecode($_POST['PROTOCOL']);
+    $ip       = urldecode($_POST['IP']);
+    $share    = urldecode($_POST['SHARE']);
+    foreach ($_POST as $k => $v) {
+      if (strlen($v)) set_config($protocol, "{$protocol}://${ip}/${share}", strtolower(urldecode($k)), urldecode($v));
+    }
+  break;
+
+  /*  NFS  */
+  case 'list_nfs_shares':
     $ip = urldecode($_POST['IP']);
-    $user = isset($_POST['USER']) ? urldecode($_POST['USER']) : "";
-    $pass = isset($_POST['PASS']) ? urldecode($_POST['PASS']) : "";
-    $share = isset($_POST['SHARE']) ? urldecode($_POST['SHARE']) : "";
-    set_samba_config("//${ip}/${share}", "ip", $ip);
-    set_samba_config("//${ip}/${share}", "user", $user);
-    set_samba_config("//${ip}/${share}", "pass", $pass);
-    set_samba_config("//${ip}/${share}", "share", $share);
-  break;
-  case 'remove_samba_config':
-    $device = urldecode(($_POST['device']));
-    remove_config_samba($device);
-  break;
-  case 'samba_automount':
-    $device = urldecode(($_POST['device']));
-    $status = urldecode(($_POST['status']));
-    echo json_encode(array( 'automount' => toggle_samba_automount($device, $status) ));
-  break;
-  case 'set_samba_command':
-    $device = urldecode(($_POST['device']));
-    $cmd = urldecode(($_POST['command']));
-    set_samba_config($device, "command_bg", urldecode($_POST['background'])) ;
-    echo json_encode(array( 'result' => set_samba_config($device, "command", $cmd)));
-  break;
-  
+    echo shell_exec("/usr/sbin/showmount --no-headers -e '{$ip}' 2>/dev/null|cut -d' ' -f1|sort");
+    break;
+  case 'list_nfs_hosts':
+    $all_ips = preg_replace("@\d+$@","1-255",$var['IPADDR']);
+    echo shell_exec("/usr/bin/nmap --open -p T:2049 --min-parallelism 100 {$all_ips} 2>&1|grep -oP 'Nmap scan report for \K.*'");
+    break;
+
+  /*  MISC */
+  case 'detect':
+    echo json_encode(array("reload" => is_file($paths['reload'])));
+    break;
+  case 'remove_hook':
+    @unlink($paths['reload']);
+    break;
   case 'get_preclear':
     $device = urldecode($_POST['device']);
-    if (is_file("/tmp/preclear_stat_{$device}")) {
-      $preclear = explode("|", file_get_contents("/tmp/preclear_stat_{$device}"));
-      $status = (count($preclear) > 3) ? ( file_exists( "/proc/".trim($preclear[3])) ? "<span style='color:#478406;'>{$preclear[2]}</span>" : "<span style='color:#CC0000;'>{$preclear[2]} <a class='exec' style='color:#CC0000;font-weight:bold;' onclick='rm_preclear(\"{$device}\");' title='Clear stats'> <i class='glyphicon glyphicon-remove hdd'></i></a></span>" ) : $preclear[2]." <a class='exec' style='color:#CC0000;font-weight:bold;' onclick='rm_preclear(\"{$device}\");' title='Clear stats'> <i class='glyphicon glyphicon-remove hdd'></i></a>";
-      $status = str_replace("^n", "<br>" , $status);
-      if (tmux_is_session("preclear_disk_{$device}") && is_file("plugins/preclear.disk/Preclear.php")) $status = "$status<a class='openPreclear exec' onclick='openPreclear(\"{$device}\");' title='Preview'><i class='glyphicon glyphicon-eye-open'></i></a>";
-      echo json_encode(array( 'preclear' => "<i class='glyphicon glyphicon-dashboard hdd'></i><span style='margin:4px;'></span>".$status ));
-    } else {
-      echo json_encode(array( 'preclear' => " "));
-    }
+    echo get_preclear_status($device);
   break;
   case 'rm_preclear':
     $device = urldecode($_POST['device']);
@@ -380,24 +391,14 @@ switch ($_POST['action']) {
   case 'send_log':
     return sendLog();
     break;
-  case 'rm_partition':
-    $device = urldecode($_POST['device']);
-    $partition = urldecode($_POST['partition']);
-    remove_partition($device, $partition );
-    break;
 }
 switch ($_GET['action']) {
   case 'change_mountpoint':
-    $serial = urldecode($_GET['serial']);
-    $partition = urldecode($_GET['partition']);
+    $device     = urldecode($_GET['device']);
+    $name       = urldecode($_GET['name']);
+    $context    = urldecode($_GET['context']);
     $mountpoint = urldecode($_POST['mountpoint']);
-    set_config($serial, "mountpoint.${partition}", $mountpoint);
-    require_once("update.htm");
-    break;
-  case 'change_samba_mountpoint':
-    $device = urldecode($_GET['device']);
-    $mountpoint = urldecode($_POST['mountpoint']);
-    set_samba_config($device, "mountpoint", $mountpoint);
+    set_config($context, $device, $name, $mountpoint);
     require_once("update.htm");
     break;
 }
