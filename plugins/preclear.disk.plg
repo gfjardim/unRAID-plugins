@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.09.20">
+<!ENTITY version   "2015.09.22">
 <!ENTITY launch    "Settings/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -17,6 +17,7 @@
 
 ###&version;
 - Fix: DVD/BluRay drives being included
+- Fix: some minor bugs
 
 ###2015.09.18
 - Fix: Areca disks not appearing correctly.

@@ -14,10 +14,6 @@ function tmux_is_session($name) {
   return in_array($name, $screens);
 }
 ?>
-<link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/<?=$plugin;?>.css">
-<link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/waitMe.min.css">
-<script type="text/javascript" src="/plugins/<?=$plugin;?>/assets/waitMe.min.js"></script>
-
 <?if (is_file("webGui/scripts/jquery.switchButton.js")): # Pre 6.1?>
 <script type="text/javascript" src="/webGui/scripts/jquery.switchButton.js"></script>
 <link type="text/css" rel="stylesheet" href="/webGui/styles/jquery-ui.min.css">
@@ -28,8 +24,8 @@ function tmux_is_session($name) {
 <link type="text/css" rel="stylesheet" href="/webGui/styles/jquery.switchbutton.css">
 <?endif;?>
 
+<link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/glyphicons.css">
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/style-<?=$display['theme'];?>.css">
-
 <style>
 
   table.preclear {padding:0px;margin:-21px 0px 22px 0px;border-collapse:collapse;white-space:nowrap;}
@@ -54,12 +50,13 @@ function tmux_is_session($name) {
   ?>
   function get_content() {
     $.post(URL,{action:"get_content",display:display},function(data){
-      $('#unassigned_devices_list').html(data);
+      $('#preclear-table-body').html(data.disks);
+      window.disksInfo = JSON.parse(data.info);
       if (typeof(startDisk) !== 'undefined') {
         start_preclear(startDisk);
         delete window.startDisk;
       }
-    }).always(function(){setTimeout('get_content()',<?=$display['refresh'] ? $display['refresh'] : "10000";?>);});
+    },"json").always(function(){setTimeout('get_content()',<?=$display['refresh'] ? $display['refresh'] : "10000";?>);});
   }
   function openPreclear(device) {
     var width=900;
@@ -230,11 +227,17 @@ function tmux_is_session($name) {
     <div class='clear_options'>
       <dt>Read size: </dt>
       <dd>
-        <select name="-r" ><option value="0">Default</option><?for ($i=1; $i <= 10; $i++){echo "<option value='{$i}M'>{$i}M</option>";}?></select>
+        <select name="-r" >
+          <option value="0">Default</option>
+          <?foreach (range(0,8) as $i){$x=pow(2,$i);echo "<option value='65536 -b ".($x*16)."'>{$x}M</option>";}?>
+        </select>
       </dd>
       <dt>Write size: </dt>
       <dd>
-        <select name="-w" ><option value="0">Default</option><?for ($i=1; $i <= 10; $i++){echo "<option value='{$i}M'>{$i}M</option>";}?></select>
+        <select name="-w" >
+          <option value="0">Default</option>
+          <?foreach (range(0,8) as $i){$x=pow(2,$i);echo "<option value='65536 -b ".($x*16)."'>{$x}M</option>";}?>
+        </select>
       </dd>
       <dt>Skip Pre-read: </dt>
       <dd>
@@ -251,17 +254,26 @@ function tmux_is_session($name) {
     <?endif;?>
   </dl>
 </div>
-<div id="unassigned_devices_list">
-  <table class='preclear custom_head'>
-    <thead><tr><td>Device</td><td>Identification</td><td>Temp</td><td>Size</td><td>Preclear Status</td></tr></thead>
-    <tbody>
-    <tr><td colspan='12' style='text-align:center;font-weight:bold;'></td></tr>
-    </tbody>
-  </table>
-</div>
+
+<table class='preclear custom_head'>
+  <thead>
+    <tr>
+      <td>Device</td>
+      <td>Identification</td>
+      <td>Temp</td>
+      <td>Size</td>
+      <td>Preclear Status</td>
+    </tr>
+  </thead>
+  <tbody id="preclear-table-body">
+    <tr><td colspan='12' style='text-align:center;font-weight:bold;'>
+      <center><i class='fa fa-spinner fa-spin'></i>&nbsp;<em>Please wait... retrieving information!</em></center>
+    </td></tr>
+  </tbody>
+</table>
 <script type="text/javascript">
   startWaitMe('#unassigned_devices_list');get_content();
-  <?if (isset($_GET['disk']) && ! tmux_is_session("preclear_disk_{$_GET[disk]}")) {
+  <?if (isset($_GET['disk']) && ! tmux_is_session("preclear_disk_{$_GET[disk]}") && is_file($script_file)) {
     echo "startDisk = '{$_GET[disk]}'";
   }
   ?>

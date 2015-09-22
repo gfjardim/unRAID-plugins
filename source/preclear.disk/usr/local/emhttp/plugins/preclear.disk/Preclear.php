@@ -4,8 +4,14 @@ require_once ("webGui/include/Helpers.php");
 $script_file    = "/boot/config/plugins/preclear.disk/preclear_disk.sh";
 $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>/dev/null|cut -d: -f2")) : NULL;
 $noprompt       = $script_version ? (strpos(file_get_contents($script_file), "noprompt") ? TRUE : FALSE ) : FALSE;
-
+$state_file      = "/var/state/{$plugin}/state.ini";
 if (isset($_POST['display'])) $display = $_POST['display'];
+
+if (! is_dir(dirname($state_file)) ) {
+  @mkdir(dirname($state_file),0777,TRUE);
+}
+
+function _echo($m) { echo "<pre>".print_r($m,TRUE)."</pre>";}; 
 
 function is_tmux_executable() {
   return is_file("/usr/bin/tmux") ? (is_executable("/usr/bin/tmux") ? TRUE : FALSE) : FALSE;
@@ -46,6 +52,18 @@ function listDir($root) {
     if (! $fileinfo->isDir()) $paths[] = $path;
   }
   return $paths;
+}
+function save_ini_file($file, $array) {
+  $res = array();
+  foreach($array as $key => $val) {
+    if(is_array($val)) {
+      $res[] = PHP_EOL."[$key]";
+      foreach($val as $skey => $sval) $res[] = "$skey = ".(is_numeric($sval) ? $sval : '"'.$sval.'"');
+    } else {
+      $res[] = "$key = ".(is_numeric($val) ? $val : '"'.$val.'"');
+    }
+  }
+  file_put_contents($file, implode(PHP_EOL, $res));
 }
 function get_unasigned_disks() {
   $disks = $paths = $unraid_disks = $unraid_cache = array();
@@ -93,8 +111,6 @@ function get_all_disks_info($bus="all") {
   $disks = get_unasigned_disks();
   foreach ($disks as $key => $disk) {
     if ($disk['type'] != $bus && $bus != "all") continue;
-    $disk['temperature'] = get_temp($key);
-    $disk['size'] = sprintf("%s %s", my_scale( intval(trim(shell_exec("blockdev --getsize64 ${key} 2>/dev/null"))) , $unit), $unit);
     $disk = array_merge($disk, get_disk_info($key));
     $disks[$key] = $disk;
   }
@@ -102,17 +118,37 @@ function get_all_disks_info($bus="all") {
   usort($disks, create_function('$a, $b','$key="device";if ($a[$key] == $b[$key]) return 0; return ($a[$key] < $b[$key]) ? -1 : 1;'));
   return $disks;
 }
+function get_info($device) {
+  global $state_file;
+  $whitelist = array("ID_MODEL","ID_SCSI_SERIAL","ID_SERIAL_SHORT");
+  $state = is_file($state_file) ? @parse_ini_file($state_file, true) : array();
+  if (array_key_exists($device, $state) && ! $reload) {
+    return $state[$device];
+  } else {
+    $disk =& $state[$device];
+    $udev = parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device 2>/dev/null) 2>/dev/null"));
+    $disk = array_intersect_key($udev, array_flip($whitelist));
+    exec("smartctl -i -d sat,12 $device 2>/dev/null", $smartInfo);
+    $disk['FAMILY']   = trim(split(":", array_values(preg_grep("#Model Family#", $smartInfo))[0])[1]);
+    $disk['MODEL']    = trim(split(":", array_values(preg_grep("#Device Model#", $smartInfo))[0])[1]);
+    $disk['FIRMWARE'] = trim(split(":", array_values(preg_grep("#Firmware Version#", $smartInfo))[0])[1]);
+    $disk['SIZE']     = intval(trim(shell_exec("blockdev --getsize64 ${device} 2>/dev/null")));
+    save_ini_file($state_file, $state);
+    return $state[$device];
+  }
+}
+
 function get_disk_info($device, $reload=FALSE){
   $disk = array();
-  $attrs = parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device ) 2>/dev/null"));
-  exec("smartctl -i -d sat,12 $device 2>/dev/null", $smartInfo);
-  $device = realpath($device);
+  $attrs = get_info($device);
   $disk['serial_short'] = isset($attrs["ID_SCSI_SERIAL"]) ? $attrs["ID_SCSI_SERIAL"] : $attrs['ID_SERIAL_SHORT'];
   $disk['serial']       = "{$attrs[ID_MODEL]}_{$disk[serial_short]}";
-  $disk['device']       = $device;
-  $disk['family']       = trim(split(":", array_values(preg_grep("#Model Family#", $smartInfo))[0])[1]);
-  $disk['model']        = trim(split(":", array_values(preg_grep("#Device Model#", $smartInfo))[0])[1]);
-  $disk['firmware']     = trim(split(":", array_values(preg_grep("#Firmware Version#", $smartInfo))[0])[1]);
+  $disk['device']       = realpath($device);
+  $disk['family']       = $attrs['FAMILY'];
+  $disk['model']        = $attrs['MODEL'];
+  $disk['firmware']     = $attrs['FIRMWARE'];
+  $disk['size']         = sprintf("%s %s", my_scale($attrs['SIZE'] , $unit), $unit);
+  $disk['temperature']  = get_temp($device);
   return $disk;
 }
 function is_disk_running($dev) {
@@ -120,9 +156,9 @@ function is_disk_running($dev) {
   return ($state == 0) ? TRUE : FALSE;
 }
 function get_temp($dev) {
-  $tc = "/var/state/hdd_temp.json";
+  $tc = "/var/state/{$plugin}/hdd_temp.json";
   $temps = is_file($tc) ? json_decode(file_get_contents($tc),TRUE) : array();
-  if (isset($temps[$dev]) && (time() - $temps[$dev]['timestamp']) < 60 ) {
+  if (isset($temps[$dev]) && (time() - $temps[$dev]['timestamp']) < 180 ) {
     return $temps[$dev]['temp'];
   } else if (is_disk_running($dev)) {
     $temp = trim(shell_exec("smartctl -A -d sat,12 $dev 2>/dev/null| grep -m 1 -i Temperature_Celsius | awk '{print $10}'"));
@@ -139,9 +175,7 @@ function get_temp($dev) {
 switch ($_POST['action']) {
   case 'get_content':
     $disks = get_all_disks_info();
-    echo "<script>var disksInfo = Object; var disksInfo =".json_encode($disks).";</script>";
-    echo "<table class='preclear custom_head'><thead><tr><td>Device</td><td>Identification</td><td>Temp</td><td>Size</td><td>Preclear Status</td></tr></thead>";
-    echo "<tbody>";
+    // echo "<script>var disksInfo =".json_encode($disks).";</script>";
     if ( count($disks) ) {
       $odd="odd";
       foreach ($disks as $disk) {
@@ -150,10 +184,10 @@ switch ($_POST['action']) {
         $temp = my_temp($disk['temperature']);
         $disk_name = basename($disk['device']);
         $serial = $disk['serial'];
-        echo "<tr class='$odd'>";
-        printf( "<td><img src='/webGui/images/%s'> %s</td>", ( is_disk_running($disk['device']) ? "green-on.png":"green-blink.png" ), $disk_name);
-        echo "<td><span class='toggle-hdd' hdd='{$disk_name}'><i class='glyphicon glyphicon-hdd hdd'></i>".($p?"<span style='margin:4px;'></span>":"<i class='glyphicon glyphicon-plus-sign glyphicon-append'></i>").$serial."</td>";
-        echo "<td>{$temp}</td>";
+        $disks_o .= "<tr class='$odd'>";
+        $disks_o .= sprintf( "<td><img src='/webGui/images/%s'> %s</td>", ( is_disk_running($disk['device']) ? "green-on.png":"green-blink.png" ), $disk_name);
+        $disks_o .= "<td><span class='toggle-hdd' hdd='{$disk_name}'><i class='glyphicon glyphicon-hdd hdd'></i>".($p?"<span style='margin:4px;'></span>":"<i class='glyphicon glyphicon-plus-sign glyphicon-append'></i>").$serial."</td>";
+        $disks_o .= "<td>{$temp}</td>";
         $status = $disk_mounted ? "Disk mounted" : "<a class='exec' onclick='start_preclear(\"{$disk_name}\")'>Start Preclear</a>";
         if (tmux_is_session("preclear_disk_{$disk_name}")) {
           $status = "<a class='exec' onclick='openPreclear(\"{$disk_name}\");' title='Preview'><i class='glyphicon glyphicon-eye-open'></i></a>";
@@ -177,16 +211,17 @@ switch ($_POST['action']) {
             $status = "{$status}<a class='exec' style='color:#CC0000;font-weight:bold;'onclick='stop_preclear(\"{$serial}\",\"{$disk_name}\");' title='Clear stats'> <i class='glyphicon glyphicon-remove hdd'></i></a>";
           } 
         }
+
         $status = str_replace("^n", " " , $status);
-        echo "<td><span>${disk[size]}</span></td>";
-        echo (is_file($script_file)) ? "<td>$status</td>" : "<td>Script not present</td>";
-        echo "</tr>";
+        $disks_o .= "<td><span>${disk[size]}</span></td>";
+        $disks_o .= (is_file($script_file)) ? "<td>$status</td>" : "<td>Script not present</td>";
+        $disks_o .= "</tr>";
         $odd = ($odd == "odd") ? "even" : "odd";
       }
     } else {
-      echo "<tr><td colspan='12' style='text-align:center;font-weight:bold;'>No unassigned disks available.</td></tr>";
+      $disks_o .= "<tr><td colspan='12' style='text-align:center;font-weight:bold;'>No unassigned disks available.</td></tr>";
     }
-    echo "</tbody></table><div style='min-height:20px;'></div>";
+    echo json_encode(array("disks" => $disks_o, "info" => json_encode($disks)));
     break;
 
   case 'start_preclear':
