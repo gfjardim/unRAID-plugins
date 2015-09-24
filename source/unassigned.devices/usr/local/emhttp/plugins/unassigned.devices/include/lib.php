@@ -55,7 +55,7 @@ function shell_exec_debug($cmd) {
   debug(shell_exec("$cmd 2>&1"));
 }
 
-function listDir($root) {
+function listDir($root, $filter=null) {
   $iter = new RecursiveIteratorIterator(
           new RecursiveDirectoryIterator($root, 
           RecursiveDirectoryIterator::SKIP_DOTS),
@@ -63,6 +63,7 @@ function listDir($root) {
           RecursiveIteratorIterator::CATCH_GET_CHILD);
   $paths = array();
   foreach ($iter as $path => $fileinfo) {
+    if ($filter && is_bool(strpos($path, $filter))) continue;
     if (! $fileinfo->isDir()) $paths[] = $path;
   }
   return $paths;
@@ -94,16 +95,19 @@ function lsof($dir) {
 function get_temp($dev) {
   $tc = $GLOBALS["paths"]["hdd_temp"];
   $temps = is_file($tc) ? json_decode(file_get_contents($tc),TRUE) : array();
-  if (isset($temps[$dev]) && (time() - $temps[$dev]['timestamp']) < 180 ) {
-    return $temps[$dev]['temp'];
-  } else if (is_disk_running($dev)) {
-    $temp = trim(shell_exec("smartctl -A -d sat,12 $dev 2>/dev/null| grep -m 1 -i Temperature_Celsius | awk '{print $10}'"));
-    $temp = (is_numeric($temp)) ? $temp : "*";
-    $temps[$dev] = array('timestamp' => time(),
-                         'temp'      => $temp);
-    file_put_contents($tc, json_encode($temps));
-    return $temp;
-  } else {
+  if (is_disk_running($dev)) {
+    if (isset($temps[$dev]) && (time() - $temps[$dev]['timestamp']) < 180 ) {
+      return $temps[$dev]['temp'];
+    } else {
+      $temp = trim(shell_exec("smartctl -A -d sat,12 $dev 2>/dev/null| grep -m 1 -i Temperature_Celsius | awk '{print $10}'"));
+      $temp = (is_numeric($temp)) ? $temp : "*";
+      $temps[$dev] = array('timestamp' => time(),
+                           'temp'      => $temp);
+      file_put_contents($tc, json_encode($temps));
+      return $temp;
+    }
+  }
+  else {
     return "*";
   }
 }
@@ -113,8 +117,10 @@ function verify_precleared($dev) {
   $disk_blocks    = intval(trim(exec("blockdev --getsz $dev  | awk '{ print $1 }'")));
   $max_mbr_blocks = hexdec("0xFFFFFFFF");
   $over_mbr_size  = ( $disk_blocks >= $max_mbr_blocks ) ? TRUE : FALSE;
+  $partition_size = $over_mbr_size ? $max_mbr_blocks : $disk_blocks;
   $pattern        = $over_mbr_size ? array("00000", "00000", "00002", "00000", "00000", "00255", "00255", "00255") : 
                                      array("00000", "00000", "00000", "00000", "00000", "00000", "00000", "00000");
+
 
   $b["mbr1"] = trim(shell_exec("dd bs=446 count=1 if=$dev 2>/dev/null        |sum|awk '{print $1}'"));
   $b["mbr2"] = trim(shell_exec("dd bs=1 count=48 skip=462 if=$dev 2>/dev/null|sum|awk '{print $1}'"));
@@ -145,10 +151,10 @@ function verify_precleared($dev) {
   switch ($sc) {
     case 63:
     case 64:
-      $partition_size = $disk_blocks - $sc;
+      $partition_size -= $sc;
       break;
     case 1:
-      if ($over_mbr_size) {
+      if (! $over_mbr_size) {
         debug("Failed test 3: start sector ($sc) is invalid.", "DEBUG");
         $cleared = FALSE;
       }
@@ -159,9 +165,10 @@ function verify_precleared($dev) {
       break;
   }
   if ( $partition_size != $sl ) {
-    debug("Failed test 5: disk size don't match.", "DEBUG");
+    debug("Failed test 5: disk size don't match. [$partition_size] [$sl] ", "DEBUG");
     $cleared = FALSE;
   }
+  if ($cleared) debug("Disk '{$dev}' is precleared.");
   return $cleared;
 }
 
@@ -192,8 +199,9 @@ function get_format_cmd($dev, $fs) {
 }
 
 function format_partition($partition, $fs) {
-  $part = get_partition_info($partition);
-  if ( $part['fstype'] && $part['fstype'] != "precleared" ) {
+  $local = new LOCAL();
+  $part = $local->get_partition_info($partition, array());
+  if ( $part['fstype'] ) {
     debug("Aborting format: partition '{$partition}' is already formatted with '{$part[fstype]}' filesystem.");
     return NULL;
   }
@@ -206,16 +214,21 @@ function format_partition($partition, $fs) {
 }
 
 function format_disk($dev, $fs) {
+  if (get_config("LOCAL", "Config", "destructive_mode") != "enabled") {
+    debug("Aborting removal: destructive_mode disabled");
+    return FALSE;
+  }
   # making sure it doesn't have partitions
-  foreach (get_all_disks_info() as $d) {
-    if ($d['device'] == $dev && count($d['partitions']) && $d['partitions'][0]['fstype'] != "precleared") {
+  $local = new LOCAL();
+  foreach ($local->get_all_disks_info() as $d) {
+    if ($d['device'] == $dev && count($d['partitions']) && ! $d['precleared']) {
       debug("Aborting format: disk '{$dev}' has '".count($d['partitions'])."' partition(s).");
       return FALSE;
     }
   }
-  $max_mbr_blocks   = hexdec("0xFFFFFFFF");
-  $disk_blocks      = intval(trim(exec("blockdev --getsz $dev  | awk '{ print $1 }'")));
-  $disk_schema      = ( $disk_blocks >= $max_mbr_blocks ) ? "gpt" : "msdos";
+  $max_mbr_blocks = hexdec("0xFFFFFFFF");
+  $disk_blocks    = intval(trim(exec("blockdev --getsz $dev  | awk '{ print $1 }'")));
+  $disk_schema    = ( $disk_blocks >= $max_mbr_blocks ) ? "gpt" : "msdos";
   debug("Clearing partition table of disk '$dev'.");
   shell_exec_debug("/usr/bin/dd if=/dev/zero of={$dev} bs=2M count=1");
   debug("Reloading disk '{$dev}' partition table.");
@@ -233,7 +246,12 @@ function format_disk($dev, $fs) {
 }
 
 function remove_partition($dev, $part) {
-  foreach (get_all_disks_info() as $d) {
+  if (get_config("LOCAL", "Config", "destructive_mode") != "enabled") {
+    debug("Aborting removal: destructive_mode disabled");
+    return FALSE;
+  }
+  $local = new LOCAL();
+  foreach ($local->get_all_disks_info() as $d) {
     if ($d['device'] == $dev) {
       foreach ($d['partitions'] as $p) {
         if ($p['part'] == $part && $p['target']) {
@@ -348,7 +366,7 @@ function get_mount_params($fs, $dev) {
       return "auto,async,nodev,nosuid{$discard}";
       break;
     case 'cifs':
-      return "rw,nounix,iocharset=utf8,_netdev,file_mode=0777,dir_mode=0777,username=%s,password=%s";
+      return "rw,nounix,iocharset=utf8,_netdev,username=%s,password=%s,uid=99,gid=100";
       break;
     case 'nfs':
       return "defaults";
@@ -383,7 +401,8 @@ function do_unmount($dev, $dir, $force = FALSE) {
         debug("Successfully unmounted '$dev'"); return TRUE;
       } else { sleep(0.5);}
     }
-    debug("Unmount of ${dev} failed. Error message: \n$o"); 
+    debug("Unmount of ${dev} failed. Error message: \n$o");
+    sleep(1);
     if (! lsof($dir) && ! $force) {
       debug("Since there aren't open files, try to force unmount.");
       return do_unmount($dev, $dir, true);
@@ -403,7 +422,7 @@ function is_shared($name) {
 
 function config_shared($sn, $part) {
   $share = get_config("LOCAL", $sn, "share.{$part}");
-  return ($share == "yes" || ! $share) ? TRUE : FALSE; 
+  return ($share == "yes") ? TRUE : FALSE; 
 }
 
 function toggle_share($serial, $part, $status) {
@@ -413,9 +432,14 @@ function toggle_share($serial, $part, $status) {
 }
 function add_smb_share($dir, $share_name) {
   global $paths;
-  $share_name = basename($dir);
   $config = is_file($paths['config_file']) ? @parse_ini_file($paths['config_file'], true) : array();
   $config = $config["Config"];
+  $share_name = basename($dir);
+  $share_conf = preg_replace("#\s+#", "_", realpath($paths['smb_usb_shares'])."/".$share_name.".conf");
+  if (exist_in_file($paths['smb_extra'], $share_conf) && is_file($share_conf)) {
+    return true;
+  }
+  debug("Defining share '$share_name' on file '$share_conf'.");
 
   if ($config["smb_security"] == "yes") {
     $read_users = $write_users = array();
@@ -428,8 +452,8 @@ function add_smb_share($dir, $share_name) {
     $valid_users = array_diff($valid_users, $invalid_users);
     if (count($valid_users)) {
       $valid_users = "\nvalid users = ".implode(', ', $valid_users);
-      $write_users = count($write_users) ? "\nwrite users = ".implode(', ', $write_users) : "";
-      $read_users = count($read_users) ? "\nread users = ".implode(', ', $read_users) : "";
+      $write_users = count($write_users) ? "\nwrite list = ".implode(', ', $write_users) : "";
+      $read_users = count($read_users) ? "\nread list = ".implode(', ', $read_users) : "";
       $share_cont =  "[{$share_name}]\npath = {$dir}{$valid_users}{$write_users}{$read_users}";
     } else {
       $share_cont =  "[{$share_name}]\npath = {$dir}\ninvalid users = @users";
@@ -439,12 +463,10 @@ function add_smb_share($dir, $share_name) {
   }
 
   if(!is_dir($paths['smb_usb_shares'])) @mkdir($paths['smb_usb_shares'],0755,TRUE);
-  $share_conf = preg_replace("#\s+#", "_", realpath($paths['smb_usb_shares'])."/".$share_name.".conf");
 
-  debug("Defining share '$share_name' on file '$share_conf' .");
   file_put_contents($share_conf, $share_cont);
   if (! exist_in_file($paths['smb_extra'], $share_conf)) {
-    debug("Adding share $share_name to ".$paths['smb_extra']);
+    debug("Adding share '$share_name' to ".$paths['smb_extra'].".");
     $c = (is_file($paths['smb_extra'])) ? @file($paths['smb_extra'],FILE_IGNORE_NEW_LINES) : array();
     $c[] = ""; $c[] = "include = $share_conf";
     # Do Cleanup
@@ -468,12 +490,13 @@ function rm_smb_share($dir, $share_name) {
   global $paths;
   $share_name = basename($dir);
   $share_conf = preg_replace("#\s+#", "_", realpath($paths['smb_usb_shares'])."/".$share_name.".conf");
+  if (! exist_in_file($paths['smb_extra'], $share_conf) || ! is_file($share_conf)) {
+    return true;
+  }
+  debug("Removing SMB share '$share_name' from '$share_conf'.");
   if (is_file($share_conf)) {
     @unlink($share_conf);
     debug("Removing file '$share_conf'.");
-  }
-  if (! exist_in_file($paths['smb_extra'], $share_conf)) {
-    return true;
   }
   debug("Removing share definitions from ".$paths['smb_extra'])."'.";
   $c = (is_file($paths['smb_extra'])) ? @file($paths['smb_extra'],FILE_IGNORE_NEW_LINES) : array();
@@ -486,6 +509,7 @@ function rm_smb_share($dir, $share_name) {
   debug("Reloading Samba configuration. ");
   shell_exec("/usr/bin/smbcontrol $(cat /var/run/smbd.pid 2>/dev/null) close-share '${share_name}' 2>&1");
   shell_exec("/usr/bin/smbcontrol $(cat /var/run/smbd.pid 2>/dev/null) reload-config 2>&1");
+  sleep(1);
   if(! is_shared($share_name)) {
     debug("Successfully removed share '${share_name}'."); return TRUE;
   } else {
@@ -513,7 +537,7 @@ function add_nfs_share($dir) {
 function rm_nfs_share($dir) {
   $reload = FALSE;
   foreach (array("/etc/exports","/etc/exports-") as $file) {
-    if ( exist_in_file($file, $dir) && strlen($dir)) {
+    if ( exist_in_file($file, "\"{$dir}\"") && strlen($dir)) {
       $c = (is_file($file)) ? @file($file,FILE_IGNORE_NEW_LINES) : array();
       debug("Removing NFS share '$dir' from '$file'.");
       $c = preg_grep("@\"{$dir}\"@i", $c, PREG_GREP_INVERT);
@@ -527,168 +551,36 @@ function rm_nfs_share($dir) {
 }
 
 function reload_shares() {
-  foreach (get_unasigned_disks() as $name => $disk) {
+  $local = get_proc_class('LOCAL');
+  foreach ($local->undisks as $id => $disk) {
     foreach ($disk['partitions'] as $p) {
       if(is_mounted( realpath($p) )) {
-        $info = get_partition_info($p);
-        if (is_shared(basename($info['target']))) {
-          if (config_shared( $info['serial'],  $info['part'])) {
-            debug("");debug("Reloading shared dir '{$info[target]}' ");
+        $disk = array_merge($disk, $local->get_disk_info($id));
+        $info = $local->get_partition_info($p, $disk);
+        if (is_shared(basename($info['mounted']))) {
+          if (config_shared( $disk['serial'],  $info['part'])) {
+            debug("");debug("Reloading shared dir '{$info[mounted]}' ");
             debug("Removing old config ...");
-            rm_smb_share($info['target'], $info['label']);
-            rm_nfs_share($info['target']);
+            rm_smb_share($info['mounted'], $info['label']);
+            rm_nfs_share($info['mounted']);
             debug("Adding new config ...");
             add_smb_share($info['mountpoint'], $info['label']);
             if (get_config("LOCAL", "Config", "nfs_export") == "yes") {
-              add_nfs_share($info['mountpoint']);
+              if (is_bool(strpos("ntfs vfat exfat", $info['fstype']))) {
+                add_nfs_share($info['mountpoint']);
+              }
             }
           }
         }
       }
     }
-    debug("Done.");
   }
+  debug("Done.");
 }
 
 #########################################################
 ############         DISK FUNCTIONS         #############
 #########################################################
-
-function get_unasigned_disks() {
-  $disks = $paths = $unraid_disks = $unraid_cache = array();
-  $unraid_flash = realpath("/dev/disk/by-label/UNRAID");
-  foreach (listDir("/dev/disk/by-id") as $p) {
-    $r = realpath($p);
-    if (!is_bool(strpos($r, "/dev/sd")) || !is_bool(strpos($r, "/dev/hd"))) {
-      $paths[$r] = $p;
-    }
-  }
-  natsort($paths);
-  foreach (parse_ini_string(shell_exec("/usr/bin/cat /proc/mdcmd 2>/dev/null")) as $k => $v) {
-    if (strpos($k, "rdevName") !== FALSE && strlen($v)) {
-      $unraid_disks[] = realpath("/dev/$v");
-    }
-  }
-  foreach ($unraid_disks as $k) {$o .= "  $k\n";}; debug("UNRAID DISKS:\n$o", "DEBUG");
-  foreach (parse_ini_file("/boot/config/disk.cfg") as $k => $v) {
-    if (strpos($k, "cacheId") !== FALSE && strlen($v)) {
-      foreach ( preg_grep("#".$v."$#i", $paths) as $c) $unraid_cache[] = realpath($c);
-    }
-  }
-  foreach ($unraid_cache as $k) {$g .= "  $k\n";}; debug("UNRAID CACHE:\n$g", "DEBUG");
-  foreach ($paths as $path => $d) {
-    if (preg_match("#^(.(?!wwn|part))*$#", $d)) {
-      if (! in_array($path, $unraid_disks) && ! in_array($path, $unraid_cache) && strpos($unraid_flash, $path) === FALSE) {
-        if (in_array($path, array_map(function($ar){return $ar['device'];},$disks)) ) continue;
-        $m = array_values(preg_grep("#$d.*-part\d+#", $paths));
-        natsort($m);
-        $disks[$d] = array("device"=>$path,"type"=>"ata","partitions"=>$m);
-        debug("Unassigned disk: $d", "DEBUG");
-      } else {
-        debug("Discarded: => $d ($path)", "DEBUG");
-        continue;
-      }
-    } 
-  }
-  return $disks;
-}
-
-function get_all_disks_info($bus="all") {
-  debug("Stating get_all_disks_info.", "DEBUG");
-  $d1 = time();
-  $disks = get_unasigned_disks();
-  foreach ($disks as $key => $disk) {
-    if ($disk['type'] != $bus && $bus != "all") continue;
-    $disk['disk'] = realpath($key);
-    $disk['temperature'] = get_temp($key);
-    $disk['size'] = intval(trim(shell_exec("blockdev --getsize64 ${key} 2>/dev/null")));
-    $disk = array_merge($disk, get_disk_info($key));
-    foreach ($disk['partitions'] as $k => $p) {
-      if ($p) $disk['partitions'][$k] = get_partition_info($p);
-    }
-    $disks[$key] = $disk;
-  }
-  debug("Total time: ".(time() - $d1)."s", "DEBUG");
-  usort($disks, create_function('$a, $b','$key="device";if ($a[$key] == $b[$key]) return 0; return ($a[$key] < $b[$key]) ? -1 : 1;'));
-  return $disks;
-}
-
-function get_udev_info($device, $udev=NULL, $reload) {
-  global $paths;
-  $whitelist = array("DEVPATH","DEVTYPE","ID_FS_LABEL_ENC","ID_FS_TYPE","ID_MODEL","ID_SCSI_SERIAL","ID_SERIAL","ID_SERIAL_SHORT","ID_VENDOR");
-  $state = is_file($paths['state']) ? @parse_ini_file($paths['state'], true) : array();
-  if ($udev) {
-    $state[$device] = array_intersect_key($udev, array_flip($whitelist));
-    save_ini_file($paths['state'], $state);
-    return $udev;
-  } else if (array_key_exists($device, $state) && ! $reload) {
-    debug("Using udev cache for '$device'.", "DEBUG");
-    return $state[$device];
-  } else {
-    $udev = parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device 2>/dev/null) 2>/dev/null"));
-    $state[$device] = array_intersect_key($udev, array_flip($whitelist));
-    save_ini_file($paths['state'], $state);
-    debug("Not using udev cache for '$device'.", "DEBUG");
-    return $state[$device];
-  }
-}
-
-function get_disk_info($device, $reload=FALSE){
-  $disk = array();
-  $attrs = (isset($_ENV['DEVTYPE'])) ? get_udev_info($device, $_ENV, $reload) : get_udev_info($device, NULL, $reload);
-  $device = realpath($device);
-  $disk['serial_short'] = isset($attrs["ID_SCSI_SERIAL"]) ? $attrs["ID_SCSI_SERIAL"] : $attrs['ID_SERIAL_SHORT'];
-  $disk['serial']       = "{$attrs[ID_MODEL]}_{$disk[serial_short]}";
-  $disk['device']       = $device;
-  return $disk;
-}
-
-function get_partition_info($device, $reload=FALSE){
-  global $_ENV, $paths;
-  $disk = array();
-  $attrs = (isset($_ENV['DEVTYPE'])) ? get_udev_info($device, $_ENV, $reload) : get_udev_info($device, NULL, $reload);
-  $device = realpath($device);
-  if ($attrs['DEVTYPE'] == "partition") {
-    // _echo($attrs);
-    $disk['serial_short'] = isset($attrs["ID_SCSI_SERIAL"]) ? $attrs["ID_SCSI_SERIAL"] : $attrs['ID_SERIAL_SHORT'];
-    $disk['serial']       = "{$attrs[ID_MODEL]}_{$disk[serial_short]}";
-    $disk['device']       = $device;
-    // Grab partition number
-    preg_match_all("#(.*?)(\d+$)#", $device, $matches);
-    $disk['part']   =  $matches[2][0];
-    $disk['disk']   =  $matches[1][0];
-    if (isset($attrs['ID_FS_LABEL_ENC'])){
-      $disk['label'] = safe_name($attrs['ID_FS_LABEL_ENC']);
-    } else {
-      if (isset($attrs['ID_VENDOR']) && isset($attrs['ID_MODEL'])){
-        $disk['label'] = sprintf("%s %s", safe_name($attrs['ID_VENDOR']), safe_name($attrs['ID_MODEL']));
-      } else {
-        $disk['label'] = safe_name($attrs['ID_SERIAL']);
-      }
-      $all_disks = array_unique(array_map(function($ar){return realpath($ar);},listDir("/dev/disk/by-id")));
-      $disk['label']  = (count(preg_grep("%".$matches[1][0]."%i", $all_disks)) > 2) ? $disk['label']."-part".$matches[2][0] : $disk['label'];
-    }
-    $disk['fstype'] = safe_name($attrs['ID_FS_TYPE']);
-    $disk['fstype'] = (! $disk['fstype'] && verify_precleared($disk['disk'])) ? "precleared" : $disk['fstype'];
-    $disk['target'] = str_replace("\\040", " ", trim(shell_exec("cat /proc/mounts 2>&1|grep ${device}|awk '{print $2}'")));
-    $disk['size']   = intval(trim(shell_exec("blockdev --getsize64 ${device} 2>/dev/null")));
-    $disk['used']   = intval(trim(shell_exec("df --output=used,source 2>/dev/null|grep -v 'Filesystem'|grep ${device}|awk '{print $1}'")))*1024;
-    $disk['avail']  = $disk['size'] - $disk['used'];
-    if ( $disk['mountpoint'] = get_config("LOCAL", $disk['serial'], "mountpoint.{$disk[part]}") ) {
-      if (! $disk['mountpoint'] ) goto empty_mountpoint;
-    } else {
-      empty_mountpoint:
-      $disk['mountpoint'] = $disk['target'] ? $disk['target'] : preg_replace("%\s+%", "_", sprintf("%s/%s", $paths['usb_mountpoint'], $disk['label']));
-    }
-    $disk['owner'] = (isset($_ENV['DEVTYPE'])) ? "udev" : "user";
-    $is_usb = (!is_bool(strpos($attrs['DEVPATH'], "usb"))) ? TRUE : FALSE;
-    $disk['automount'] = is_automount("LOCAL", $disk['serial'], $is_usb);
-    $disk['shared'] = ($disk['target']) ? is_shared(basename($disk['mountpoint'])) : config_shared($disk['serial'], $disk['part']);
-    $disk['command'] = get_config("LOCAL", $disk['serial'], "command.{$disk[part]}");
-    $disk['command_bg'] = get_config("LOCAL", $disk['serial'], "command_bg.{$disk[part]}");
-    return $disk;
-  }
-}
 
 function get_fsck_commands($fs, $dev, $type = "ro") {
   switch ($fs) {

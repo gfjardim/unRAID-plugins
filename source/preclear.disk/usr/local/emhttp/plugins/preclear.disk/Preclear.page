@@ -5,14 +5,11 @@ Icon="preclear.disk.png"
 <?
 $plugin = "preclear.disk";
 $script_file = "/boot/config/plugins/preclear.disk/preclear_disk.sh";
+require_once("plugins/${plugin}/Preclear.php");
 $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>/dev/null|cut -d: -f2")) : NULL;
 $fast_postread  = $script_version ? (strpos(file_get_contents($script_file), "fast_postread") ? TRUE : FALSE ) : FALSE;
 $notifications  = $script_version ? (strpos(file_get_contents($script_file), "notify_channels") ? TRUE : FALSE ) : FALSE;
-
-function tmux_is_session($name) {
-  exec('/usr/bin/tmux ls 2>/dev/null|cut -d: -f1', $screens);
-  return in_array($name, $screens);
-}
+$numdisks = count(get_unasigned_disks())-1;
 ?>
 <?if (is_file("webGui/scripts/jquery.switchButton.js")): # Pre 6.1?>
 <script type="text/javascript" src="/webGui/scripts/jquery.switchButton.js"></script>
@@ -261,6 +258,7 @@ function tmux_is_session($name) {
     <tr><td colspan='12' style='text-align:center;font-weight:bold;'>
       <center><i class='fa fa-spinner fa-spin'></i>&nbsp;<em>Please wait... retrieving information!</em></center>
     </td></tr>
+    <?for ($i=0; $i < $numdisks; $i++) {$odd = ($odd == "even") ? "odd" : "even"; echo "<tr class='$odd'><td colspan='12'>&nbsp;</td></tr>";}?>
   </tbody>
 </table>
 <script type="text/javascript">

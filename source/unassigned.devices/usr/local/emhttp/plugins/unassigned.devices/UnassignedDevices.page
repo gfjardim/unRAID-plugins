@@ -6,10 +6,10 @@ Markdown="false"
 $plugin = "unassigned.devices";
 require_once("plugins/${plugin}/include/lib.php");
 if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/OpenDevices.page","plugins/dynamix/OpenDevices.page-");
+$class = new LOCAL;
+$numdisks = count($class->undisks);
 ?>
-<link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/waitMe.min.css">
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/glyphicons.css">
-<script type="text/javascript" src="/plugins/<?=$plugin;?>/assets/waitMe.min.js"></script>
 
 <?if (is_file("webGui/scripts/jquery.switchButton.js")): # Pre 6.1?>
 <script type="text/javascript" src="/webGui/scripts/jquery.switchButton.js"></script>
@@ -51,13 +51,13 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
   table.usb_disks thead tr>td{text-align:left;width:8%;padding-left:12px;}
   table.usb_disks {padding:0px;margin:-21px 0px 22px 0px;border-collapse:collapse;white-space:nowrap;}
   table.usb_disks tr>td{text-align:left;width:8%;padding-left:12px;padding-right:0;white-space:nowrap;}
-
-  table.usb_disks tr>td+td+td{min-width:0px;}
-  table.usb_disks tr>td+td+td+td{text-align:center;padding-left:0;padding-right:12px;width:auto;min-width:0px;}
-  table.usb_disks tr>td+td+td+td+td+td{text-align:right;padding-left:0;padding-right:12px;width:auto;}
-  table.usb_disks tr>td+td+td+td+td+td+td+td{text-align:left;padding:0px 0px 0px 12px;width: 75px;}
-  table.usb_disks tr>td+td+td+td+td+td+td+td+td+td{text-align:right;padding-left:12px;padding-right:0px;width:auto;}
-  table.usb_disks tr>td+td+td+td+td+td+td+td+td+td+td+td{text-align:right;padding-left:0px;padding-right:7px;width:auto;}
+  table.usb_disks tr>td+td{width: auto;}
+  table.usb_disks tr>td+td+td{width:8%}
+  table.usb_disks tr>td+td+td+td{text-align:center;padding-left:0;padding-right:12px;width: 6.5%}
+  table.usb_disks tr>td+td+td+td+td{text-align:right;}
+  table.usb_disks tr>td+td+td+td+td+td+td+td{padding-right:0px;border-left:18px;}
+  table.usb_disks tr>td+td+td+td+td+td+td+td+td+td{text-align:right;padding-right:12px;border-left:0px;}
+  table.usb_disks tr>td+td+td+td+td+td+td+td+td+td+td+td{text-align:right;padding-left:0px;padding-right:10px;width:4%}
 
   table.usb_absent thead tr>td{text-align:left;width:8%;padding-left:12px;}
   table.usb_absent tr>td{text-align:left;width:8%;padding-left:12px;padding-right:0;white-space:nowrap;}
@@ -79,7 +79,7 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
   .exec{cursor: pointer;}
   i.glyphicon-append{margin:0px;font-size: 0.8em;position: relative; left:-0.3em;top:0.7em;}
   .underline{text-decoration: underline;}
-  button.array {padding:2px 7px 2px 7px;}
+  button.array {padding:2px 7px 2px 7px;margin:0;}
 
   .switch-wrapper {
     display: inline-block;
@@ -114,24 +114,15 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
     window.open(run, 'log', options);
   }
   function get_preclear() {
-    $(".preclear_status").each(function(){
-      var el = $(this);
-      $.post(URL,{action:"get_preclear",device:el.attr("disk")},function(data) {
-        el.html(data);
-      });
-    });
-  }
-  function startWaitMe(el) {
-    <?if ($display['theme'] == 'white'):?>
-    $(el).waitMe({effect:'ios',text:' ',bg:'rgba(255,255,255,0.9)',color:'#000',sizeW:'',sizeH:'',source:''});
-    <?else:?>
-    $(el).waitMe({effect:'ios',text:' ',bg:'rgba(0,0,0,0.9)',color:'#FFF',sizeW:'',sizeH:'',source:''});
-    <?endif;?>
-    $('.waitMe_content').css('top','40px');
+    $.post(URL,{action:"get_preclear_status"},function(data){
+      $.each(data, function(index, value) {
+        $("#preclear_status_"+index).html(value);
+      }); 
+    },"json");
   }
   function disk_op(el, op, device){
     // add spinning and disable button
-    $(el).html("<i class='fa fa-circle-o-notch fa-spin'></i> "+(op == "mount" ? "Mounting" : "Unmounting")+" ...");
+    $(el).html("<i class='fa fa-circle-o-notch fa-spin'></i> "+(op == "mount" ? "Mounting" : "Unmounting"));
     $(el).prop("disabled","true");
     // disable partition buttons
     td = $(el).closest('td');
@@ -152,9 +143,9 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
   }
   function usb_disks(tabnum) {
     $.post(URL,{action:"get_content",display:display},function(data) {
-      if (data.disks) $('#disk-table-body').html(data.disks);
-      if (data.remotes) $('#remotes-table-body').html(data.remotes);
-      if (data.misc) $('#misc-div-body').html(data.misc);
+      $('#disk-table-body').html(data.disks);
+      $('#remotes-table-body').html(data.remotes);
+      $('#misc-div-body').html(data.misc);
     },"json").always(function() {
       $(".automount").each(toggleFunctions.prepare_automount);
       $(".toggle_share").each(toggleFunctions.prepare_toggle_share);
@@ -392,7 +383,12 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
       $(this).change(toggleFunctions.toggle_share);
     },
     toggle_share: function() {
-      $.post(URL,{action:"toggle_share",info:$(this).attr("info"),status:$(this).is(":checked")},function(data){$(this).prop("checked",data.result);},"json");
+      var sid = $(this).attr('sid');
+      $.post(URL,{action:"toggle_share",info:$(this).attr("info"),status:$(this).is(":checked")},function(data){
+        $('*[sid="'+sid+'"]').each(function(){
+          $(this).switchButton({checked:data.result});
+        });
+      },"json");
     }, 
     toggle_hdd: function(e) {
       el = $(this);
@@ -502,7 +498,7 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
       <td>Device</td>
       <td>Identification</td>
       <td></td>
-      <td>Temp</td>
+      <td>Temp.</td>
       <td>FS</td>
       <td>Size</td>
       <td>Open files</td>
@@ -517,6 +513,7 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
     <tr><td colspan='12' style='text-align:center;font-weight:bold;'>
       <center><i class='fa fa-spinner fa-spin'></i>&nbsp;<em>Please wait... retrieving information!</em></center>
     </td></tr>
+    <?for ($i=0; $i < $numdisks; $i++) {$odd = ($odd == "even") ? "odd" : "even"; echo "<tr class='$odd'><td colspan='12'>&nbsp;</td></tr>";}?>
   </tbody>
 </table>
 
@@ -547,7 +544,7 @@ if (file_exists("plugins/dynamix/OpenDevices.page")) @rename("plugins/dynamix/Op
   <div id="misc-div-body"></div>
 </div>
 <script type="text/javascript">
-  $(".show-complete").css("display", $(".complete-switch").is(":checked") ? "block" : "none");
+  $(".show-complete").css("display", ($.cookie('unassigned-complete-view') == 'yes') ? "block" : "none");
 </script>
 
 <blockquote class='inline_help'>
