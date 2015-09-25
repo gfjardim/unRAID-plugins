@@ -526,8 +526,8 @@ function add_nfs_share($dir) {
       $fsid = 100 + count(preg_grep("@^\"@", $c));
       $c[] = "\"{$dir}\" -async,no_subtree_check,fsid={$fsid} *(sec=sys,rw,insecure,anongid=100,anonuid=99,all_squash)";
       $c[] = "";
-      $c = preg_replace('/\n\s*\n\s*\n/s', PHP_EOL.PHP_EOL, implode(PHP_EOL, $c));
-      file_put_contents($file, $c);
+      // $c = preg_replace('/\n\s*\n\s*\n/s', PHP_EOL.PHP_EOL, implode(PHP_EOL, $c));
+      file_put_contents($file, implode(PHP_EOL, $c));
       $reload = TRUE;
     }
   }
@@ -541,8 +541,8 @@ function rm_nfs_share($dir) {
       $c = (is_file($file)) ? @file($file,FILE_IGNORE_NEW_LINES) : array();
       debug("Removing NFS share '$dir' from '$file'.");
       $c = preg_grep("@\"{$dir}\"@i", $c, PREG_GREP_INVERT);
-      $c = preg_replace('/\n\s*\n\s*\n/s', PHP_EOL.PHP_EOL, implode(PHP_EOL, $c));
-      file_put_contents($file, $c);
+      // $c = preg_replace('/\n\s*\n\s*\n/s', PHP_EOL.PHP_EOL, implode(PHP_EOL, $c));
+      file_put_contents($file, implode(PHP_EOL, $c));
       $reload = TRUE;
     }
   }

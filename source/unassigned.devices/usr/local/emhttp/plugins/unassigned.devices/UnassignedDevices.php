@@ -75,7 +75,7 @@ function render_used_and_free($partition) {
 
 function render_partition($disk, $partition) {
   global $plugin, $paths;
-  // if (! isset($partition['device'])) return array();
+  if (! isset($partition['device'])) return array();
   $out = array();
   $mounted = $partition['mounted'] ? true : false;
   if ( (! $mounted &&  $partition['fstype'] != 'btrfs') || ($mounted && $partition['fstype'] == 'btrfs') ) {
@@ -186,7 +186,7 @@ switch ($_POST['action']) {
         $o_disks .= "<td>{$hdd_serial}</td>";
         $o_disks .= "<td class='mount'>{$mbutton}</td>";
         $o_disks .= "<td>{$temp}</td>";
-        $o_disks .= ($p)? ($is_precleared ? "<td>precleared</td>" : $p[5]) :"<td>-</td>";
+        $o_disks .= ($p)? ($is_precleared ? "<td>erased</td>" : $p[5]) :"<td>-</td>";
         $o_disks .= "<td>".my_scale($disk['size'],$unit)." {$unit}</td>";
         $o_disks .= ($p)?$p[7]:"<td>-</td><td>-</td>";
         $o_disks .= "<td><input type='checkbox' class='automount' context='LOCAL' serial='".$disk['serial']."' ".(($disk['automount']) ? 'checked':'')."></td>";
