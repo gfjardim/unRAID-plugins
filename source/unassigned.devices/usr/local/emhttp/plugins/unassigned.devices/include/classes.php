@@ -92,7 +92,7 @@ class LOCAL extends CONFIG {
       if ($block['TYPE'] == "disk") {
         $this->blkdisks[$block['NAME']] = $block;
       } elseif ($block['TYPE'] == "part") {
-        $block["USED"] = $used[$block['NAME']] ? $used[$block['NAME']] : 0;
+        $block["USED"] = isset($used[$block['NAME']]) ? $used[$block['NAME']] : 0;
         $this->blkparts[$block['NAME']] = $block;
       }
     }
@@ -149,15 +149,13 @@ class LOCAL extends CONFIG {
         $unraid_disks[] = realpath("/dev/$v");
       }
     }
-    foreach ($unraid_disks as $k) {$o .= "  $k\n";};
-    //debug("UNRAID DISKS:\n$o", "DEBUG");
+    // foreach ($unraid_disks as $k) {$o .= "  $k\n";};debug("UNRAID DISKS:\n$o", "DEBUG");
     foreach (parse_ini_file("/boot/config/disk.cfg") as $k => $v) {
       if (strpos($k, "cacheId") !== FALSE && strlen($v)) {
         foreach ( preg_grep("#".$v."$#i", $paths) as $c) $unraid_cache[] = realpath($c);
       }
     }
-    foreach ($unraid_cache as $k) {$g .= "  $k\n";};
-    //debug("UNRAID CACHE:\n$g", "DEBUG");
+    // foreach ($unraid_cache as $k) {$g .= "  $k\n";};debug("UNRAID CACHE:\n$g", "DEBUG");
     foreach ($paths as $path => $d) {
       if (preg_match("#^(.(?!wwn|part))*$#", $d)) {
         if (! in_array($path, $unraid_disks) && ! in_array($path, $unraid_cache) && strpos($unraid_flash, $path) === FALSE) {
@@ -198,7 +196,7 @@ class LOCAL extends CONFIG {
     if (empty($disk)) {
       $attrs = parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $id 2>/dev/null) 2>/dev/null"));
       $disk['serial_short'] = isset($attrs["ID_SCSI_SERIAL"]) ? $attrs["ID_SCSI_SERIAL"] : $attrs['ID_SERIAL_SHORT'];
-      $disk['serial']       = "{$attrs[ID_MODEL]}_{$disk[serial_short]}";
+      $disk['serial']       = "{$attrs['ID_MODEL']}_{$disk['serial_short']}";
       $disk['size']         = $this->blkdisks[$name]['SIZE'];
       $disk['model']        = $attrs['ID_MODEL'];
       $disk['owner']        = (isset($_ENV['DEVTYPE'])) ? "udev" : "user";
@@ -218,23 +216,23 @@ class LOCAL extends CONFIG {
     $part['device']  = $device;
     $part['part']    = str_replace($disk['device'], "", $device);
     $part['disk']    = $disk['device'];
-    $part['label']   = $blkinfo['LABEL'] ? $blkinfo['LABEL'] : "{$disk[serial]}-part{$part[part]}";
+    $part['label']   = $blkinfo['LABEL'] ? $blkinfo['LABEL'] : "{$disk['serial']}-part{$part['part']}";
     $part['fstype']  = $blkinfo['FSTYPE'];
-    $mp_config       = $this->get_config($disk['serial'], "mountpoint.{$part[part]}");
+    $mp_config       = $this->get_config($disk['serial'], "mountpoint.{$part['part']}");
     $part['mounted'] = trim($blkinfo['MOUNTPOINT']);
     if ($part['mounted']) {
       $part['mountpoint'] = $part['mounted'];
     } elseif ($mp_config) {
       $part['mountpoint'] = $mp_config;
     } else {
-      $part['mountpoint'] = "{$this->globals[paths][usb_mountpoint]}/{$part[label]}";
+      $part['mountpoint'] = "{$this->globals['paths']['usb_mountpoint']}/{$part['label']}";
     }
     $part['size']    = intval($blkinfo['SIZE']);
     $part['used']    = $blkinfo['USED'];
     $part['avail']   = $part['size'] - $part['used'];
     $part['shared']  = $part['mounted'] ? is_shared(basename($part['mountpoint'])) : config_shared($disk['serial'], $part['part']);
     // $part['shared']  = config_shared($disk['serial'], $part['part']);
-    $part['command'] = $this->get_config($disk['serial'], "command.{$part[part]}");
+    $part['command'] = $this->get_config($disk['serial'], "command.{$part['part']}");
     return $part;
   }
 }
@@ -269,13 +267,13 @@ class SMB extends CONFIG {
       $mount['mounted']  = trim(shell_exec("echo '$mounts' 2>&1|grep '".str_replace(" ", '\\\040', $mount['device'])." '|awk '{print $2}'"));
       $mount['fstype']   = "cifs";
       $mount['protocol'] = "SMB";
-      $mount['size']     = intval(trim(shell_exec("df --output=size,source 2>/dev/null|grep -v 'Filesystem'|grep '{$mount[device]}'|awk '{print $1}'")))*1024;
-      $mount['used']     = intval(trim(shell_exec("df --output=used,source 2>/dev/null|grep -v 'Filesystem'|grep '{$mount[device]}'|awk '{print $1}'")))*1024;
+      $mount['size']     = intval(trim(shell_exec("df --output=size,source 2>/dev/null|grep -v 'Filesystem'|grep '{$mount['device']}'|awk '{print $1}'")))*1024;
+      $mount['used']     = intval(trim(shell_exec("df --output=used,source 2>/dev/null|grep -v 'Filesystem'|grep '{$mount['device']}'|awk '{print $1}'")))*1024;
       $mount['avail']    = $mount['size'] - $mount['used'];
       if ($mount["mounted"]) {
         $mount["mountpoint"] = $mount['mounted'];
       } else {
-        $mount["mountpoint"] = $mount['target'] ? $mount['target'] : preg_replace("%\s+%", "_", "{$this->usb_mountpoint}/smb_{$mount[ip]}_{$mount[share]}");
+        $mount["mountpoint"] = $mount['target'] ? $mount['target'] : preg_replace("%\s+%", "_", "{$this->usb_mountpoint}/smb_{$mount['ip']}_{$mount['share']}");
       }
       $mount['icon'] = "/plugins/dynamix/icons/smbsettings.png";
       $mount['automount'] = $this->is_automount($serial);
@@ -341,12 +339,12 @@ class NFS extends CONFIG {
     $nfs_mounts = array_filter($this->get_config_file(), function ($v){if($v['protocol'] == "NFS"){return $v;}});
     foreach ($nfs_mounts as $serial => $mount) {
       $mount['serial']   = $serial;
-      $mount['device']   = "{$mount[ip]}:{$mount[share]}";
+      $mount['device']   = "{$mount['ip']}:{$mount['share']}";
       $mount['mounted']  = trim(shell_exec("cat /proc/mounts 2>&1|grep '".str_replace(" ", '\\\040', $mount['device'])." '|awk '{print $2}'"));
       $mount['fstype']   = "nfs";
       $mount['protocol'] = "NFS";
-      $mount['size']     = intval(trim(shell_exec("df --output=size,source 2>/dev/null|grep -v 'Filesystem'|grep '{$mount[device]}'|awk '{print $1}'")))*1024;
-      $mount['used']     = intval(trim(shell_exec("df --output=used,source 2>/dev/null|grep -v 'Filesystem'|grep '{$mount[device]}'|awk '{print $1}'")))*1024;
+      $mount['size']     = intval(trim(shell_exec("df --output=size,source 2>/dev/null|grep -v 'Filesystem'|grep '{$mount['device']}'|awk '{print $1}'")))*1024;
+      $mount['used']     = intval(trim(shell_exec("df --output=used,source 2>/dev/null|grep -v 'Filesystem'|grep '{$mount['device']}'|awk '{print $1}'")))*1024;
       $mount['avail']    = $mount['size'] - $mount['used'];
       if ($mount["mount"]) {
         $mount['mountpoint'] = $mount['mounted'];

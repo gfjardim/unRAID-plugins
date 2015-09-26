@@ -4,7 +4,7 @@
 <!ENTITY name      "unassigned.devices">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.09.25">
+<!ENTITY version   "2015.09.26">
 <!ENTITY launch    "Main/UnassignedDevices">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -17,6 +17,9 @@
 ##&name;
 
 ###&version;
+- debug: debug version
+
+###2015.09.25
 - Fix: minor fixes
 
 ###2015.09.22b
