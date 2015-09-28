@@ -95,7 +95,7 @@ function render_partition($disk, $partition) {
     $mpoint .= "</form> {$rm_partition}</div>";
   }
   $mbutton = make_mount_button($partition);
-  $out[] = "<tr class='$outdd toggle-parts toggle-{$disk['name']}' style='__SHOW__' >";
+  $out[] = "<tr class='toggle-parts toggle-{$disk['name']}' style='__SHOW__' >";
   $out[] = "<td></td>";
   $out[] = "<td>{$mpoint}</td>";
   $out[] = "<td class='mount'>{$mbutton}</td>";
@@ -116,7 +116,7 @@ function render_partition($disk, $partition) {
 
 function make_mount_button($device) {
   global $paths;
-  $button = "<span style='width:auto;text-align:right;'><button type='button' device='{$device[device]}' class='array' context='%s' role='%s' %s><i class='%s'></i>  %s</button></span>";
+  $button = "<span style='width:auto;text-align:right;'><button type='button' device='{$device['device']}' class='array' context='%s' role='%s' %s><i class='%s'></i>  %s</button></span>";
   if (isset($device['partitions'])) {
     $mounted = in_array(true,array_filter($device['partitions'],function($p){if($p['mounted']){return true;}}));
     $disable = count(array_filter($device['partitions'], function($p){ if (! empty($p['fstype'])) return TRUE;})) ? "" : "disabled";
@@ -128,10 +128,13 @@ function make_mount_button($device) {
     $format = ((isset($device['fstype']) && empty($device['fstype'])) || $device['fstype'] == "precleared") ? true : false;
     $context = "partition";
   }
-  $preclearing   = is_file("/tmp/preclear_stat_".basename($device['name']));
-  $is_mounting   = array_values(preg_grep("@/mounting_".basename($device['device'])."@i", listDir(dirname($paths['mounting']))))[0];
+  $preclearing   = is_file("/tmp/preclear_stat_{$device['name']}");
+
+  $is_mounting   = array_values(preg_grep("@/mounting_{$device['name']}@i", listDir(dirname($paths['mounting']))));
+  $is_mounting   = count($is_mounting) ? $is_mounting[0] : "";
   $is_mounting   = (time() - filemtime($is_mounting) < 300) ? TRUE : FALSE;
-  $is_unmounting = array_values(preg_grep("@/unmounting_".basename($device['device'])."@i", listDir(dirname($paths['mounting']))))[0];
+  $is_unmounting = array_values(preg_grep("@/unmounting_{$device['name']}@i", listDir(dirname($paths['mounting']))));
+  $is_unmounting = count($is_unmounting) ? $is_unmounting[0] : "";
   $is_unmounting = (time() - filemtime($is_unmounting) < 300) ? TRUE : FALSE;
   if ($format) {
     $disable = (get_config("LOCAL", "Config", "destructive_mode") == "enabled" && ! $preclearing) ? "" : "disabled";
@@ -181,7 +184,7 @@ if (isset($_POST['action'])) {
             $hdd_serial = sprintf($hdd_serial, "exec", "<i class='glyphicon glyphicon-plus-sign glyphicon-append'></i>");
           }
 
-          $o_disks .= "<tr class='$odd toggle-disk'>";
+          $o_disks .= "<tr class='{$odd} toggle-disk'>";
           $o_disks .= "<td><img src='/webGui/images/".(is_disk_running($disk['device']) ? "green-on.png":"green-blink.png" )."'> ";
           $o_disks .= "<a href='/Main/Device?name={$disk['name']}&file=/tmp/screen_buffer'>{$disk['name']}</a></td>";
           $o_disks .= "<td>{$hdd_serial}</td>";
@@ -253,8 +256,7 @@ if (isset($_POST['action'])) {
 
       $config_file = $GLOBALS["paths"]["config_file"];
       $config = is_file($config_file) ? @parse_ini_file($config_file, true) : array();
-      $disks_serials = array();
-      foreach ($disks as $disk) $disks_serials[] = $disk['serial'];
+      $disks_serials = array_map(function($d){return $d['serial'];}, $disks);
       $ct = "";
       foreach ($config as $serial => $value) {
         if($serial == "Config") continue;
@@ -391,7 +393,9 @@ if (isset($_POST['action'])) {
       echo json_encode(array("reload" => is_file($paths['reload'])));
       break;
     case 'remove_hook':
-      @unlink($paths['reload']);
+      if (is_file($paths['reload'])) {
+        @unlink($paths['reload']);
+      }
       break;
     case 'get_preclear_status':
       $status = array();

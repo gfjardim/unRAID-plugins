@@ -632,7 +632,7 @@ if [ $use_mail -gt 0 ] || [ ! -z $mail_rcpt ]
     fi
     
     no_mail=`which mail 2>&1 | awk '{print $2}'`
-    if [ "$no_mail" = "no" && ! -f "$notify_script" ]
+    if [ "$no_mail" = "no" ] && [ ! -f "$notify_script" ]
     then
         echo "error: \"mail\" program does not exist." >&2
         usage >&2

@@ -17,10 +17,6 @@ $paths = array("smb_extra"       => "/boot/config/smb-extra.conf",
                "mounting"        => "/var/state/${plugin}/mounting_%s.state",
                );
 
-if (! is_dir(dirname($paths["state"])) ) {
-  @mkdir(dirname($paths["state"]),0755,TRUE);
-}
-
 if (! isset($var)){
   if (! is_file("/usr/local/emhttp/state/var.ini")) shell_exec("wget -qO /dev/null localhost:$(ss -napt|grep emhttp|grep -Po ':\K\d+')");
   $var = @parse_ini_file("/usr/local/emhttp/state/var.ini");
@@ -418,7 +414,7 @@ function do_unmount($dev, $dir, $force = FALSE) {
     $o = shell_exec("umount".($force ? " -f -l" : "")." '${dev}' 2>&1");
     for ($i=0; $i < 10; $i++) {
       if (! is_mounted($dev)){
-        if (is_dir($dir)) rmdir($dir);
+        if (is_dir($dir)) @rmdir($dir);
         debug("Successfully unmounted '$dev'"); return TRUE;
       } else { sleep(0.5);}
     }

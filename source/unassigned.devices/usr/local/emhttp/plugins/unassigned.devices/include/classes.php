@@ -17,7 +17,6 @@ class CONFIG {
   protected $config_file;
 
   public function get_config_file() {
-    if (! is_file($this->config_file)) @mkdir(dirname($this->config_file),0777,TRUE);
     return is_file($this->config_file) ? @parse_ini_file($this->config_file, true) : array();
   }
 
@@ -135,48 +134,35 @@ class LOCAL extends CONFIG {
   }
 
   public function get_unasigned_disks() {
-    $disks = $paths = $unraid_disks = $unraid_cache = array();
-    $unraid_flash = realpath("/dev/disk/by-label/UNRAID");
-    foreach (listDir("/dev/disk/by-id") as $p) {
-      $r = realpath($p);
-      if (!is_bool(strpos($r, "/dev/sd")) || !is_bool(strpos($r, "/dev/hd"))) {
-        $paths[$r] = $p;
+
+    $paths          = listDir("/dev/disk/by-id");
+    exec("/usr/bin/strings /boot/config/super.dat 2>/dev/null", $disks_serial);
+    $cache_serial   = array_flip(preg_grep("#cacheId#i", array_flip(parse_ini_file("/boot/config/disk.cfg"))));
+    $flash          = realpath("/dev/disk/by-label/UNRAID");
+    $flash_serial   = array_filter($paths, function($p) use ($flash) {if(!is_bool(strpos($flash,realpath($p)))) return basename($p);});
+    $unraid_serials = array_merge($disks_serial,$cache_serial,$flash_serial);
+
+    $unassigned = $paths;
+    foreach($unraid_serials as $serial) {
+      $unassigned = preg_grep("#{$serial}|wwn-|-part#", $unassigned, PREG_GREP_INVERT);
+    }
+    natsort($unassigned);
+
+    foreach ($unassigned as $k => $disk) {
+      unset($unassigned[$k]);
+      $parts = array_values(preg_grep("#{$disk}-part\d+#", $paths));
+      $device = realpath($disk);
+      if (! is_bool(strpos($device, "/dev/sd")) || ! is_bool(strpos($device, "/dev/hd"))) {
+        $unassigned[$disk] = array("device"=>$device,"partitions"=>$parts);
       }
     }
-    natsort($paths);
-    foreach (parse_ini_string(shell_exec("/usr/bin/cat /proc/mdcmd 2>/dev/null")) as $k => $v) {
-      if (strpos($k, "rdevName") !== FALSE && strlen($v)) {
-        $unraid_disks[] = realpath("/dev/$v");
-      }
-    }
-    // foreach ($unraid_disks as $k) {$o .= "  $k\n";};debug("UNRAID DISKS:\n$o", "DEBUG");
-    foreach (parse_ini_file("/boot/config/disk.cfg") as $k => $v) {
-      if (strpos($k, "cacheId") !== FALSE && strlen($v)) {
-        foreach ( preg_grep("#".$v."$#i", $paths) as $c) $unraid_cache[] = realpath($c);
-      }
-    }
-    // foreach ($unraid_cache as $k) {$g .= "  $k\n";};debug("UNRAID CACHE:\n$g", "DEBUG");
-    foreach ($paths as $path => $d) {
-      if (preg_match("#^(.(?!wwn|part))*$#", $d)) {
-        if (! in_array($path, $unraid_disks) && ! in_array($path, $unraid_cache) && strpos($unraid_flash, $path) === FALSE) {
-          if (in_array($path, array_map(function($ar){return $ar['device'];},$disks)) ) continue;
-          $m = array_values(preg_grep("#$d.*-part\d+#", $paths));
-          natsort($m);
-          $disks[$d] = array("device"=>$path,"type"=>"ata","partitions"=>$m);
-          //debug("Unassigned disk: $d", "DEBUG");
-        } else {
-          //debug("Discarded: => $d ($path)", "DEBUG");
-          continue;
-        }
-      } 
-    }
-    return $disks;
+    return $unassigned;
   }
 
   public function get_all_disks_info() {
+    $disks = array();
     foreach ($this->undisks as $id => $disk) {
       $disk = array_merge($disk, $this->get_disk_info($id));
-      $disk['temp'] = get_temp($id);
       foreach ($disk['partitions'] as $k => $p) {
         if ($p) $disk['partitions'][$k] = $this->get_partition_info($p, $disk);
       }
@@ -199,10 +185,10 @@ class LOCAL extends CONFIG {
       $disk['serial']       = "{$attrs['ID_MODEL']}_{$disk['serial_short']}";
       $disk['size']         = $this->blkdisks[$name]['SIZE'];
       $disk['model']        = $attrs['ID_MODEL'];
-      $disk['owner']        = (isset($_ENV['DEVTYPE'])) ? "udev" : "user";
       $disk['bus']          = (!is_bool(strpos($attrs['DEVPATH'], "usb"))) ? "usb" : "ata";
       save_ini_file($cache_file, $cached);
     }
+    $disk['temp'] = get_temp($id);
     $disk['name']      = basename($device);
     $disk['device']    = $device;
     $disk['automount'] = $this->is_automount($disk['serial'], ($disk['bus'] == "usb" ? true : false));
@@ -233,6 +219,7 @@ class LOCAL extends CONFIG {
     $part['shared']  = $part['mounted'] ? is_shared(basename($part['mountpoint'])) : config_shared($disk['serial'], $part['part']);
     // $part['shared']  = config_shared($disk['serial'], $part['part']);
     $part['command'] = $this->get_config($disk['serial'], "command.{$part['part']}");
+    $part['owner']   = isset($_ENV['DEVTYPE']) ? "udev" : "user";
     return $part;
   }
 }
@@ -259,7 +246,7 @@ class SMB extends CONFIG {
 
   public function get_mounts() {
     $o = array();
-    $samba_mounts = array_filter($this->get_config_file(), function ($v){if($v['protocol'] == "SMB"){return $v;}});
+    $samba_mounts = array_filter($this->get_config_file(), function ($v){if(isset($v['protocol']) && $v['protocol'] == "SMB"){return $v;}});
     foreach ($samba_mounts as $serial => $mount) {
       $mount['serial']   = $serial;
       $mount['device']   = "//{$mount[ip]}/{$mount[share]}";
@@ -336,7 +323,7 @@ class NFS extends CONFIG {
 
   public function get_mounts() {
     $o = array();
-    $nfs_mounts = array_filter($this->get_config_file(), function ($v){if($v['protocol'] == "NFS"){return $v;}});
+    $nfs_mounts = array_filter($this->get_config_file(), function ($v){if(isset($v['protocol']) && $v['protocol'] == "NFS"){return $v;}});
     foreach ($nfs_mounts as $serial => $mount) {
       $mount['serial']   = $serial;
       $mount['device']   = "{$mount['ip']}:{$mount['share']}";
