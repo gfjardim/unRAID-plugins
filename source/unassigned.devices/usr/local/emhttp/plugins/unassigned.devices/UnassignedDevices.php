@@ -425,4 +425,5 @@ if (isset($_POST['action'])) {
       break;
   }
 }
+set_error_handler($ori_error_handler);
 ?>

@@ -139,3 +139,4 @@ Destructive Mode:
 &nbsp;
 : <input type="submit" name="#apply" value="Apply"><input type="button" value="Done" onclick="done()">
 </form>
+<?set_error_handler($ori_error_handler);?>

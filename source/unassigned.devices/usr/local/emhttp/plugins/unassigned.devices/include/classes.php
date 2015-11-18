@@ -133,43 +133,35 @@ class LOCAL extends CONFIG {
     }
   }
 
-  public function get_unasigned_disks() {
-    $disks = $paths = $unraid_disks = $unraid_cache = array();
-    foreach (listDir("/dev/disk/by-id") as $p) {
-      $r = realpath($p);
-      if (!is_bool(strpos($r, "/dev/sd")) || !is_bool(strpos($r, "/dev/hd"))) {
-        $paths[$r] = $p;
+  function get_unasigned_disks() {
+    $paths          = listDir("/dev/disk/by-id");
+    $disks_id       = preg_grep("#wwn-|-part#", $paths, PREG_GREP_INVERT);
+    $disks_real     = array_map(function($p){return realpath($p);}, $disks_id);
+    exec("/usr/bin/strings /boot/config/super.dat 2>/dev/null|grep -Po '.{10,}'", $disks_serial);
+    $disks_cfg      = is_file("/boot/config/disk.cfg") ? parse_ini_file("/boot/config/disk.cfg") : array();
+    $cache_serial   = array_flip(preg_grep("#cacheId#i", array_flip($disks_cfg)));
+    $flash          = realpath("/dev/disk/by-label/UNRAID");
+    $flash_serial   = array_filter($paths, function($p) use ($flash) {if(!is_bool(strpos($flash,realpath($p)))) return basename($p);});
+    $unraid_serials = array_merge($disks_serial,$cache_serial,$flash_serial);
+    $unraid_disks   = array();
+    foreach($unraid_serials as $serial) {
+      $unraid_disks = array_merge($unraid_disks, preg_grep("#".preg_quote($serial, "#")."#", $disks_id));
+    }
+    $unraid_real = array_map(function($p){return realpath($p);}, $unraid_disks);
+    $unassigned  = array_flip(array_diff(array_combine($disks_id, $disks_real), $unraid_real));
+    natsort($unassigned);
+    foreach ($unassigned as $k => $disk) {
+      unset($unassigned[$k]);
+      $parts = array_values(preg_grep("#{$disk}-part\d+#", $paths));
+      $device = realpath($disk);
+      if (! is_bool(strpos($device, "/dev/sd")) || ! is_bool(strpos($device, "/dev/hd"))) {
+        $unassigned[$disk] = array("device"=>$device,"partitions"=>$parts);
       }
     }
-    natsort($paths);
-    $unraid_flash = realpath("/dev/disk/by-label/UNRAID");
-    foreach (parse_ini_string(shell_exec("/usr/bin/cat /proc/mdcmd 2>/dev/null")) as $k => $v) {
-      if (strpos($k, "rdevName") !== FALSE && strlen($v)) {
-        $unraid_disks[] = realpath("/dev/$v");
-      }
-    }
-    //foreach ($unraid_disks as $k) {$o .= "  $k\n";}; debug("UNRAID DISKS:\n$o", "DEBUG");
-    foreach (parse_ini_file("/boot/config/disk.cfg") as $k => $v) {
-      if (strpos($k, "cacheId") !== FALSE && strlen($v)) {
-        foreach ( preg_grep("#".$v."$#i", $paths) as $c) $unraid_cache[] = realpath($c);
-      }
-    }
-    //foreach ($unraid_cache as $k) {$g .= "  $k\n";}; debug("UNRAID CACHE:\n$g", "DEBUG");
-    foreach ($paths as $path => $d) {
-      if (preg_match("#^(.(?!wwn|part))*$#", $d)) {
-        if (! in_array($path, $unraid_disks) && ! in_array($path, $unraid_cache) && strpos($unraid_flash, $path) === FALSE) {
-          if (in_array($path, array_map(function($ar){return $ar['device'];},$disks)) ) continue;
-          $m = array_values(preg_grep("#$d.*-part\d+#", $paths));
-          natsort($m);
-          $disks[$d] = array("device"=>$path,"type"=>"ata","partitions"=>$m);
-          //debug("Unassigned disk: $d", "DEBUG");
-        } else {
-          //debug("Discarded: => $d ($path)", "DEBUG");
-          continue;
-        }
-      } 
-    }
-    return $disks;
+    debug("\nDisks:\n+ ".implode("\n+ ", array_map(function($k,$v){return "$k => $v";}, $disks_real, $disks_id)), "DEBUG");
+    debug("\nunRAID Serials:\n+ ".implode("\n+ ", $unraid_serials), "DEBUG");
+    debug("\nunRAID Disks:\n+ ".implode("\n+ ", $unraid_disks), "DEBUG");
+    return $unassigned;
   }
 
   public function get_all_disks_info() {

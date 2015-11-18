@@ -1,5 +1,5 @@
 <?
-set_error_handler("log_error");
+$ori_error_handler = set_error_handler("log_error");
 $plugin = "unassigned.devices";
 require_once("/usr/local/emhttp/plugins/${plugin}/include/classes.php");
 // $VERBOSE=TRUE;

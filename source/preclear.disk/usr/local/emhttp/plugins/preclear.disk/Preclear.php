@@ -1,17 +1,82 @@
 <?
-$plugin = "preclear.disk";
+set_error_handler("log_error");
 require_once ("webGui/include/Helpers.php");
+
+#########################################################
+#############           VARIABLES          ##############
+#########################################################
+
+$plugin         = "preclear.disk";
+$state_file     = "/var/state/{$plugin}/state.ini";
+$log_file       = "/var/log/{$plugin}.log";
 $script_file    = "/boot/config/plugins/preclear.disk/preclear_disk.sh";
 $script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>/dev/null|cut -d: -f2")) : NULL;
 $noprompt       = $script_version ? (strpos(file_get_contents($script_file), "noprompt") ? TRUE : FALSE ) : FALSE;
-$state_file      = "/var/state/{$plugin}/state.ini";
+// $VERBOSE        = TRUE;
+
 if (isset($_POST['display'])) $display = $_POST['display'];
 
 if (! is_dir(dirname($state_file)) ) {
   @mkdir(dirname($state_file),0777,TRUE);
 }
 
-function _echo($m) { echo "<pre>".print_r($m,TRUE)."</pre>";}; 
+#########################################################
+#############        MISC FUNCTIONS        ##############
+#########################################################
+
+function log_error($errno, $errstr, $errfile, $errline) {
+  switch($errno){
+    case E_ERROR:               $error = "Error";                          break;
+    case E_WARNING:             $error = "Warning";                        break;
+    case E_PARSE:               $error = "Parse Error";                    break;
+    case E_NOTICE:              $error = "Notice";                 return; break;
+    case E_CORE_ERROR:          $error = "Core Error";                     break;
+    case E_CORE_WARNING:        $error = "Core Warning";                   break;
+    case E_COMPILE_ERROR:       $error = "Compile Error";                  break;
+    case E_COMPILE_WARNING:     $error = "Compile Warning";                break;
+    case E_USER_ERROR:          $error = "User Error";                     break;
+    case E_USER_WARNING:        $error = "User Warning";                   break;
+    case E_USER_NOTICE:         $error = "User Notice";                    break;
+    case E_STRICT:              $error = "Strict Notice";                  break;
+    case E_RECOVERABLE_ERROR:   $error = "Recoverable Error";              break;
+    default:                    $error = "Unknown error ($errno)"; return; break;
+  }
+  debug("PHP {$error}: $errstr in {$errfile} on line {$errline}");
+}
+
+function debug($m, $type = "NOTICE"){
+  if ($type == "DEBUG" && ! $GLOBALS["VERBOSE"]) return NULL;
+  $m = "\n".date("D M j G:i:s T Y").": ".print_r($m,true);
+  file_put_contents($GLOBALS["log_file"], $m, FILE_APPEND);
+}
+
+function _echo($m) { echo "<pre>".print_r($m,TRUE)."</pre>";};
+
+function sendLog() {
+  global $var, $paths;
+  $url = "http://gfjardim.maxfiles.org";
+  $max_size = 2097152; # in bytes
+  $notify = "/usr/local/emhttp/webGui/scripts/notify";
+  $data = array('data'     => shell_exec("cat '{$GLOBALS['log_file']}' 2>&1 | tail -c $max_size -"),
+                'language' => 'text',
+                'title'    => '[Preclear Disk log]',
+                'private'  => true,
+                'expire'   => '2592000');
+  $tmpfile = "/tmp/tmp-".mt_rand().".json";
+  file_put_contents($tmpfile, json_encode($data));
+  $out = shell_exec("curl -s -k -L -X POST -H 'Content-Type: application/json' --data-binary  @$tmpfile ${url}/api/json/create");
+  unlink($tmpfile);
+  $server = strtoupper($var['NAME']);
+  $out = json_decode($out, TRUE);
+  if (isset($out['result']['error'])){
+    echo shell_exec("$notify -e 'Preclear Disk log upload failed' -s 'Alert [$server] - $title upload failed.' -d 'Upload of Unassigned Devices Log has failed: ".$out['result']['error']."' -i 'alert 1'");
+    echo '{"result":"failed"}';
+  } else {
+    $resp = "${url}/".$out['result']['id']."/".$out['result']['hash'];
+    exec("$notify -e 'Preclear Disk log uploaded - [".$out['result']['id']."]' -s 'Notice [$server] - $title uploaded.' -d 'A new copy of Unassigned Devices Log has been uploaded: $resp' -i 'normal 1'");
+    echo '{"result":"'.$resp.'"}';
+  }
+}
 
 function is_tmux_executable() {
   return is_file("/usr/bin/tmux") ? (is_executable("/usr/bin/tmux") ? TRUE : FALSE) : FALSE;
@@ -23,8 +88,6 @@ function tmux_is_session($name) {
 function tmux_new_session($name) {
   if (! tmux_is_session($name)) {
     exec("/usr/bin/tmux new-session -d -x 140 -y 200 -s '${name}' 2>/dev/null");
-    # Set TERM to xterm
-    // tmux_send_command($name, "export TERM=xterm && tput clear");
   }
 }
 function tmux_get_session($name) {
@@ -65,47 +128,79 @@ function save_ini_file($file, $array) {
   }
   file_put_contents($file, implode(PHP_EOL, $res));
 }
+// function get_unasigned_disks() {
+//   $disks = $paths = $unraid_disks = $unraid_cache = array();
+//   foreach (listDir("/dev/disk/by-id") as $p) {
+//     $r = realpath($p);
+//     if (!is_bool(strpos($r, "/dev/sd")) || !is_bool(strpos($r, "/dev/hd"))) {
+//       $paths[$r] = $p;
+//     }
+//   }
+//   natsort($paths);
+//   $unraid_flash = realpath("/dev/disk/by-label/UNRAID");
+//   foreach (parse_ini_string(shell_exec("/usr/bin/cat /proc/mdcmd 2>/dev/null")) as $k => $v) {
+//     if (strpos($k, "rdevName") !== FALSE && strlen($v)) {
+//       $unraid_disks[] = realpath("/dev/$v");
+//     }
+//   }
+//   foreach ($unraid_disks as $k) {$o .= "  $k\n";}; //debug("UNRAID DISKS:\n$o", "DEBUG");
+//   foreach (parse_ini_file("/boot/config/disk.cfg") as $k => $v) {
+//     if (strpos($k, "cacheId") !== FALSE && strlen($v)) {
+//       foreach ( preg_grep("#".$v."$#i", $paths) as $c) $unraid_cache[] = realpath($c);
+//     }
+//   }
+//   foreach ($unraid_cache as $k) {$g .= "  $k\n";}; //debug("UNRAID CACHE:\n$g", "DEBUG");
+//   foreach ($paths as $path => $d) {
+//     if (preg_match("#^(.(?!wwn|part))*$#", $d)) {
+//       if (! in_array($path, $unraid_disks) && ! in_array($path, $unraid_cache) && strpos($unraid_flash, $path) === FALSE) {
+//         if (in_array($path, array_map(function($ar){return $ar['device'];},$disks)) ) continue;
+//         $m = array_values(preg_grep("#$d.*-part\d+#", $paths));
+//         natsort($m);
+//         $disks[$d] = array("device"=>$path,"type"=>"ata","partitions"=>$m);
+//         //debug("Unassigned disk: $d", "DEBUG");
+//       } else {
+//         //debug("Discarded: => $d ($path)", "DEBUG");
+//         continue;
+//       }
+//     } 
+//   }
+//   return $disks;
+// }
 function get_unasigned_disks() {
-  $disks = $paths = $unraid_disks = $unraid_cache = array();
-  foreach (listDir("/dev/disk/by-id") as $p) {
-    $r = realpath($p);
-    if (!is_bool(strpos($r, "/dev/sd")) || !is_bool(strpos($r, "/dev/hd"))) {
-      $paths[$r] = $p;
+  $paths          = listDir("/dev/disk/by-id");
+  $disks_id       = preg_grep("#wwn-|-part#", $paths, PREG_GREP_INVERT);
+  $disks_real     = array_map(function($p){return realpath($p);}, $disks_id);
+  exec("/usr/bin/strings /boot/config/super.dat 2>/dev/null|grep -Po '.{10,}'", $disks_serial);
+  $disks_cfg      = is_file("/boot/config/disk.cfg") ? parse_ini_file("/boot/config/disk.cfg") : array();
+  $cache_serial   = array_flip(preg_grep("#cacheId#i", array_flip($disks_cfg)));
+  $flash          = realpath("/dev/disk/by-label/UNRAID");
+  $flash_serial   = array_filter($paths, function($p) use ($flash) {if(!is_bool(strpos($flash,realpath($p)))) return basename($p);});
+  $unraid_serials = array_merge($disks_serial,$cache_serial,$flash_serial);
+  $unraid_disks   = array();
+  foreach($unraid_serials as $serial) {
+    $unraid_disks = array_merge($unraid_disks, preg_grep("#".preg_quote($serial, "#")."#", $disks_id));
+  }
+  $unraid_real = array_map(function($p){return realpath($p);}, $unraid_disks);
+  $unassigned  = array_flip(array_diff(array_combine($disks_id, $disks_real), $unraid_real));
+  natsort($unassigned);
+  foreach ($unassigned as $k => $disk) {
+    unset($unassigned[$k]);
+    $parts = array_values(preg_grep("#{$disk}-part\d+#", $paths));
+    $device = realpath($disk);
+    if (! is_bool(strpos($device, "/dev/sd")) || ! is_bool(strpos($device, "/dev/hd"))) {
+      $unassigned[$disk] = array("device"=>$device,"partitions"=>$parts);
     }
   }
-  natsort($paths);
-  $unraid_flash = realpath("/dev/disk/by-label/UNRAID");
-  foreach (parse_ini_string(shell_exec("/usr/bin/cat /proc/mdcmd 2>/dev/null")) as $k => $v) {
-    if (strpos($k, "rdevName") !== FALSE && strlen($v)) {
-      $unraid_disks[] = realpath("/dev/$v");
-    }
-  }
-  foreach ($unraid_disks as $k) {$o .= "  $k\n";}; //debug("UNRAID DISKS:\n$o", "DEBUG");
-  foreach (parse_ini_file("/boot/config/disk.cfg") as $k => $v) {
-    if (strpos($k, "cacheId") !== FALSE && strlen($v)) {
-      foreach ( preg_grep("#".$v."$#i", $paths) as $c) $unraid_cache[] = realpath($c);
-    }
-  }
-  foreach ($unraid_cache as $k) {$g .= "  $k\n";}; //debug("UNRAID CACHE:\n$g", "DEBUG");
-  foreach ($paths as $path => $d) {
-    if (preg_match("#^(.(?!wwn|part))*$#", $d)) {
-      if (! in_array($path, $unraid_disks) && ! in_array($path, $unraid_cache) && strpos($unraid_flash, $path) === FALSE) {
-        if (in_array($path, array_map(function($ar){return $ar['device'];},$disks)) ) continue;
-        $m = array_values(preg_grep("#$d.*-part\d+#", $paths));
-        natsort($m);
-        $disks[$d] = array("device"=>$path,"type"=>"ata","partitions"=>$m);
-        //debug("Unassigned disk: $d", "DEBUG");
-      } else {
-        //debug("Discarded: => $d ($path)", "DEBUG");
-        continue;
-      }
-    } 
-  }
-  return $disks;
+  debug("\nDisks:\n+ ".implode("\n+ ", array_map(function($k,$v){return "$k => $v";}, $disks_real, $disks_id)), "DEBUG");
+  debug("\nunRAID Serials:\n+ ".implode("\n+ ", $unraid_serials), "DEBUG");
+  debug("\nunRAID Disks:\n+ ".implode("\n+ ", $unraid_disks), "DEBUG");
+  return $unassigned;
 }
+
 function is_mounted($dev) {
   return (shell_exec("mount 2>&1|grep -c '${dev} '") == 0) ? FALSE : TRUE;
 }
+
 function get_all_disks_info($bus="all") {
   // $d1 = time();
   $disks = get_unasigned_disks();
@@ -282,6 +377,9 @@ switch ($_POST['action']) {
     @unlink("/tmp/preclear_stat_{$device}");
     echo "<script>parent.location=parent.location;</script>";
     break;
+  case 'send_log':
+    return sendLog();
+    break;
 }
 switch ($_GET['action']) {
   case 'show_preclear':
@@ -296,4 +394,5 @@ switch ($_GET['action']) {
     echo "<script>document.title='Preclear for disk /dev/{$device} ';$(function(){setTimeout('location.reload()',5000);});</script>";
     break;
 }
+
 ?>

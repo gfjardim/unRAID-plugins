@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.09.28a">
+<!ENTITY version   "2015.11.18">
 <!ENTITY launch    "Settings/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -16,6 +16,10 @@
 ##&name;
 
 ###&version;
+- Add: logging capabilities
+- Fix: php error if disk.cfg file doesn't exist
+
+###2015.09.28a
 - Fix: DVD/BluRay drives being included
 - Fix: some minor bugs
 

@@ -164,5 +164,5 @@ Script content:
   function rmfile(file) {
     $.post("/update.php",{"#command":"/plugins/unassigned.devices/scripts/rm","#arg[1]":file}).done(function(){location.reload();});
   }
-
 </script>
+<?set_error_handler($ori_error_handler);?>

@@ -551,3 +551,4 @@ $numdisks = count($class->undisks);
   <p>Click <a class="exec underline" onclick="openWindow('/webGui/scripts/tail_log&arg1=unassigned.devices.log','Log Information',600,900);">here</a> to see the log. Alternatively, you can upload a copy of the log by clicking <a class="underline exec" onclick="sendLog();">here</a>.
   </p>
 </blockquote>
+<?set_error_handler($ori_error_handler);?>
