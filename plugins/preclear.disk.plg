@@ -181,6 +181,7 @@ The 'remove' script.
 <INLINE>
 
 # Remove plugin related files
+removepkg /boot/config/plugins/&name;/&name;-&version;.txz
 rm -rf /boot/config/plugins/&name; \
        /usr/local/emhttp/plugins/&name; \
        /var/state/&name;
