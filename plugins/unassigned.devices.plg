@@ -350,6 +350,7 @@ rmdir /mnt/disks
 find "/boot/config/plugins/&name;/packages/" -type f -iname "*.txz" -delete
 
 # Remove possible leftovers
+removepkg &packages;/&name;-&version;.txz
 rm -rf /usr/local/emhttp/plugins/&name; \
        /var/state/&name; \
        &packages;
