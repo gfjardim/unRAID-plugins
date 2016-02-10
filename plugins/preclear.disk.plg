@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.08.12">
+<!ENTITY version   "2015.11.18">
 <!ENTITY launch    "Settings/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,30 @@
 
 <CHANGES>
 ##&name;
+
+###&version;
+- Add: logging capabilities
+- Fix: php error if disk.cfg file doesn't exist
+
+###2015.09.28a
+- Fix: DVD/BluRay drives being included
+- Fix: some minor bugs
+
+###2015.09.18
+- Fix: Areca disks not appearing correctly.
+
+###2015.09.17b
+- Fix: black CSS conformity
+
+###2015.09.17
+- Release: maintenance release.
+
+###2015.09.08
+- Add: ncurses package, avoiding the use of the xterm hack.
+
+###2015.09.07d
+- Improvement: better integration with Unassigned Devices.
+- Fix: unRAID 6.1.1 doesn't have a 'screen' terminal descriptor; xterm used instead.
 
 ###2015.08.12
 - Fix: 6.1-rc3 compatibility
@@ -66,10 +90,17 @@
 </CHANGES>
 
 <!--
-The 'source' file.
+The 'plugin' package file.
 -->
-<FILE Name="/boot/config/plugins/&name;/&name;-&version;.txz" Run="upgradepkg --install-new">
+<FILE Name="/boot/config/plugins/&name;/&name;-&version;.txz">
 <URL>&gitURL;/archive/&name;-&version;.txz</URL>
+</FILE>
+
+<!--
+The 'plugin' package MD5 hash.
+-->
+<FILE Name="/boot/config/plugins/&name;/&name;-&version;.md5">
+<URL>&gitURL;/archive/&name;-&version;.md5</URL>
 </FILE>
 
 <!--
@@ -96,16 +127,41 @@ libevent-2.0.21-x86_64-1.txz
 </FILE>
 
 <!--
+ncurses-5.9-x86_64-2.txz
+-->
+<FILE Name="/boot/config/plugins/&name;/ncurses-5.9-x86_64-2.txz" Run="installpkg">
+<URL>http://slackware.osuosl.org/slackware64-14.1/slackware64/l/ncurses-5.9-x86_64-2.txz</URL>
+<MD5>9134fa31097ee352a1f1662e3f6bcb3f</MD5>
+</FILE>
+
+<!--
 The 'post-install' script.
 -->
 <FILE Run="/bin/bash">
 <INLINE>
+# Verify and install plugin package
+sum1=$(/usr/bin/md5sum /boot/config/plugins/&name;/&name;-&version;.txz)
+sum2=$(/usr/bin/cat /boot/config/plugins/&name;/&name;-&version;.md5)
+if [ "${sum1:0:32}" != "${sum2:0:32}" ]; then
+  echo "Wrong 'plugin' package md5 hash."
+  rm /boot/config/plugins/&name;/&name;-&version;.txz
+  rm /boot/config/plugins/&name;/&name;-&version;.md5
+  exit 1
+else
+  upgradepkg --install-new /boot/config/plugins/&name;/&name;-&version;.txz
+fi
+
+# Create a symlink to /root/mdcmd
+if [[ ! -e /root/mdcmd ]]; then
+  ln -sf /usr/local/sbin/mdcmd /root/mdcmd
+fi
 
 # Update file access mode
 chmod 644 $(awk '/\.(htm|php|js|page|css|png|plg|gif|cfg|md)$/ {print "/"$0}' /var/log/packages/&name;-&version;)
 
 # Cleaning old source files
 find /boot/config/plugins/&name;/ -type f -iname "&name;*.txz" ! -iname "*&version;*" -delete
+find /boot/config/plugins/&name;/ -type f -iname "&name;*.md5" ! -iname "*&version;*" -delete
 
 echo ""
 echo "-----------------------------------------------------------"
@@ -125,15 +181,11 @@ The 'remove' script.
 <INLINE>
 
 # Remove plugin related files
-rm -rf /boot/config/plugins/&name;
-rm -f /tmp/plugins/&name;.plg /boot/readvz
+rm -rf /boot/config/plugins/&name; \
+       /usr/local/emhttp/plugins/&name; \
+       /var/state/&name;
 
-# Uninstall the 'source' package
-removepkg &name;-&version;
-
-removepkg libevent-2.0.21-x86_64-1
-removepkg tmux-1.8-x86_64-1
-
+exit 0
 </INLINE>
 </FILE>
 

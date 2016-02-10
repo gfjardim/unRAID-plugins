@@ -63,10 +63,12 @@
 #                 default in the absence of "-A" or "-a" option.
 # Version 1.14  - Added text describing how -A and -a options are not used or needed on disks > 2.2TB.
 #                 Added additional logic to detect assigned drives in the newest of 5.0 releases.
-# Version 1.15  - a) Added PID to preclear_stat_sdX files and support for notifications - gfjardim
-#                 b) Add notification channel choice
-#                 c) Added support for fast post read (bjp999)
-ver="1.15c"
+# Version 1.15  - Added export of LC_CTYPE=C to prevent unicode use on 64 bit printf.
+#                 Added PID to preclear_stat_sdX files and support for notifications - gfjardim
+#                 Add notification channel choice - gfjardim
+#                 Added support for fast post read - bjp999
+#                 Remove /root/mdcmd dependency - gfjardim
+ver="1.15"
 
 progname=$0
 options=$*
@@ -310,8 +312,8 @@ send_mail() {
   description=$(echo ${2} | tr "'" '`' )
   message=$(echo ${3} | tr "'" '`' )
   recipient=${4}
-  if [ -f "/usr/local/sbin/notify" ]; then
-    /usr/local/sbin/notify -e "Preclear ${model} ${serial}" -s """${subject}""" -d """${description}""" -m """${message}""" -i "normal ${notify_channels}"
+  if [ -f "$notify_script" ]; then
+    $notify_script -e "Preclear ${model} ${serial}" -s """${subject}""" -d """${description}""" -m """${message}""" -i "normal ${notify_channels}"
   else
     echo -e "${message}" | mail -s "${subject}" "${recipient}"
   fi
@@ -616,8 +618,21 @@ fi
 # Check to see if Mail exists if m or M parameter is used.
 if [ $use_mail -gt 0 ] || [ ! -z $mail_rcpt ]
     then
+    if [ -f "/usr/local/sbin/notify" ]
+    then
+      # unRAID 6.0
+      notify_script="/usr/local/sbin/notify"
+    elif [ -f "/usr/local/emhttp/plugins/dynamix/scripts/notify" ]
+    then
+      # unRAID 6.1
+      notify_script="/usr/local/emhttp/plugins/dynamix/scripts/notify"
+    else
+      # unRAID pre 6.0
+      notify_script=""
+    fi
+    
     no_mail=`which mail 2>&1 | awk '{print $2}'`
-    if [ "$no_mail" = "no" && ! -f "/usr/local/sbin/notify" ]
+    if [ "$no_mail" = "no" ] && [ ! -f "$notify_script" ]
     then
         echo "error: \"mail\" program does not exist." >&2
         usage >&2
@@ -1370,7 +1385,7 @@ exec </dev/tty
 # First, do some basic tests to ensure the disk  is not part of the arrray
 # and not mounted, and not in use in any way.
 #----------------------------------------------------------------------------------
-devices=`/root/mdcmd status | strings | grep rdevName | sed 's/\([^=]*\)=\([^=]\)/\/dev\/\2/'`
+devices=`cat /proc/mdcmd | strings | grep rdevName | sed 's/\([^=]*\)=\([^=]\)/\/dev\/\2/'`
 
 echo $devices | grep $theDisk >/dev/null 2>&1
 if [  $? = 0 ]
@@ -1767,7 +1782,8 @@ then
   if [ "$ans" = "Yes" ]
   then
     echo "zeroing MBR only"
-    dd if=/dev/zero bs=512 count=1 of=$theDisk
+    dd if=/dev/zero bs=2M count=1 of=$theDisk
+    hdparm -z $theDisk # Reload partition table
     echo "zeroing MBR complete."
     echo "Verification of MBR zero starting."
     read_mbr
