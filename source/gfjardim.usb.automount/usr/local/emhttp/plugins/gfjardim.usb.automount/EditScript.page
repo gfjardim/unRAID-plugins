@@ -1,0 +1,116 @@
+Title="Edit Script"
+---
+<?PHP
+$plugin = "gfjardim.usb.automount";
+require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
+
+$serial = $_GET['s'];
+$partition = $_GET['p'];
+$file = get_config($serial,"command.{$partition}");
+if (! $file ) $file = "/boot/config/plugins/${plugin}/".( preg_replace("%\s+%", "_", urldecode($_GET['l'])) ).".sh";
+
+$text = @file_get_contents($file);
+$default_text = <<<EOT
+#!/bin/bash
+PATH=/usr/local/sbin:/usr/sbin:/sbin:/usr/local/bin:/usr/bin:/bin
+## Available variables: 
+# AVAIL      : available space
+# USED       : used space
+# SIZE       : partition size
+# SERIAL     : disk serial number
+# ACTION     : if mounting, ADD; if unmounting, REMOVE
+# MOUNTPOINT : where the partition is mounted
+# FSTYPE     : partition filesystem
+# LABEL      : partition label
+# DEVICE     : partition device, e.g /dev/sda1
+# OWNER      : "udev" if executed by UDEV, otherwise "user"
+
+case \$ACTION in
+  'ADD' )
+    // do your stuff here
+    echo "Added"
+  ;;
+  'REMOVE' )
+    // do your stuff here
+    echo "Removed"
+  ;;
+esac
+EOT;
+
+?>
+<link type="text/css" rel="stylesheet" href="/webGui/styles/jqueryFileTree.css" >
+<style type="text/css">
+  .fileTree {
+    border: solid 1px #BBB;
+    background: #FFF;
+    overflow: scroll;
+    padding: 5px;
+    position:absolute;
+    z-index:100;
+    display:none;
+  }
+</style>
+
+<form markdown="1" method="POST" action="/update.php" target="progressFrame">
+<input type="hidden" name="#include" value="update.file.php">
+
+&nbsp;
+: <input type="text" name="#file" style="width:40%;" onclick="openFileBrowser(this,'/boot/config/plugins/<?=$plugin;?>/','sh',false,true);" autocomplete="off" value="<?=$file;?>"><input type="submit" value="Save"/><input type="reset"/><button type="button" onclick="setDefault(this.form)">Default Script</button><button type="button" onclick="done('/')">Done</button>
+
+Script content:
+
+: <textarea spellcheck="false" cols="80" rows="22" name="text" style="font-family:bitstream;width:66%"><?=$text;?></textarea>
+
+
+> Click the **Apply** button to commit the current edits.  Click **Reset** to
+> undo any changes you make (before Saving). Click **Done** to exit this page.
+>
+> Click the **Default** button to initialize the edit box with the
+> factory-default contents.  You still need to click **Apply** in order to
+>commit the change.
+
+</form>
+
+<script type="text/javascript" src="/webGui/scripts/jqueryFileTree.js"></script>
+<script>
+  $( "form" ).submit(function( event ) {
+    $.post("/plugins/<?=$plugin;?>/update_cfg.php",{action:"set_command",serial:"<?=$serial;?>",command:$("input[name='#file']").val(),part:"<?=$partition;?>"},function(data){event.preventDefault();},"json");
+  });
+
+  function setDefault(form) {
+    form.elements['text'].value = <?=json_encode($default_text);?>;
+  }
+
+  function load(el) {
+    $.get($( el ).val(),function(data){ $( 'textarea' ).val(data);});
+  }
+
+  function openFileBrowser(el, root, filter, on_folders, on_files) {
+    if (on_folders === undefined) on_folders = true;
+    if (on_files   === undefined) on_files = true;
+    if (! filter && ! on_files)   filter = 'HIDE_FILES_FILTER';
+    p = $(el);
+    // Skip is fileTree is already open
+    if ( p.next().hasClass('fileTree') ){return null;}
+    // create a random id
+    var r = Math.floor((Math.random()*1000)+1);
+    // Add a new span and load fileTree
+    p.after("<span id='fileTree"+r+"' class='fileTree'></span>");
+    var ft = $('#fileTree'+r);
+    ft.fileTree({
+      root: root,
+      filter: filter,
+      allowBrowsing : true
+      },
+      function(file){if(on_files){p.val(file);$(ft).slideUp('fast',function (){$(ft).remove();});load(p);}},
+      function(folder){if(on_folders){p.val(folder);$(ft).slideUp('fast',function (){$(ft).remove();});}}
+    );
+    // Format fileTree according to parent position, height and width
+    ft.css({'left':p.position().left,'top':( p.position().top + p.outerHeight() ),'width':(p.width()+2) });
+    // close if click elsewhere
+    $(document).mouseup(function(e){if(!ft.is(e.target) && ft.has(e.target).length === 0){$(ft).slideUp('fast',function (){$(ft).remove();});}});
+    // Open fileTree
+    ft.slideDown('fast');
+  }
+
+</script>

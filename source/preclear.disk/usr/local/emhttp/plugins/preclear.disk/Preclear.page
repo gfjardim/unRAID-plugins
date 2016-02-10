@@ -5,12 +5,13 @@ Icon="preclear.disk.png"
 <?
 $plugin = "preclear.disk";
 $script_file = "/boot/config/plugins/preclear.disk/preclear_disk.sh";
-require_once("plugins/${plugin}/Preclear.php");
-$script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>/dev/null|cut -d: -f2")) : NULL;
-$fast_postread  = $script_version ? (strpos(file_get_contents($script_file), "fast_postread") ? TRUE : FALSE ) : FALSE;
-$notifications  = $script_version ? (strpos(file_get_contents($script_file), "notify_channels") ? TRUE : FALSE ) : FALSE;
-$numdisks = count(get_unasigned_disks())-1;
+$script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>/dev/null|cut -d: -f2")) : FALSE;
+
 ?>
+<link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/<?=$plugin;?>.css">
+<link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/waitMe.min.css">
+<script type="text/javascript" src="/plugins/<?=$plugin;?>/assets/waitMe.min.js"></script>
+
 <?if (is_file("webGui/scripts/jquery.switchButton.js")): # Pre 6.1?>
 <script type="text/javascript" src="/webGui/scripts/jquery.switchButton.js"></script>
 <link type="text/css" rel="stylesheet" href="/webGui/styles/jquery-ui.min.css">
@@ -21,10 +22,14 @@ $numdisks = count(get_unasigned_disks())-1;
 <link type="text/css" rel="stylesheet" href="/webGui/styles/jquery.switchbutton.css">
 <?endif;?>
 
-<link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/glyphicons.css">
-<link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/style-<?=$display['theme'];?>.css">
 <style>
-
+  <?if ($display['theme'] == 'white'):?>
+  table.custom_head thead tr td{font-size:13px;font-weight:normal;background:-webkit-radial-gradient(#E0E0E0,#C0C0C0);background:linear-gradient(#E0E0E0,#C0C0C0);padding:5px 20px 5px 6px;white-space:nowrap;text-align:left;}
+  table.custom_head tbody tr.even{background-color:#F8F8F8;}
+  <?else:?>
+  table.custom_head thead tr td{font-size:13px;font-weight:normal;background:-webkit-radial-gradient(#101010,#202020);background:linear-gradient(#101010,#202020);padding:5px 20px 5px 6px;white-space:nowrap;text-align:left;}
+  table.custom_head tbody tr.even{background-color: #0C0C0C;}
+  <?endif;?>
   table.preclear {padding:0px;margin:-21px 0px 22px 0px;border-collapse:collapse;white-space:nowrap;}
   table.preclear thead tr>td{text-align:left;width:8%;padding-left:12px;}
   table.preclear thead tr>td+td{text-align:left;width:auto;padding-left:12px;}
@@ -46,14 +51,7 @@ $numdisks = count(get_unasigned_disks())-1;
   <?echo ($script_version) ? "$('.tabs').append('<span id=\"progress\" class=\"status\">Script: <span class=\"green\">Present, version $script_version</span></span>');" : "$('.tabs').append('<span id=\"progress\" class=\"status\">Script: <span class=\"red\">Not present</span></span>');";
   ?>
   function get_content() {
-    $.post(URL,{action:"get_content",display:display},function(data){
-      $('#preclear-table-body').html(data.disks);
-      window.disksInfo = JSON.parse(data.info);
-      if (typeof(startDisk) !== 'undefined') {
-        start_preclear(startDisk);
-        delete window.startDisk;
-      }
-    },"json").always(function(){setTimeout('get_content()',<?=$display['refresh'] ? $display['refresh'] : "10000";?>);});
+   $.post(URL,{action:"get_content",display:display},function(data){$('#unassigned_devices_list').html(data);}).always(function(){setTimeout('get_content()',<?=$display['refresh'] ? $display['refresh'] : "10000";?>);});
   }
   function openPreclear(device) {
     var width=900;
@@ -63,13 +61,13 @@ $numdisks = count(get_unasigned_disks())-1;
     var options = 'resizeable=yes,scrollbars=yes,height=600,width=900,top='+top+',left='+left;
     window.open('/plugins/<?=$plugin;?>/Preclear.php?action=show_preclear&device='+device, 'Preclear', options);
   }
-  function start_preclear(device){
+  function start_preclear(serial, device){
     var title = 'Start Preclear';
-    $( "#dialog-start" ).html("<dl><dt>Model Family:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(device, 'family')+"</span></dd></dl>");
-    $( "#dialog-start" ).append("<dl><dt>Device Model:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(device, 'model')+"</span></dd></dl>");
-    $( "#dialog-start" ).append("<dl><dt>Serial Number:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(device, 'serial_short')+"</span></dd></dl>");
-    $( "#dialog-start" ).append("<dl><dt>Firmware Version:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(device, 'firmware')+"</span></dd></dl>");
-    $( "#dialog-start" ).append("<dl><dt>Size:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(device, 'size')+"</span></dd></dl><hr style='margin-left:12px;'>");
+    $( "#dialog-start" ).html("<dl><dt>Model Family:</dt><dd style='margin-bottom:0px;'><span style='color:#CC0000;font-weight:bold;'>"+getDiskInfo(device, 'family')+"</span></dd></dl>");
+    $( "#dialog-start" ).append("<dl><dt>Device Model:</dt><dd style='margin-bottom:0px;'><span style='color:#CC0000;font-weight:bold;'>"+getDiskInfo(device, 'model')+"</span></dd></dl>");
+    $( "#dialog-start" ).append("<dl><dt>Serial Number:</dt><dd style='margin-bottom:0px;'><span style='color:#CC0000;font-weight:bold;'>"+getDiskInfo(device, 'serial_short')+"</span></dd></dl>");
+    $( "#dialog-start" ).append("<dl><dt>Firmware Version:</dt><dd style='margin-bottom:0px;'><span style='color:#CC0000;font-weight:bold;'>"+getDiskInfo(device, 'firmware')+"</span></dd></dl>");
+    $( "#dialog-start" ).append("<dl><dt>Size:</dt><dd style='margin-bottom:0px;'><span style='color:#CC0000;font-weight:bold;'>"+getDiskInfo(device, 'size')+"</span></dd></dl><hr style='margin-left:12px;'>");
     $( "#dialog-start" ).append($("#start-defaults").html());
     $( "#dialog-start" ).find(".switch").switchButton({labels_placement:"right",on_label:'YES',off_label:'NO'});
     $( "#dialog-start" ).find(".switch-button-background").css("margin-top", "6px");
@@ -93,7 +91,7 @@ $numdisks = count(get_unasigned_disks())-1;
           opts["-W"] = getVal(this, "-W");
           opts["-f"] = getVal(this, "-f");
           opts["-o"] = getVal(this, "-o");
-          $.post(URL,opts,function(data){if(data){alert(data);} openPreclear(device)}).always(function(data){window.location=window.location.pathname+window.location.hash;});
+          $.post(URL,opts,function(data){if(data){alert(data);} openPreclear(device)}).always(function(data){location.reload();});
           startWaitMe('#unassigned_devices_list');
           $( this ).dialog( "close" );
         },
@@ -102,10 +100,13 @@ $numdisks = count(get_unasigned_disks())-1;
         }
       }
     });
-
+    $(".ui-dialog .ui-dialog-titlebar").addClass('menu');
+    $(".ui-dialog .ui-dialog-title").css('text-align','center').css( 'width', "100%");
+    $(".ui-dialog .ui-dialog-content").css('padding-top','15px').css('vertical-align','bottom');
+    $(".ui-button-text").css('padding','0px 5px');
   }
   function remove_session(device) {
-    $.post(URL,{action:"stop_preclear",device:device}).always(function(){window.location=window.location.pathname+window.location.hash;});
+    $.post(URL,{action:"stop_preclear",device:device}).always(function(){location.reload();});
   }
   function stop_preclear(serial, device){
     var title = 'Stop Preclear';
@@ -120,7 +121,7 @@ $numdisks = count(get_unasigned_disks())-1;
       hide : {effect: 'fade' , duration: 250},
       buttons: {
         "Stop": function() {
-          $.post(URL,{action:"stop_preclear",device:device}).always(function(){window.location=window.location.pathname+window.location.hash;});
+          $.post(URL,{action:"stop_preclear",device:device}).always(function(){location.reload();});
           startWaitMe('#unassigned_devices_list');
           $( this ).dialog( "close" );
         },
@@ -129,13 +130,25 @@ $numdisks = count(get_unasigned_disks())-1;
         }
       }
     });
+    $(".ui-dialog .ui-dialog-titlebar").addClass('menu');
+    $(".ui-dialog .ui-dialog-title").css('text-align','center').css( 'width', "100%");
+    $(".ui-dialog .ui-dialog-content").css('padding-top','15px').css('font-weight','bold');
+    $(".ui-button-text").css('padding','0px 5px');
   }
   function getVal(el, name) {
     el = $(el).find("*[name="+name+"]");
     return value = ( $(el).attr('type') == 'checkbox' ) ? ($(el).is(':checked') ? "on" : "off") : $(el).val();
   }
   function clear_preclear(device) {
-    $.post(URL,{action:"clear_preclear",device:device}).always(function(){window.location=window.location.pathname+window.location.hash;});
+    $.post(URL,{action:"clear_preclear",device:device}).always(function(){location.reload();});
+  }
+  function startWaitMe(el) {
+    <?if ($display['theme'] == 'white'):?>
+    $(el).waitMe({effect:'ios',text:'Please wait...',bg:'rgba(255,255,255,0.9)',color:'#000',sizeW:'',sizeH:'',source:''});
+    <?else:?>
+    $(el).waitMe({effect:'ios',text:'Please wait...',bg:'rgba(0,0,0,0.9)',color:'#FFF',sizeW:'',sizeH:'',source:''});
+    <?endif;?>
+    $('.waitMe_content').css('top','55px');
   }
   function toggleSettings(el) {
     if(el.selectedIndex > 0 && el.selectedIndex != 5){
@@ -185,7 +198,7 @@ $numdisks = count(get_unasigned_disks())-1;
         <select name="-c"><?for ($i=1; $i <= 20; $i++){echo "<option value='$i'>$i</option>";}?></select>
       </dd>
     </div>
-    <?if ($notifications):?>
+    <?if (preg_match("#\d+c$#", $script_version)):?>
     <div class='test_options'>
       <dt>Notifications:</dt>
       <dd>
@@ -216,24 +229,18 @@ $numdisks = count(get_unasigned_disks())-1;
     <div class='clear_options'>
       <dt>Read size: </dt>
       <dd>
-        <select name="-r" >
-          <option value="0">Default</option>
-          <?foreach (range(0,8) as $i){$x=pow(2,$i);echo "<option value='65536 -b ".($x*16)."'>{$x}M</option>";}?>
-        </select>
+        <select name="-r" ><option value="0">Default</option><?for ($i=1; $i <= 10; $i++){echo "<option value='{$i}M'>{$i}M</option>";}?></select>
       </dd>
       <dt>Write size: </dt>
       <dd>
-        <select name="-w" >
-          <option value="0">Default</option>
-          <?foreach (range(0,8) as $i){$x=pow(2,$i);echo "<option value='65536 -b ".($x*16)."'>{$x}M</option>";}?>
-        </select>
+        <select name="-w" ><option value="0">Default</option><?for ($i=1; $i <= 10; $i++){echo "<option value='{$i}M'>{$i}M</option>";}?></select>
       </dd>
       <dt>Skip Pre-read: </dt>
       <dd>
         <input type="checkbox" name="-W" class="switch" >
       </dd>
     </div>
-    <?if ($fast_postread):?>
+    <?if (preg_match("#\d+[bc]$#", $script_version)):?>
     <div class='test_options'>
       <dt>Fast post-read verify: </dt>
       <dd>
@@ -243,28 +250,14 @@ $numdisks = count(get_unasigned_disks())-1;
     <?endif;?>
   </dl>
 </div>
-
-<table class='preclear custom_head'>
-  <thead>
-    <tr>
-      <td>Device</td>
-      <td>Identification</td>
-      <td>Temp</td>
-      <td>Size</td>
-      <td>Preclear Status</td>
-    </tr>
-  </thead>
-  <tbody id="preclear-table-body">
-    <tr><td colspan='12' style='text-align:center;font-weight:bold;'>
-      <center><i class='fa fa-spinner fa-spin'></i>&nbsp;<em>Please wait... retrieving information!</em></center>
-    </td></tr>
-    <?for ($i=0; $i < $numdisks; $i++) {$odd = ($odd == "even") ? "odd" : "even"; echo "<tr class='$odd'><td colspan='12'>&nbsp;</td></tr>";}?>
-  </tbody>
-</table>
+<div id="unassigned_devices_list">
+  <table class='preclear custom_head'>
+    <thead><tr><td>Device</td><td>Identification</td><td>Temp</td><td>Size</td><td>Preclear Status</td></tr></thead>
+    <tbody>
+    <tr><td colspan='12' style='text-align:center;font-weight:bold;'></td></tr>
+    </tbody>
+  </table>
+</div>
 <script type="text/javascript">
-  get_content();
-  <?if (isset($_GET['disk']) && ! tmux_is_session("preclear_disk_{$_GET[disk]}") && is_file($script_file)) {
-    echo "startDisk = '{$_GET[disk]}'";
-  }
-  ?>
+  startWaitMe('#unassigned_devices_list');get_content();
 </script>

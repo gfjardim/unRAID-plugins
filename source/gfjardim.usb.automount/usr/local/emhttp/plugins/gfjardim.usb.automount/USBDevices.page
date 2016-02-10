@@ -1,0 +1,137 @@
+Menu="Main:4"
+Title="USB Devices"
+Markdown="false"
+---
+<?PHP
+$plugin = "gfjardim.usb.automount";
+require_once("/usr/local/emhttp/plugins/${plugin}/include/usb_mount_lib.php");
+// echo "<pre>".print_r($display, true)."</pre>";
+?>
+<link type='text/css' rel='stylesheet' href='/webGui/styles/jquery.switchButton.css'>
+<link type="text/css" rel="stylesheet" href="/webGui/styles/jquery-ui.min.css">
+<link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/waitMe.min.css">
+<link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/automount.css">
+<style>
+  <?if ($display['theme'] == 'white'):?>
+  table.usb_disks thead tr td{font-size:13px;font-weight:normal;background:-webkit-radial-gradient(#E0E0E0,#C0C0C0);background:linear-gradient(#E0E0E0,#C0C0C0);padding:5px 20px 5px 6px;white-space:nowrap;text-align:left;}
+  table.usb_disks tbody tr.even{background-color:#F8F8F8;}
+  <?else:?>
+  table.usb_disks thead tr td{font-size:13px;font-weight:normal;background:-webkit-radial-gradient(#101010,#202020);background:linear-gradient(#101010,#202020);padding:5px 20px 5px 6px;white-space:nowrap;text-align:left;}
+  table.usb_disks tbody tr.even{background-color: #0C0C0C;}
+  <?endif;?>
+  table.usb_disks {padding:0px;margin:-21px 0px 22px 0px;border-collapse:collapse;white-space:nowrap;}
+  table.usb_disks tr>td{text-align:left;width:8%;padding-left:12px;padding-right:0;white-space:nowrap;}
+  table.usb_disks tr>td+td{text-align:left;width:;}
+  table.usb_disks tr>td+td+td+td{text-align:center;padding-left:0;padding-right:12px;width:auto;}
+  table.usb_disks tr>td+td+td+td+td+td{text-align:right;padding-left:0;padding-right:12px;width:auto;}
+  table.usb_disks tr>td+td+td+td+td+td+td+td+td+td{text-align:left;padding:0px 0px 0px 12px;width: 75px;}
+  table.usb_disks tr>td+td+td+td+td+td+td+td+td+td+td{text-align:right;padding-left:0;padding-right:12px;}
+
+  table.usb_absent tr>td{text-align:left;width:8%;padding-left:12px;padding-right:0;white-space:nowrap;}
+  table.usb_absent tr>td+td{text-align:left;width:auto;}
+  table.usb_absent tr>td+td+td+td+td{text-align:right;padding-left:0;padding-right:12px;width: 5em;}
+
+  button[type=button] {margin:0px 14px 0 14px;}
+  i.glyphicon{margin:0px 5px 0 5px;}
+  i.hdd{margin-left: 0px;}
+  i.partition{margin-left: 20px;}
+  .exec{cursor: pointer;}
+</style>
+<script type="text/javascript" src="/webGui/scripts/jquery.switchButton.js"></script>
+<script type="text/javascript" src="/plugins/<?=$plugin;?>/assets/waitMe.min.js"></script>
+<script type="text/javascript">
+  var URL = '/plugins/<?=$plugin;?>/USBDevicesList.php';
+  var display = <?=json_encode($display);?>;
+  var tab_usbdisks = $('input[name$="tabs"]').length;
+  $('#tab'+tab_usbdisks).bind({click:function() {pin_tab(tab_usbdisks); usb_disks(tab_usbdisks);detect_usb_disk_change(tab_usbdisks); }});
+  $(function(){usb_disks(tab_usbdisks);detect_usb_disk_change(tab_usbdisks);});
+  function startWaitMe(el) {
+    <?if ($display['theme'] == 'white'):?>
+    $(el).waitMe({effect:'ios',text:' ',bg:'rgba(255,255,255,0.9)',color:'#000',sizeW:'',sizeH:'',source:''});
+    <?else:?>
+    $(el).waitMe({effect:'ios',text:' ',bg:'rgba(0,0,0,0.9)',color:'#FFF',sizeW:'',sizeH:'',source:''});
+    <?endif;?>
+    $('.waitMe_content').css('top','100px');
+  }
+  function usb_mount(cmd){
+    el = $('#usb_devices_list');
+    startWaitMe(el);
+    $.post('/update.php',{'#command':cmd});
+    timers.usbdisks = setTimeout('$('+el+').waitMe("hide")',10000);
+  }
+  function pin_tab(n) {
+    $.removeCookie('one',{path:'/'});
+    $.cookie('tab','tab'+n,{path:'/'});
+  }
+  function usb_disks(tabnum) {
+    if ($('#tab'+tabnum).is(':checked')) {
+      startWaitMe('#usb_devices_list');
+      $.post(URL,{action:"get_content",display:display},function(data) {if (data) $('#usb_devices_list').html(data);});
+    }
+  }
+  function detect_usb_disk_change(tabnum) {
+    if ($('#tab'+tabnum).is(':checked')) {
+      clearTimeout(timers.usbdisks);
+      $.post(URL,{action:"detect"},function(data){if(data.reload){usb_disks(tabnum);$.post(URL,{action:"remove_hook"});}},"json").always(function(){timers.usbdisks=setTimeout('detect_usb_disk_change('+tabnum+')',5000);});
+    } else {
+      clearTimeout(timers.usbdisks);
+    }
+    return false;
+  }
+  function remove_disk_config(serial){
+    var title = 'Removing config';
+    $( "#dialog-confirm" ).html(serial);
+    $( "#dialog-confirm" ).append( "<br><br><span style='color: #E80000;'>Are you sure?</span>" );
+    $( "#dialog-confirm" ).dialog({
+      title: title,
+      resizable: false,
+      width: 500,
+      modal: true,
+      show : {effect: 'fade' , duration: 250},
+      hide : {effect: 'fade' , duration: 250},
+      buttons: {
+        "Yes": function() {
+          $( this ).dialog( "close" );
+          $.post("/plugins/<?=$plugin;?>/update_cfg.php",{action:"remove_config",serial:serial},"json");
+          usb_disks(tab_usbdisks);
+        },
+        Cancel: function() {
+          $( this ).dialog( "close" );
+          $( this ).html("");
+        }
+      }
+    });
+    $(".ui-dialog .ui-dialog-titlebar").addClass('menu');
+    $(".ui-dialog .ui-dialog-title").css('text-align','center').css( 'width', "100%");
+    $(".ui-dialog .ui-dialog-content").css('padding-top','15px').css('font-weight','bold');
+    $(".ui-button-text").css('padding','0px 5px');
+  }
+</script>
+<form id="formUsbMount" method="POST" action="/update.php" target="progressFrame">
+  <input type="hidden" id="cmdUsbMount" name="#command" value="" />
+</form>
+<div id="dialog-confirm" style="display:none;" title="Dialog Title"></div>
+<div id="usb_devices_list">
+  <table class='usb_disks' id='usb_table'>
+    <thead><tr><td>Device</td><td>Identification</td><td>Mount point</td><td>FS</td><td>Size</td><td>Used</td><td>Free</td><td>Open files</td><td>Control</td><td>Auto mount</td><td>Script</td></tr></thead>
+    <tbody><tr><td colspan='12' style='text-align:center;font-weight:bold;'></td></tr></tbody>
+  </table>
+</div>
+<script type="text/javascript">
+
+function showInput(){
+    $(this).off('click');
+    $(this).siblings('input').each(function(){$(this).show();});
+    $(this).siblings('input').focus();
+    $(this).hide();
+}
+
+function hideInput(){
+    $(this).hide();
+    $(this).siblings('span').show();
+    $(this).siblings('span').click(showInput);
+}
+
+</script>
+
+
