@@ -81,7 +81,9 @@ $numdisks = count(get_unasigned_disks())-1;
       show : {effect: 'fade' , duration: 250},
       hide : {effect: 'fade' , duration: 250},
       buttons: {
-        "Start": function() {
+        "Start": function(e) {
+          $('button:eq(0)',$('#dialog_id').dialog.buttons).button('disable');
+          $(e.target).attr('disabled', true);
           var opts = new Object();
           opts["action"] = "start_preclear";
           opts["device"] = device;
@@ -91,7 +93,6 @@ $numdisks = count(get_unasigned_disks())-1;
           opts["--skip-preread"]  = getVal(this, "--skip-preread");
           opts["--skip-postread"] = getVal(this, "--skip-postread");
           $.post(URL,opts,function(data){if(data){alert(data);} openPreclear(device)}).always(function(data){window.location=window.location.pathname+window.location.hash;});
-          startWaitMe('#unassigned_devices_list');
           $( this ).dialog( "close" );
         },
         Cancel: function() {

@@ -313,6 +313,7 @@ switch ($_POST['action']) {
     tmux_kill_window("preclear_disk_{$device}");
     tmux_new_session("preclear_disk_{$device}");
     tmux_send_command("preclear_disk_{$device}", $cmd);
+    sleep(2);
     if ($wait_confirm && ! $noprompt) {
       foreach(range(0, 30) as $x) {
         if ( strpos(tmux_get_session("preclear_disk_{$device}"), "Answer Yes to continue") ) {

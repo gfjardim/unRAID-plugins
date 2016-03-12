@@ -329,7 +329,7 @@ write_zeroes(){
 
     status="Time elapsed: $(timer $time_start) | Write speed: $current_speed | Average speed: $(($bytes_wrote / ($time_current - $time_start) / 1048576 ))MB/s"
     if [ "$cycles" -gt 1 ]; then
-      cycle_disp="(${$cycle of $cycles})"
+      cycle_disp="($cycle of $cycles)"
     fi
 
     echo "$disk_name|NN|Zeroing${cycle_disp}: ${percent_wrote}% @ $current_speed MB/s ($(timer $time_start))|$$" >$stat_file
@@ -531,7 +531,7 @@ read_entire_disk() {
 
     status="Time elapsed: $(timer $time_start) | Current speed: $read_speed | Average speed: $(($bytes_read / ($time_current - $time_start) / 1048576 ))MB/s"
     if [ "$cycles" -gt 1 ]; then
-      cycle_disp="(${$cycle of $cycles})"
+      cycle_disp="($cycle of $cycles)"
     fi
     echo "$disk_name|NN|${read_type_s}${cycle_disp}: ${percent_read}% @ $read_speed MB/s ($(timer $time_start))|$$" > $stat_file
 
@@ -898,7 +898,7 @@ if [ "$verify_disk_mbr" == "y" ]; then
       sleep 10
     else
       append display_step "Verifying if disk is zeroed:#${bold}FAIL${norm}"
-      echo "${disk_properties[name]}|NY|Verifying if disk is zeroed successfull|$$" > ${all_files[stat]}
+      echo "${disk_properties[name]}|NY|Verifying if disk is zeroed successful|$$" > ${all_files[stat]}
       exit 1
       display_status
     fi
@@ -926,8 +926,9 @@ for cycle in $(seq $cycles); do
 
   # Reset canvas title
   unset display_title
+  unset display_step
   append display_title "${ul}unRAID Server Pre-Clear of disk${noul} ${bold}$theDisk${norm}"
-  append display_title "cycle ${bold}${cycle}$norm of ${cycles}, partition start on sector 64"
+  append display_title "Cycle ${bold}${cycle}$norm of ${cycles}, partition start on sector 64."
   
   # Adjust the number of steps
   max_steps=5
@@ -975,7 +976,7 @@ for cycle in $(seq $cycles); do
   if verify_mbr $theDisk; then
     append display_step "Verifying unRAID's Preclear signature: # ${bold}SUCCESS${norm}"
     display_status
-    echo "${disk_properties[name]}|NN|unRAID's signature on the MBR successfull|$$" > ${all_files[stat]}
+    echo "${disk_properties[name]}|NN|unRAID's signature on the MBR successful|$$" > ${all_files[stat]}
   else
     append display_step "Verifying unRAID's Preclear signature: # ${bold}FAIL${norm}"
     display_status
@@ -990,7 +991,7 @@ for cycle in $(seq $cycles); do
     if read_entire_disk verify 'postread' ; then
       append display_step "Post-Read verification:#${bold}SUCCESS${norm}"
       display_status
-      echo "${disk_properties[name]}|NY|Post-Read verification successfull|$$" > ${all_files[stat]}
+      echo "${disk_properties[name]}|NY|Post-Read verification successful|$$" > ${all_files[stat]}
 
     else
       append display_step "Post-Read verification ${bold}FAIL${norm}"
