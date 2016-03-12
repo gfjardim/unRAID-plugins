@@ -2,6 +2,9 @@
 LC_CTYPE=C
 export LC_CTYPE
 
+# Version
+version="0.2-beta"
+
 # Lets make sure some features are supported by BASH
 BV=$(echo $BASH_VERSION|tr '.' "\n"|grep -Po "^\d+"|xargs printf "%.2d\n"|tr -d '\040\011\012\015')
 if [ "$BV" -lt "040253" ]; then
@@ -45,8 +48,7 @@ list_unraid_disks(){
   then
     while read line ; do
       disk=$(find /dev/disk/by-id/ -type l -iname "*${line}*" ! -iname "*-part*")
-      if [ -n "$disk" ]
-      then
+      if [ -n "$disk" ]; then
         let "i+=1"
         unraid_disks[$i]=$(readlink -f $disk)
       fi
@@ -732,7 +734,6 @@ refresh_period=10
 canvas_width=90
 canvas_height=20
 canvas_brick=#
-version="Beta 0.1"
 
 OPTS=$(getopt -o f:n:sSr:w:b:tdlc:ujv \
       --long frequency:,notify:,skip-preread,skip-postread,read-size:,write-size:,read-blocks:,test,no-stress,list,cycles:,signature,verify,no-prompt -n "$(basename $0)" -- "$@")
