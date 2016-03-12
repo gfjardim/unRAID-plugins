@@ -27,17 +27,17 @@ list_unraid_disks(){
   local _result=$1
   i=0
   # Get flash disk device
-  unraid_disks[$i]=$(readlink -f /dev/disk/by-label/UNRAID|grep -Po "[^\d]*$")
+  unraid_disks[$i]=$(readlink -f /dev/disk/by-label/UNRAID|grep -Po "[^\d]*")
 
   # Grab cache disks using disks.cfg file
   if [ -f "/boot/config/disk.cfg" ]
   then
     while read line ; do
-      if [[ $line =~ cacheId[^\"]*\"([^\"]*) ]]; then
-        let "i+=1"
-        unraid_disks[$i]=$(find /dev/disk/by-id/ -type l -iname "*${BASH_REMATCH[1]}*" ! -iname "*-part*"| xargs readlink -f)
+      if [ -n "$line" ]; then
+        let "i+=1" 
+        unraid_disks[$i]=$(find /dev/disk/by-id/ -type l -iname "*$line*" ! -iname "*-part*"| xargs readlink -f)
       fi
-    done < <(cat /boot/config/disk.cfg)
+    done < <(cat /boot/config/disk.cfg|grep 'cacheId'|grep -Po '=\"\K[^\"]*')
   fi
 
   # Get array disks using super.dat id's
@@ -50,7 +50,7 @@ list_unraid_disks(){
         let "i+=1"
         unraid_disks[$i]=$(readlink -f $disk)
       fi
-    done < <(strings /boot/config/super.dat)
+    done < <(strings /boot/config/super.dat|grep -x '.\{5,1000\}')
   fi
   eval "$_result=(${unraid_disks[@]})"
 }
