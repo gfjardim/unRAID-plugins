@@ -3,19 +3,21 @@ DIR="$(dirname "$(readlink -f ${BASH_SOURCE[0]})")"
 tmpdir=/tmp/tmp.$(( $RANDOM * 19318203981230 + 40 ))
 plugin=$(basename ${DIR})
 archive="$(dirname $(dirname ${DIR}))/archive"
+plg_file="$(dirname $(dirname ${DIR}))/plugins/${plugin}.plg"
 version=$(date +"%Y.%m.%d")
-package="${archive}/${plugin}-${version}.txz"
-md5="${archive}/${plugin}-${version}.md5"
+package="${archive}/${plugin}-%s.txz"
+md5="${archive}/${plugin}-%s.md5"
 
-if [[ -f $package ]]; then
-  for x in a b c d e d f g h ; do
-    package="${archive}/${plugin}-${version}${x}.txz"
-    md5="${archive}/${plugin}-${version}${x}.md5"
-    if [[ ! -f $package ]]; then
-      break
-    fi
-  done
-fi
+for x in "" a b c d e d f g h ; do
+  package=$(printf "$package" "${version}${x}")
+  md5=$(printf "$md5" "${version}${x}")
+  if [[ ! -f $package ]]; then
+    version="${version}${x}"
+    break
+  fi
+done
+
+sed -i -e "s#\(ENTITY\s*version[^\"]*\).*#\1\"${version}\">#" "$plg_file"
 
 mkdir -p $tmpdir
 cd "$DIR"
