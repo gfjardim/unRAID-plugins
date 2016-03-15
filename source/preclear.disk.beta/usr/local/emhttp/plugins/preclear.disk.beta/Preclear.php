@@ -133,14 +133,13 @@ function get_unasigned_disks() {
   $disks_id       = preg_grep("#wwn-|-part#", $paths, PREG_GREP_INVERT);
   $disks_real     = array_map(function($p){return realpath($p);}, $disks_id);
   exec("/usr/bin/strings /boot/config/super.dat 2>/dev/null|grep -Po '.{10,}'", $disks_serial);
+  exec("udevadm info --query=property --name /dev/disk/by-label/UNRAID 2>/dev/null|grep -Po 'ID_SERIAL=\K.*'", $flash_serial);
   $disks_cfg      = is_file("/boot/config/disk.cfg") ? parse_ini_file("/boot/config/disk.cfg") : array();
   $cache_serial   = array_flip(preg_grep("#cacheId#i", array_flip($disks_cfg)));
-  $flash          = realpath("/dev/disk/by-label/UNRAID");
-  $flash_serial   = array_filter($paths, function($p) use ($flash) {if(!is_bool(strpos($flash,realpath($p)))) return basename($p);});
   $unraid_serials = array_merge($disks_serial,$cache_serial,$flash_serial);
   $unraid_disks   = array();
   foreach($unraid_serials as $serial) {
-    $unraid_disks = array_merge($unraid_disks, preg_grep("#".preg_quote($serial, "#")."#", $disks_id));
+    $unraid_disks = array_merge($unraid_disks, preg_grep("#-".preg_quote($serial, "#")."#", $disks_id));
   }
   $unraid_real = array_map(function($p){return realpath($p);}, $unraid_disks);
   $unassigned  = array_flip(array_diff(array_combine($disks_id, $disks_real), $unraid_real));

@@ -3,7 +3,7 @@ LC_CTYPE=C
 export LC_CTYPE
 
 # Version
-version="0.2-beta"
+version="0.3-beta"
 
 # Lets make sure some features are supported by BASH
 BV=$(echo $BASH_VERSION|tr '.' "\n"|grep -Po "^\d+"|xargs printf "%.2d\n"|tr -d '\040\011\012\015')
@@ -26,6 +26,13 @@ done
 ##                                                  ##
 ######################################################
 
+trim() {
+  local var="$*"
+  var="${var#"${var%%[![:space:]]*}"}"   # remove leading whitespace characters
+  var="${var%"${var##*[![:space:]]}"}"   # remove trailing whitespace characters
+  echo -n "$var"
+}
+
 list_unraid_disks(){
   local _result=$1
   i=0
@@ -38,7 +45,7 @@ list_unraid_disks(){
     while read line ; do
       if [ -n "$line" ]; then
         let "i+=1" 
-        unraid_disks[$i]=$(find /dev/disk/by-id/ -type l -iname "*$line*" ! -iname "*-part*"| xargs readlink -f)
+        unraid_disks[$i]=$(find /dev/disk/by-id/ -type l -iname "*-$line*" ! -iname "*-part*"| xargs readlink -f)
       fi
     done < <(cat /boot/config/disk.cfg|grep 'cacheId'|grep -Po '=\"\K[^\"]*')
   fi
@@ -47,7 +54,7 @@ list_unraid_disks(){
   if [ -f "/boot/config/super.dat" ]
   then
     while read line ; do
-      disk=$(find /dev/disk/by-id/ -type l -iname "*${line}*" ! -iname "*-part*")
+      disk=$(find /dev/disk/by-id/ -type l -iname "*-${line}*" ! -iname "*-part*")
       if [ -n "$disk" ]; then
         let "i+=1"
         unraid_disks[$i]=$(readlink -f $disk)
@@ -176,7 +183,7 @@ verify_mbr() {
   # called verify_mbr "/dev/disX"
   local cleared
   local disk=$1
-  local disk_blocks
+  local disk_blocks=${disk_properties[blocks_512]}
   local i
   local max_mbr_blocks
   local mbr_blocks
@@ -185,17 +192,16 @@ verify_mbr() {
   local patterns
   declare sectors
   local start_sector 
-
-  patterns=("00000" "00000" "00000" "00170" "00085")
-  disk_blocks=$(blockdev --getsz $disk 2>/dev/null | awk '{ print $1 }')
-  partition_size=$disk_blocks
-  max_mbr_blocks=$(printf "%d" 0xFFFFFFFF)
+  local patterns=("00000" "00000" "00000" "00170" "00085")
+  local max_mbr_blocks=$(printf "%d" 0xFFFFFFFF)
 
   if [ $disk_blocks -ge $max_mbr_blocks ]; then
     over_mbr_size="y"
     patterns+=("00000" "00000" "00002" "00000" "00000" "00255" "00255" "00255")
+    partition_size=$(printf "%d" 0xFFFFFFFF)
   else
     patterns+=("00000" "00000" "00000" "00000" "00000" "00000" "00000" "00000")
+    partition_size=$disk_blocks
   fi
 
   array=$(read_mbr sectors "$disk")
@@ -246,16 +252,16 @@ verify_mbr() {
 
 write_signature() {
   local disk=${disk_properties[device]}
-  local disk_blocks=${disk_properties[blocks]} 
+  local disk_blocks=${disk_properties[blocks_512]} 
   local max_mbr_blocks partition_size size1=0 size2=0 sig start_sector=$1 var
   let partition_size=($disk_blocks - $start_sector)
   max_mbr_blocks=$(printf "%d" 0xFFFFFFFF)
   
   if [ $disk_blocks -ge $max_mbr_blocks ]; then
-    size1=`printf "%d" "0x00020000"`
-    size2=`printf "%d" "0xFFFFFF00"`
+    size1=$(printf "%d" "0x00020000")
+    size2=$(printf "%d" "0xFFFFFF00")
     start_sector=1
-    partition_size=`printf "%d" 0xFFFFFFFF`
+    partition_size=$(printf "%d" 0xFFFFFFFF)
   fi
 
   dd if=/dev/zero bs=512 seek=1 of=$disk  count=4096 2>/dev/null
@@ -292,6 +298,7 @@ write_zeroes(){
   local total_bytes
   local write_bs=""
   local time_start
+  local output=$1
 
   time_start=$(timer)
 
@@ -316,7 +323,7 @@ write_zeroes(){
   # if we are interrupted, kill the background zero of the disk.
   trap 'kill -9 $dd_pid 2>/dev/null;exit' 2
   while kill -0 $dd_pid >/dev/null 2>&1; do
-    sleep 3 && kill -USR1 $dd_pid && sleep 2
+    sleep 3 && kill -USR1 $dd_pid 2>/dev/null && sleep 2
     # ensure bytes_wrote is a number
     bytes_dd=$(awk 'END{print $1}' $dd_output|xargs)
     if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
@@ -326,25 +333,28 @@ write_zeroes(){
     if [ ! -z "${bytes_wrote##*[!0-9]*}" ]; then
       let percent_wrote=($bytes_wrote*100/$total_bytes)
     fi
-    current_speed=$(awk 'END{print $8$9}' $dd_output)
     time_current=$(timer)
 
-    status="Time elapsed: $(timer $time_start) | Write speed: $current_speed | Average speed: $(($bytes_wrote / ($time_current - $time_start) / 1048576 ))MB/s"
+    current_speed=$(awk -F',' 'END{print $NF}' $dd_output|xargs)
+    average_speed=$(($bytes_wrote / ($time_current - $time_start) / 1000000 ))
+
+    status="Time elapsed: $(timer $time_start) | Write speed: $current_speed | Average speed: $average_speed MB/s"
     if [ "$cycles" -gt 1 ]; then
       cycle_disp="($cycle of $cycles)"
     fi
 
-    echo "$disk_name|NN|Zeroing${cycle_disp}: ${percent_wrote}% @ $current_speed MB/s ($(timer $time_start))|$$" >$stat_file
+    echo "$disk_name|NN|Zeroing${cycle_disp}: ${percent_wrote}% @ $current_speed ($(timer $time_start))|$$" >$stat_file
     
     if [ -z "${time_display}" ]; then
       time_display=$(timer)
     else
       if [ "$(( $time_current - $time_display ))" -gt "$refresh_period" ]; then
         time_display=$(timer)
-        display_status "Zeroing in progress: # ${ul}(${percent_wrote}% Done)${noul}" "** $status"
+        display_status "Zeroing in progress:|###(${percent_wrote}% Done)###" "** $status"
       fi
     fi
   done
+  eval "$output='[$(timer $time_start) @ $average_speed MB/s']"
 }
 
 format_number() {
@@ -404,6 +414,7 @@ read_entire_disk() {
   local read_type=$2
   local stat_file=${all_files[stat]}
   local verify_errors=${all_files[verify_errors]}
+  local output=$3
 
   # Type of read: Pre-Read or Post-Read
   if [ "$read_type" == "preread" ]; then
@@ -528,21 +539,22 @@ read_entire_disk() {
     # calculate the current status
     let bytes_read=($skip * $chunk)
     let percent_read=( $bytes_read*100/$total_bytes)
-    read_speed=$(awk 'END{print $8$9}' $dd_output)
     time_current=$(timer)
+    read_speed=$(awk -F',' 'END{print $NF}' $dd_output|xargs)
+    average_speed=$(($bytes_read / ($time_current - $time_start) / 1000000 ))
 
-    status="Time elapsed: $(timer $time_start) | Current speed: $read_speed | Average speed: $(($bytes_read / ($time_current - $time_start) / 1048576 ))MB/s"
+    status="Time elapsed: $(timer $time_start) | Current speed: $read_speed | Average speed: $average_speed MB/s"
     if [ "$cycles" -gt 1 ]; then
       cycle_disp="($cycle of $cycles)"
     fi
-    echo "$disk_name|NN|${read_type_s}${cycle_disp}: ${percent_read}% @ $read_speed MB/s ($(timer $time_start))|$$" > $stat_file
+    echo "$disk_name|NN|${read_type_s}${cycle_disp}: ${percent_read}% @ $read_speed ($(timer $time_start))|$$" > $stat_file
 
     if [ -z "${time_display}" ]; then
       time_display=$(( $(timer) - $refresh_period ))
     else
       if [ "$(( $time_current - $time_display ))" -gt "$refresh_period" ]; then
         time_display=$(timer)
-        display_status "$read_type # ${ul}(${percent_read}% Done)${noul}" "** $status"
+        display_status "$read_type|###(${percent_read}% Done)###" "** $status"
       fi
     fi
 
@@ -552,6 +564,7 @@ read_entire_disk() {
       let bcount=($total_chunks - $skip)
     fi
   done
+  eval "$output='[$(timer $time_start) @ $average_speed MB/s']"
 }
 
 draw_canvas(){
@@ -610,17 +623,19 @@ display_status(){
     if [ -n "${prev[$i]}" ]; then
       line=${prev[$i]}
       stat=""
-      if [ "$(echo "$line"|grep -c '#')" -gt "0" ]; then
-        stat=$(echo "$line"|cut -d'#' -f2)
-        line=$(echo "$line"|cut -d'#' -f1)
+      if [ "$(echo "$line"|grep -c '|')" -gt "0" ]; then
+        stat=$(trim $(echo "$line"|cut -d'|' -f2))
+        line=$(trim $(echo "$line"|cut -d'|' -f1))
       fi
       if [ -n "$max" ]; then
         line="Step $step of $max - $line"
       fi
-      tput cup $l $inipos && echo $line
+      tput cup $l $inipos; echo $line
       if [ -n "$stat" ]; then
-        stat_num=$(echo "$stat"|tr -d "${bold}"|tr -d "${norm}"|tr -d "${ul}"|tr -d "${noul}"|wc -m)
-        tput cup $l $(($width - $stat_num - 1 )) && echo "$stat"
+      clean_stat=$(echo "$stat"|sed -e "s|\*\{3\}\([^\*]*\)\*\{3\}|\1|g"|sed -e "s|\#\{3\}\([^\#]*\)\#\{3\}|\1|g")
+      stat_num=${#clean_stat}
+      stat=$(echo "$stat"|sed -e "s|\*\{3\}\([^\*]*\)\*\{3\}|${bold}\1${norm}|g"|sed -e "s|\#\{3\}\([^\#]*\)\#\{3\}|${ul}\1${noul}|g")
+        tput cup $l $(($width - $stat_num - 1 ));  echo "$stat"
       fi
       let "l+=1"
       let "step+=1"
@@ -629,17 +644,19 @@ display_status(){
   if [ -n "$current" ]; then
     line=$current;
     stat=""
-    if [ "$(echo "$line"|grep -c '#')" -gt "0" ]; then
-      stat=$(echo "$line"|cut -d'#' -f2)
-      line=$(echo "$line"|cut -d'#' -f1)
+    if [ "$(echo "$line"|grep -c '|')" -gt "0" ]; then
+      stat=$(echo "$line"|cut -d'|' -f2)
+      line=$(echo "$line"|cut -d'|' -f1)
     fi
     if [ -n "$max" ]; then
       line="Step $step of $max - $line"
     fi
     tput cup $l $inipos && echo $line
     if [ -n "$stat" ]; then
-      stat_num=$(echo "$stat"|tr -d "${bold}"|tr -d "${norm}"|tr -d "${ul}"|tr -d "${noul}"|wc -m)
-      tput cup $l $(($width - $stat_num - 1 )) && echo "$stat"
+      clean_stat=$(echo "$stat"|sed -e "s|\*\{3\}\([^\*]*\)\*\{3\}|\1|g"|sed -e "s|\#\{3\}\([^\#]*\)\#\{3\}|\1|g")
+      stat_num=${#clean_stat}
+      stat=$(echo "$stat"|sed -e "s|\*\{3\}\([^\*]*\)\*\{3\}|${bold}\1${norm}|g"|sed -e "s|\#\{3\}\([^\#]*\)\#\{3\}|${ul}\1${noul}|g")
+      tput cup $l $(($width - $stat_num - 1 )); echo "$stat"
     fi
     let "l+=1"
   fi
@@ -731,12 +748,12 @@ cycles=1
 append display_step ""
 verify_mbr_only=n
 refresh_period=10
-canvas_width=90
+canvas_width=92
 canvas_height=20
 canvas_brick=#
 
-OPTS=$(getopt -o f:n:sSr:w:b:tdlc:ujv \
-      --long frequency:,notify:,skip-preread,skip-postread,read-size:,write-size:,read-blocks:,test,no-stress,list,cycles:,signature,verify,no-prompt -n "$(basename $0)" -- "$@")
+OPTS=$(getopt -o f:n:sSr:w:b:tdlc:ujvo \
+      --long frequency:,notify:,skip-preread,skip-postread,read-size:,write-size:,read-blocks:,test,no-stress,list,cycles:,signature,verify,no-prompt,version,preclear-only -n "$(basename $0)" -- "$@")
 
 if [ "$?" -ne "0" ]; then
   exit 1
@@ -761,6 +778,7 @@ while true ; do
     -p|--verify)        verify_disk_mbr=y; verify_zeroed=y;  shift 1;;
     -j|--no-prompt)     no_prompt=y;                         shift 1;;
     -v|--version)       echo "$0 version: $version"; exit 0; shift 1;;
+    -o|--preclear-only) write_disk_mbr=y;                    shift 1;;
 
     --) shift ; break ;;
     * ) echo "Internal error!" ; exit 1 ;;
@@ -781,12 +799,13 @@ theDisk=$(echo $1|xargs)
 ######################################################
 
 # Disk properties
-append disk_properties 'device'   "$theDisk"
-append disk_properties 'size'     $(blockdev --getsize64 ${disk_properties[device]} 2>/dev/null)
-append disk_properties 'block_sz' $(blockdev --getpbsz ${disk_properties[device]} 2>/dev/null)
-append disk_properties 'blocks'   $(( ${disk_properties[size]} / ${disk_properties[block_sz]} ))
-append disk_properties 'name'     $(basename ${disk_properties[device]} 2>/dev/null)
-append disk_properties 'parts'    $(grep -c "${disk_properties[name]}[0-9]" /proc/partitions 2>/dev/null)
+append disk_properties 'device'     "$theDisk"
+append disk_properties 'size'       $(blockdev --getsize64 ${disk_properties[device]} 2>/dev/null)
+append disk_properties 'block_sz'   $(blockdev --getpbsz ${disk_properties[device]} 2>/dev/null)
+append disk_properties 'blocks'     $(( ${disk_properties[size]} / ${disk_properties[block_sz]} ))
+append disk_properties 'blocks_512' $(blockdev --getsz ${disk_properties[device]} 2>/dev/null)
+append disk_properties 'name'       $(basename ${disk_properties[device]} 2>/dev/null)
+append disk_properties 'parts'      $(grep -c "${disk_properties[name]}[0-9]" /proc/partitions 2>/dev/null)
 
 if [ "${disk_properties[parts]}" -gt 0 ]; then
   for part in $(seq 1 "${disk_properties[parts]}" ); do
@@ -880,11 +899,11 @@ if [ "$verify_disk_mbr" == "y" ]; then
   echo "${disk_properties[name]}|NN|Verifying unRAID's signature on the MBR...|$$" > ${all_files[stat]}
   sleep 10
   if verify_mbr $theDisk; then
-    append display_step "Verifying unRAID's Preclear MBR: # ${bold}SUCCESS${norm}"
+    append display_step "Verifying unRAID's Preclear MBR:|***SUCCESS***"
     echo "${disk_properties[name]}|NN|Verifying unRAID's signature on the MBR successful|$$" > ${all_files[stat]}
     display_status
   else
-    append display_step "Verifying unRAID's signature: # ${bold}FAIL${norm}"
+    append display_step "Verifying unRAID's signature:| ***FAIL***"
     echo "${disk_properties[name]}|NY|Verifying unRAID's signature on the MBR failed|$$" > ${all_files[stat]}
     display_status
     echo Failed
@@ -892,14 +911,14 @@ if [ "$verify_disk_mbr" == "y" ]; then
   fi
   if [ "$max_steps" -eq "2" ]; then
     display_status "Verifying if disk is zeroed ..." ""
-    if read_entire_disk verify 'zeroed' ; then
-      append display_step "Verifying if disk is zeroed:#${bold}SUCCESS${norm}"
+    if read_entire_disk verify zeroed average; then
+      append display_step "Verifying if disk is zeroed:|${average} ***SUCCESS***"
       echo "${disk_properties[name]}|NN|Verifying if disk is zeroed: SUCCESS|$$" > ${all_files[stat]}
       display_status
       sleep 10
     else
-      append display_step "Verifying if disk is zeroed:#${bold}FAIL${norm}"
-      echo "${disk_properties[name]}|NY|Verifying if disk is zeroed successful|$$" > ${all_files[stat]}
+      append display_step "Verifying if disk is zeroed:|***FAIL***"
+      echo "${disk_properties[name]}|NY|Verifying if disk is zeroed: FAIL|$$" > ${all_files[stat]}
       exit 1
       display_status
     fi
@@ -909,17 +928,33 @@ if [ "$verify_disk_mbr" == "y" ]; then
 fi
 
 ######################################################
-##                 PRECLEAR THE DISK                ##
+##               WRITE PRECLEAR STATUS              ##
 ######################################################
 
+# ask
 append display_title "${ul}unRAID Server Pre-Clear of disk${noul} ${bold}$theDisk${norm}"
 
 if [ "$no_prompt" != "y" ]; then
   ask_preclear
+  tput clear
 fi
+
+if [ "$write_disk_mbr" == "y" ]; then
+  write_signature 64
+  exit 0
+fi
+
+
+
+######################################################
+##                 PRECLEAR THE DISK                ##
+######################################################
 
 # reset timer
 all_timer=$(timer)
+
+# add custom title
+append display_title "${ul}unRAID Server Pre-Clear of disk${noul} ${bold}$theDisk${norm}"
 
 for cycle in $(seq $cycles); do
   # Set a cycle timer
@@ -927,9 +962,9 @@ for cycle in $(seq $cycles); do
 
   # Reset canvas title
   unset display_title
-  unset display_step
   append display_title "${ul}unRAID Server Pre-Clear of disk${noul} ${bold}$theDisk${norm}"
   append display_title "Cycle ${bold}${cycle}$norm of ${cycles}, partition start on sector 64."
+  unset display_step && append display_step ""
   
   # Adjust the number of steps
   max_steps=5
@@ -943,11 +978,11 @@ for cycle in $(seq $cycles); do
   # Do a preread if not skipped
   if [ "$skip_preread" != "y" ]; then
     display_status "Pre-Read in progress ..." ""
-    if read_entire_disk no-verify 'preread'; then
-      append display_step "Pre-read verification:#${bold}SUCCESS${norm}"
+    if read_entire_disk no-verify preread average; then
+      append display_step "Pre-read verification:|${average} ***SUCCESS***"
       display_status
     else
-      append display_step "Pre-read verification ${bold}FAIL${norm}"
+      append display_step "Pre-read verification:|${bold}FAIL${norm}"
       display_status
       echo "${disk_properties[name]}|NY|Pre-read verification failed - Aborted|$$" > ${all_files[stat]}
       echo "--> FAIL: Result: Pre-Read failed."
@@ -957,9 +992,9 @@ for cycle in $(seq $cycles); do
 
   # Zero the disk
   display_status "Zeroing in progress ..." ""
-  write_zeroes
+  write_zeroes average
   sleep 10
-  append display_step "Zeroing the disk: # ${bold}SUCCESS${norm}"
+  append display_step "Zeroing the disk:|${average} ***SUCCESS***"
   sleep 10
 
   # Write unRAID's preclear signature to the disk
@@ -967,7 +1002,7 @@ for cycle in $(seq $cycles); do
   echo "${disk_properties[name]}|NN|Writing unRAID's Preclear signature|$$" > ${all_files[stat]}
   write_signature 64
   sleep 10
-  append display_step "Writing unRAID's Preclear signature: # ${bold}SUCCESS${norm}"
+  append display_step "Writing unRAID's Preclear signature:|***SUCCESS*** "
   echo "${disk_properties[name]}|NN|Writing unRAID's Preclear signature finished|$$" > ${all_files[stat]}
   sleep 10
 
@@ -975,11 +1010,11 @@ for cycle in $(seq $cycles); do
   display_status "Verifying unRAID's signature on the MBR ..." ""
   echo "${disk_properties[name]}|NN|Verifying unRAID's signature on the MBR|$$" > ${all_files[stat]}
   if verify_mbr $theDisk; then
-    append display_step "Verifying unRAID's Preclear signature: # ${bold}SUCCESS${norm}"
+    append display_step "Verifying unRAID's Preclear signature:|***SUCCESS*** "
     display_status
     echo "${disk_properties[name]}|NN|unRAID's signature on the MBR successful|$$" > ${all_files[stat]}
   else
-    append display_step "Verifying unRAID's Preclear signature: # ${bold}FAIL${norm}"
+    append display_step "Verifying unRAID's Preclear signature:|***FAIL*** "
     display_status
     echo "--> FAIL: unRAID's Preclear signature not valid. "
     echo "${disk_properties[name]}|NY|unRAID's signature on the MBR failed - Aborted|$$" > ${all_files[stat]}
@@ -989,13 +1024,13 @@ for cycle in $(seq $cycles); do
   # Do a post-read if not skipped
   if [ "$skip_postread" != "y" ]; then
     display_status "Post-Read in progress ..." ""
-    if read_entire_disk verify 'postread' ; then
-      append display_step "Post-Read verification:#${bold}SUCCESS${norm}"
+    if read_entire_disk verify postread average; then
+      append display_step "Post-Read verification:|${average} ***SUCCESS*** "
       display_status
       echo "${disk_properties[name]}|NY|Post-Read verification successful|$$" > ${all_files[stat]}
 
     else
-      append display_step "Post-Read verification ${bold}FAIL${norm}"
+      append display_step "Post-Read verification:|***FAIL***"
       display_status
       echo "--> FAIL: Post-Read verification failed. Your drive is not zeroed."
       echo "${disk_properties[name]}|NY|Post-Read verification failed - Aborted|$$" > ${all_files[stat]}
@@ -1004,5 +1039,6 @@ for cycle in $(seq $cycles); do
     fi
   fi
 done
+
 echo "${disk_properties[name]}|NN|Preclear Finished Successfully!|$$" > ${all_files[stat]}
 
