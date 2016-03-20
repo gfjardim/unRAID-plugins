@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk.beta">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2016.03.20">
+<!ENTITY version   "2016.03.20a">
 <!ENTITY launch    "Settings/PreclearBeta">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -158,6 +158,7 @@ fi
 
 # Make executable
 chmod +x /usr/local/emhttp/plugins/&name;/script/preclear_disk.sh
+chmod -R +x /usr/local/emhttp/plugins/&name;/event/
 
 # Cleaning old source files
 find /boot/config/plugins/&name;/ -type f -iname "&name;*.txz" ! -iname "*&version;*" -delete

@@ -291,6 +291,7 @@ write_zeroes(){
   local dd_output=${all_files[dd_out]}
   local disk=${disk_properties[device]}
   local disk_name=${disk_properties[name]}
+  local pause=${all_files[pause]}
   local percent_wrote
   local short_test=$short_test
   local stat_file=${all_files[stat]}
@@ -299,6 +300,7 @@ write_zeroes(){
   local write_bs=""
   local time_start
   local output=$1
+  local niceness=19
 
   time_start=$(timer)
 
@@ -314,9 +316,9 @@ write_zeroes(){
   fi
 
   if [ "$short_test" == "y" ]; then
-    dd if=/dev/zero bs=2048k seek=1 of=$disk count=4096 2> $dd_output &
+    nice -n $niceness dd if=/dev/zero bs=2048k seek=1 of=$disk count=4096 2> $dd_output &
   else
-    dd if=/dev/zero bs=$write_bs seek=1 of=$disk        2> $dd_output &
+    nice -n $niceness dd if=/dev/zero bs=$write_bs seek=1 of=$disk        2> $dd_output &
   fi
   dd_pid=$!
 
@@ -352,6 +354,16 @@ write_zeroes(){
         time_display=$(timer)
         display_status "Zeroing in progress:|###(${percent_wrote}% Done)###" "** $status"
       fi
+    fi
+    if [ -f "$pause" ]; then
+      display_status "Zeroing in progress:|###(${percent_wrote}% Done)### ***PAUSED***" "** PAUSED"
+    echo "$disk_name|NN|Zeroing${cycle_disp}: PAUSED|$$" >$stat_file
+
+      kill -TSTP $dd_pid
+      while [[ -f $pause ]]; do
+        sleep 1
+      done
+      kill -CONT $dd_pid
     fi
   done
   eval "$output='[$(timer $time_start) @ $average_speed MB/s']"
@@ -407,6 +419,7 @@ read_entire_disk() {
   local dd_output=${all_files[dd_out]}
   local disk=${disk_properties[device]}
   local disk_name=${disk_properties[name]}
+  local pause=${all_files[pause]}
   local short_test=$short_test
   local read_size=$read_size
   local skip=0
@@ -562,6 +575,15 @@ read_entire_disk() {
     let next_chunk_read=($skip + $bcount )
     if [ $next_chunk_read -gt $total_chunks ]; then
       let bcount=($total_chunks - $skip)
+    fi
+
+    # pause if requested
+    if [ -f "$pause" ]; then
+      display_status "$read_type|###(${percent_read}% Done)### ***PAUSED***" "** PAUSED"
+      echo "$disk_name|NN|${read_type_s}${cycle_disp}: PAUSED|$$" > $stat_file
+      while [[ -f "$pause" ]]; do
+        sleep 1
+      done
     fi
   done
   eval "$output='[$(timer $time_start) @ $average_speed MB/s']"
@@ -840,8 +862,9 @@ done < <(smartctl --info -d sat,auto "$theDisk")
 # Used files
 append all_files 'dir'           "/tmp/.preclear/${disk_properties[name]}"
 append all_files 'dd_out'        "${all_files[dir]}/dd_output"
+append all_files 'pause'         "${all_files[dir]}/pause"
 append all_files 'verify_errors' "${all_files[dir]}/verify_errors"
-append all_files 'stat'         " /tmp/preclear_stat_${disk_properties[name]}"
+append all_files 'stat'          " /tmp/preclear_stat_${disk_properties[name]}"
 mkdir -p "${all_files[dir]}"
 
 # Set terminal variables

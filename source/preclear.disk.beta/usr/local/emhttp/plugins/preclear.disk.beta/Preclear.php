@@ -176,6 +176,10 @@ function get_all_disks_info($bus="all") {
 }
 function get_info($device) {
   global $state_file;
+  $parse_smart = function($smart, $property) {
+    $value = trim(split(":", array_values(preg_grep("#$property#", $smart))[0])[1]);
+    return ($value) ? $value : "n/a";
+  };
   $whitelist = array("ID_MODEL","ID_SCSI_SERIAL","ID_SERIAL_SHORT");
   $state = is_file($state_file) ? @parse_ini_file($state_file, true) : array();
   if (array_key_exists($device, $state) && ! $reload) {
@@ -185,16 +189,16 @@ function get_info($device) {
     $udev = parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device 2>/dev/null) 2>/dev/null"));
     $disk = array_intersect_key($udev, array_flip($whitelist));
     exec("smartctl -i -d sat,auto $device 2>/dev/null", $smartInfo);
-    $disk['FAMILY']   = trim(split(":", array_values(preg_grep("#Model Family#", $smartInfo))[0])[1]);
-    $disk['MODEL']    = trim(split(":", array_values(preg_grep("#Device Model#", $smartInfo))[0])[1]);
-    if (empty($disk['FAMILY']) && empty($disk['MODEL'])) {
-      $vendor   = trim(split(":", array_values(preg_grep("#Vendor#", $smartInfo))[0])[1]);
-      $product  = trim(split(":", array_values(preg_grep("#Product#", $smartInfo))[0])[1]);
-      $revision = trim(split(":", array_values(preg_grep("#Revision#", $smartInfo))[0])[1]);
+    $disk['FAMILY']   = $parse_smart($smartInfo, "Model Family");
+    $disk['MODEL']    = $parse_smart($smartInfo, "Device Model");
+    if ($disk['FAMILY'] == "n/a" && $disk['MODEL'] == "n/a" ) {
+      $vendor   = $parse_smart($smartInfo, "Vendor");
+      $product  = $parse_smart($smartInfo, "Product");
+      $revision = $parse_smart($smartInfo, "Revision");
       $disk['FAMILY'] = "{$vendor} {$product}";
       $disk['MODEL']  = "{$vendor} {$product} - Rev. {$revision}";
     }
-    $disk['FIRMWARE'] = trim(split(":", array_values(preg_grep("#Firmware Version#", $smartInfo))[0])[1]);
+    $disk['FIRMWARE'] = $parse_smart($smartInfo, "Firmware Version");
     $disk['SIZE']     = intval(trim(shell_exec("blockdev --getsize64 ${device} 2>/dev/null")));
     save_ini_file($state_file, $state);
     return $state[$device];
@@ -257,7 +261,8 @@ switch ($_POST['action']) {
         $disk_name = basename($disk['device']);
         $serial = $disk['serial'];
         $disks_o .= "<tr class='$odd'>";
-        $disks_o .= sprintf( "<td><img src='/webGui/images/%s'> %s</td>", ( is_disk_running($disk['device']) ? "green-on.png":"green-blink.png" ), $disk_name);
+        $disks_o .= sprintf( "<td><img src='/webGui/images/%s'><a href='/Settings/New?name=%s'> %s</a></td>", ( is_disk_running($disk['device']) ? "green-on.png":"green-blink.png" ), 
+                            $disk_name, $disk_name);
         $disks_o .= "<td><span class='toggle-hdd' hdd='{$disk_name}'><i class='glyphicon glyphicon-hdd hdd'></i>".($p?"<span style='margin:4px;'></span>":"<i class='glyphicon glyphicon-plus-sign glyphicon-append'></i>").$serial."</td>";
         $disks_o .= "<td>{$temp}</td>";
         $status = $disk_mounted ? "Disk mounted" : "<a class='exec' onclick='start_preclear(\"{$disk_name}\")'>Start Preclear</a>";
