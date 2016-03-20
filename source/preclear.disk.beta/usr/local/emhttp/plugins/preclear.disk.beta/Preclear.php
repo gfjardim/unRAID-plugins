@@ -12,7 +12,7 @@ $log_file       = "/var/log/{$plugin}.log";
 $script_file    = "/usr/local/emhttp/plugins/${plugin}/script/preclear_disk.sh";
 $script_version = (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>/dev/null|cut -d: -f2")) : NULL;
 $noprompt       = $script_version ? (strpos(file_get_contents($script_file), "noprompt") ? TRUE : FALSE ) : FALSE;
-// $VERBOSE        = TRUE;
+$VERBOSE        = TRUE;
 
 if (isset($_POST['display'])) $display = $_POST['display'];
 
@@ -203,7 +203,9 @@ function get_info($device) {
 
 function get_disk_info($device, $reload=FALSE){
   $disk = array();
+  $d1=time();
   $attrs = get_info($device);
+  debug("get_info($device): ".(time() - $d1),'DEBUG');
   $disk['serial_short'] = isset($attrs["ID_SCSI_SERIAL"]) ? $attrs["ID_SCSI_SERIAL"] : $attrs['ID_SERIAL_SHORT'];
   $disk['serial']       = "{$attrs[ID_MODEL]}_{$disk[serial_short]}";
   $disk['device']       = realpath($device);
@@ -211,7 +213,9 @@ function get_disk_info($device, $reload=FALSE){
   $disk['model']        = $attrs['MODEL'];
   $disk['firmware']     = $attrs['FIRMWARE'];
   $disk['size']         = sprintf("%s %s", my_scale($attrs['SIZE'] , $unit), $unit);
+  $d1=time();
   $disk['temperature']  = get_temp($device);
+  debug("get_temp($device):".(time() - $d1),'DEBUG');
   return $disk;
 }
 function is_disk_running($dev) {
@@ -235,9 +239,13 @@ function get_temp($dev) {
   }
 }
 
+$start_time = time();
 switch ($_POST['action']) {
   case 'get_content':
+    debug("Starting get_content: ".(time() - $start_time),'DEBUG');
+    debug("Starting get_all_disks_info: ".(time() - $start_time),'DEBUG');
     $disks = get_all_disks_info();
+    debug("Finished get_all_disks_info: ".(time() - $start_time),'DEBUG');
     // echo "<script>var disksInfo =".json_encode($disks).";</script>";
     if ( count($disks) ) {
       $odd="odd";
@@ -245,6 +253,7 @@ switch ($_POST['action']) {
         $disk_mounted = false;
         foreach ($disk['partitions'] as $p) if (is_mounted(realpath($p))) $disk_mounted = TRUE;
         $temp = my_temp($disk['temperature']);
+        debug("my_temp: ".(time() - $start_time),'DEBUG');
         $disk_name = basename($disk['device']);
         $serial = $disk['serial'];
         $disks_o .= "<tr class='$odd'>";
@@ -256,6 +265,7 @@ switch ($_POST['action']) {
           $status = "<a class='exec' onclick='openPreclear(\"{$disk_name}\");' title='Preview'><i class='glyphicon glyphicon-eye-open'></i></a>";
           $status = "{$status}<a title='Clear' style='color:#CC0000;' class='exec' onclick='remove_session(\"{$disk_name}\");'> <i class='glyphicon glyphicon-remove hdd'></i></a>";
         }
+        debug("Starting get preclear status: ".(time() - $start_time),'DEBUG');
         if (is_file("/tmp/preclear_stat_{$disk_name}")) {
           $preclear = explode("|", file_get_contents("/tmp/preclear_stat_{$disk_name}"));
           if (count($preclear) > 3) {
@@ -274,7 +284,7 @@ switch ($_POST['action']) {
             $status = "{$status}<a class='exec' style='color:#CC0000;font-weight:bold;'onclick='stop_preclear(\"{$serial}\",\"{$disk_name}\");' title='Clear stats'> <i class='glyphicon glyphicon-remove hdd'></i></a>";
           } 
         }
-
+        debug("finished get preclear status: ".(time() - $start_time),'DEBUG');
         $status = str_replace("^n", " " , $status);
         $disks_o .= "<td><span>${disk[size]}</span></td>";
         $disks_o .= (is_file($script_file)) ? "<td>$status</td>" : "<td>Script not present</td>";
@@ -284,6 +294,7 @@ switch ($_POST['action']) {
     } else {
       $disks_o .= "<tr><td colspan='12' style='text-align:center;font-weight:bold;'>No unassigned disks available.</td></tr>";
     }
+    debug("get_content Finished: ".(time() - $start_time),'DEBUG');
     echo json_encode(array("disks" => $disks_o, "info" => json_encode($disks)));
     break;
 
