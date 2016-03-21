@@ -3,7 +3,7 @@ LC_CTYPE=C
 export LC_CTYPE
 
 # Version
-version="0.3-beta"
+version="0.4-beta"
 
 # Lets make sure some features are supported by BASH
 BV=$(echo $BASH_VERSION|tr '.' "\n"|grep -Po "^\d+"|xargs printf "%.2d\n"|tr -d '\040\011\012\015')
@@ -533,9 +533,9 @@ read_entire_disk() {
     if [ "$verify" == "verify" ]; then
       # first block must be treated differently
       if [ "$skip" -eq "0" ]; then
-        dd_cmd="dd if=$disk bs=512 count=8192 skip=1 conv=noerror"
+        dd_cmd="dd if=$disk bs=512 count=8192 skip=1 conv=noerror iflag=fullblock"
       else 
-        dd_cmd="dd if=$disk bs=$chunk count=$bcount skip=$skip conv=noerror"
+        dd_cmd="dd if=$disk bs=$chunk count=$bcount skip=$skip conv=noerror iflag=fullblock"
       fi
       rsum=$($dd_cmd 2>$dd_output|sum|awk '{print $1}')
       if [ "$rsum" != "00000" ]; then
@@ -543,7 +543,7 @@ read_entire_disk() {
         return 1
       fi
     else
-      dd if=$disk of=/dev/null bs=$chunk count=$bcount skip=$skip conv=noerror >$dd_output 2>&1
+      dd if=$disk of=/dev/null bs=$chunk count=$bcount skip=$skip conv=noerror iflag=fullblock >$dd_output 2>&1
     fi
 
     # update the skip count
@@ -695,6 +695,9 @@ display_status(){
 
   tput cup $(( $height + 2 )) 0
 
+  if [ -n "$display_smart" ]; then
+    echo "$display_smart"
+  fi
 }
 
 ask_preclear(){
@@ -757,6 +760,75 @@ ask_preclear(){
   fi
 }
 
+save_smart_info() {
+  local name=$3
+  local device=$1
+  local type=$2
+  local valid_attributes=" 4 5 9 183 187 188 196 197 198 199 242 "
+  local smart_file="${all_files[smart_prefix]}${name}"
+  cat /dev/null > $smart_file
+
+  while read line; do
+    attr=$(echo $line | cut -d'|' -f1)
+    if [[ $valid_attributes =~ [[:space:]]$attr[[:space:]] ]]; then
+      echo $line >> $smart_file
+    fi
+  done < <(smartctl --attributes -d $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" | \
+           grep -v "ATTRIBUTE_NAME" | grep -v "^$" | awk '{ print $1 "|" $2 "|" $NF}')
+}
+
+compare_smart() {
+  local initial="${all_files[smart_prefix]}$1"
+  local current="${all_files[smart_prefix]}$2"
+  local final="${all_files[smart_final]}"
+  local title=$3
+  if [ -e "$final" -a -n "$title" ]; then
+    sed -i " 1 s/$/|$title/" $final
+  elif [ ! -f "$current" ]; then
+    echo "ATTRIBUTE|INITIAL VALUE" > $final
+    current=$initial
+  else
+    echo "ATTRIBUTE|INITIAL VALUE|$title" > $final
+  fi
+
+  while read line; do
+    attr=$(echo $line | cut -d'|' -f1)
+    name=$(echo $line | cut -d'|' -f2)
+    nvalue=$(echo $line | cut -d'|' -f3)
+    ivalue=$(cat $initial| grep "^${attr}"|cut -d'|' -f3)
+    if [ "$(cat $final 2>/dev/null|grep -c "$name")" -gt "0" ]; then
+      sed -i "/^$name/ s/$/|${nvalue}/" $final
+    else
+      echo "${name}|${ivalue}" >> $final
+    fi
+  done < <(cat $current)
+}
+
+output_smart() {
+  local final="${all_files[smart_final]}"
+  local device=$1
+  local type=$2
+  nfinal="${final}_$(( $RANDOM * 19318203981230 + 40 ))"
+  cp -f "$final" "$nfinal"
+  sed -i " 1 s/$/|STATUS/" $nfinal
+  while read line; do
+    attr=$(echo $line | cut -d'|' -f1)
+    inival=$(echo "$line" | cut -d'|' -f2)
+    lasval=$(echo "$line" | grep -o '[^|]*$')
+    let diff=($lasval - $inival)
+    if [ "$diff" -gt "0" ]; then
+      msg="Increased by '$diff'"
+    elif [ "$diff" -lt "0" ]; then
+      msg="Decreased by '$diff'"
+    else
+      msg="Not changed"
+    fi
+    sed -i "/^$attr/ s/$/|${msg}/" $nfinal
+  done < <(cat $nfinal | tail -n +2)
+  echo -e "${bold}SMART STATUS OVERVIEW${norm}\n"
+  cat $nfinal | column -t -s "|" -o '   '
+  echo -e "\n$(smartctl --health -d $type $device | sed -n '/SMART DATA SECTION/,/^$/p'| tail -n +2 | head -n 1)\n\n"
+}
 
 ######################################################
 ##                                                  ##
@@ -773,9 +845,12 @@ refresh_period=10
 canvas_width=92
 canvas_height=20
 canvas_brick=#
+smart_type=auto
+opts_long="frequency:,notify:,skip-preread,skip-postread,read-size:,write-size:,read-blocks:,"
+opts_long+="test,no-stress,list,cycles:,signature,verify,no-prompt,version,preclear-only"
 
 OPTS=$(getopt -o f:n:sSr:w:b:tdlc:ujvo \
-      --long frequency:,notify:,skip-preread,skip-postread,read-size:,write-size:,read-blocks:,test,no-stress,list,cycles:,signature,verify,no-prompt,version,preclear-only -n "$(basename $0)" -- "$@")
+      --long $opts_long -n "$(basename $0)" -- "$@")
 
 if [ "$?" -ne "0" ]; then
   exit 1
@@ -864,8 +939,12 @@ append all_files 'dir'           "/tmp/.preclear/${disk_properties[name]}"
 append all_files 'dd_out'        "${all_files[dir]}/dd_output"
 append all_files 'pause'         "${all_files[dir]}/pause"
 append all_files 'verify_errors' "${all_files[dir]}/verify_errors"
-append all_files 'stat'          " /tmp/preclear_stat_${disk_properties[name]}"
+append all_files 'pid'           "${all_files[dir]}/pid"
+append all_files 'stat'          "/tmp/preclear_stat_${disk_properties[name]}"
+append all_files 'smart_prefix'  "${all_files[dir]}/smart_"
+append all_files 'smart_final'   "${all_files[dir]}/smart_final"
 mkdir -p "${all_files[dir]}"
+trap "rm -rf ${all_files[dir]}" EXIT;
 
 # Set terminal variables
 if [ -x /usr/bin/tput ]; then
@@ -897,6 +976,20 @@ draw_canvas $canvas_height $canvas_width >/dev/null
 ##                MAIN PROGRAM BLOCK                ##
 ##                                                  ##
 ######################################################
+
+# Verify if it's already running
+if [ -f "${all_files[pid]}" ]; then
+  pid=$(cat ${all_files[pid]})
+  if [ -e "/proc/${pid}" ]; then
+    echo "A instance of Preclear for disk '$theDisk' is already running."
+    trap '' EXIT
+    exit 1
+  else
+    echo "$$" > ${all_files[pid]}
+  fi
+else
+  echo "$$" > ${all_files[pid]}
+fi
 
 if ! is_preclear_candidate $theDisk; then
   echo -e "\n${bold}The disk '$theDisk' is part of unRAID's array, or is assigned as a cache device.${norm}"
@@ -968,7 +1061,6 @@ if [ "$write_disk_mbr" == "y" ]; then
 fi
 
 
-
 ######################################################
 ##                 PRECLEAR THE DISK                ##
 ######################################################
@@ -978,6 +1070,13 @@ all_timer=$(timer)
 
 # add custom title
 append display_title "${ul}unRAID Server Pre-Clear of disk${noul} ${bold}$theDisk${norm}"
+
+# Export initial SMART status
+save_smart_info $theDisk $smart_type "cycle_initial_start"
+
+# Add current SMART status to display_smart
+compare_smart "cycle_initial_start"
+display_smart=$(output_smart $theDisk $smart_type)
 
 for cycle in $(seq $cycles); do
   # Set a cycle timer
@@ -997,6 +1096,9 @@ for cycle in $(seq $cycles); do
   if [ "$skip_postread" == "y" ]; then
     let max_steps-=1
   fi
+
+  # Export initial SMART status
+  save_smart_info $theDisk $smart_type "cycle_${cycle}_start"
 
   # Do a preread if not skipped
   if [ "$skip_preread" != "y" ]; then
@@ -1039,7 +1141,7 @@ for cycle in $(seq $cycles); do
   else
     append display_step "Verifying unRAID's Preclear signature:|***FAIL*** "
     display_status
-    echo "--> FAIL: unRAID's Preclear signature not valid. "
+    echo "--> FAIL: unRAID's Preclear signature not valid. \n\n"
     echo "${disk_properties[name]}|NY|unRAID's signature on the MBR failed - Aborted|$$" > ${all_files[stat]}
     exit 1
   fi
@@ -1051,17 +1153,26 @@ for cycle in $(seq $cycles); do
       append display_step "Post-Read verification:|${average} ***SUCCESS*** "
       display_status
       echo "${disk_properties[name]}|NY|Post-Read verification successful|$$" > ${all_files[stat]}
-
     else
       append display_step "Post-Read verification:|***FAIL***"
       display_status
-      echo "--> FAIL: Post-Read verification failed. Your drive is not zeroed."
+      echo -e "--> FAIL: Post-Read verification failed. Your drive is not zeroed.\n\n"
       echo "${disk_properties[name]}|NY|Post-Read verification failed - Aborted|$$" > ${all_files[stat]}
       # cat "${all_files[verify_errors]}"
       exit 1
     fi
   fi
+  # Export final SMART status for cycle
+  save_smart_info $theDisk $smart_type "cycle_${cycle}_end"
+  # Compare start/end values
+  compare_smart "cycle_${cycle}_start" "cycle_${cycle}_end" "CYCLE $cycle"
+  # Add current SMART status to display_smart
+  display_smart=$(output_smart $theDisk $smart_type)
+  display_status
 done
 
-echo "${disk_properties[name]}|NN|Preclear Finished Successfully!|$$" > ${all_files[stat]}
+echo -e "--> ATENTION: Please take a look into the SMART report above for drive health issues.\n\n"
 
+echo -e "\n--> RESULT: Preclear finished succesfully./n/n"
+
+echo "${disk_properties[name]}|NN|Preclear Finished Successfully!|$$" > ${all_files[stat]};

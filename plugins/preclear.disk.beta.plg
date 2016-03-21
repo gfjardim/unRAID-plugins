@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk.beta">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2016.03.20a">
+<!ENTITY version   "2016.03.21">
 <!ENTITY launch    "Settings/PreclearBeta">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -15,7 +15,11 @@
 <CHANGES>
 ##&name;
 
-###&version;
+###2016.03.21
+- Add: pause any preclear operations while array start/stop
+- Add: Initial SMART reporting
+
+###2016.03.20
 - Fix: disk detected as part of the array if cache slot was empty
 
 ###2016.03.11b
