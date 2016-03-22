@@ -3,7 +3,7 @@ LC_CTYPE=C
 export LC_CTYPE
 
 # Version
-version="0.4-beta"
+version="0.5-beta"
 
 # Lets make sure some features are supported by BASH
 BV=$(echo $BASH_VERSION|tr '.' "\n"|grep -Po "^\d+"|xargs printf "%.2d\n"|tr -d '\040\011\012\015')
@@ -13,7 +13,7 @@ if [ "$BV" -lt "040253" ]; then
 fi
 
 # Let's verify all dependencies
-for dep in cat awk basename blockdev comm date dd find fold getopt grep kill printf readlink seq sort strings sum tac tput udevadm xargs; do
+for dep in cat awk basename blockdev comm date dd find fold getopt grep kill printf readlink seq sort strings sum tac todos tput udevadm xargs; do
   if ! type $dep >/dev/null 2>&1 ; then
     echo -e "The following dependency isn'y met: [$dep]\nPlease install it and try again."
     exit 1
@@ -305,7 +305,7 @@ write_zeroes(){
   time_start=$(timer)
 
   if [ "$short_test" == "y" ]; then
-    total_bytes=8589934592   # 2048k * 4096
+    total_bytes=1073741824 # 2048k * 512
   else
     total_bytes=${disk_properties[size]}
   fi
@@ -316,7 +316,7 @@ write_zeroes(){
   fi
 
   if [ "$short_test" == "y" ]; then
-    nice -n $niceness dd if=/dev/zero bs=2048k seek=1 of=$disk count=4096 2> $dd_output &
+    nice -n $niceness dd if=/dev/zero bs=2048k seek=1 of=$disk count=512 2> $dd_output &
   else
     nice -n $niceness dd if=/dev/zero bs=$write_bs seek=1 of=$disk        2> $dd_output &
   fi
@@ -590,22 +590,24 @@ read_entire_disk() {
 }
 
 draw_canvas(){
-  local height=$1 width=$2 brick=$canvas_brick
+  local start=$1 height=$2 width=$3 brick=$canvas_brick c
 
-  eval "local x=\${canvas+x}"
+  eval "local x=\${canvas_${start}+x}"
   if [ -z $x ]; then
-    declare -g canvas;
-    for line in $(seq 0 $height); do
-      canvas+=$(tput cup $line 0 && echo $brick)
-      canvas+=$(tput cup $line $width && echo $brick)
+    eval "declare -g canvas_${start}";
+    let iniline=($height + $start)
+    for line in $(seq $start $iniline ); do
+      c+=$(tput cup $line 0 && echo $brick)
+      c+=$(tput cup $line $width && echo $brick)
     done
     for col in $(seq $width); do
-      canvas+=$(tput cup 0 $col && echo $brick)
-      canvas+=$(tput cup $height $col && echo $brick)
-      canvas+=$(tput cup $(( $height - 2 )) $col && echo $brick)
+      c+=$(tput cup $start $col && echo $brick)
+      c+=$(tput cup $iniline $col && echo $brick)
+      c+=$(tput cup $(( $iniline - 2 )) $col && echo $brick)
     done
+    eval "canvas_${start}=\$c"
   fi
-  echo -e "$canvas\n"
+  eval "echo -e \$canvas_${start}"
 }
 
 display_status(){
@@ -620,44 +622,48 @@ display_status(){
   local brick=$canvas_brick
   local all_timer=$all_timer
   local cycle_timer=$cycle_timer
-  local inipos=4
-  local do_reset=$3
+  local smart_output="${all_files[smart_out]}"
+  local wpos=4
+  local hpos=1
+  local skip_formatting=$3
   local step=1
 
   eval "local -A prev=$(array_content display_step)"
   eval "local -A title=$(array_content display_title)"
 
-  if [ "$do_reset" != "n" ]; then
+  if [ "$skip_formatting" != "y" ]; then
     tput reset
   fi
 
-  draw_canvas $height $width 
+  draw_canvas $hpos $height $width 
 
   for (( i = 0; i <= ${#title[@]}; i++ )); do
     line=${title[$i]}
     line_num=$(echo "$line"|tr -d "${bold}"|tr -d "${norm}"|tr -d "${ul}"|tr -d "${noul}"|wc -m)
-    tput cup $(($i+2)) $(( $width/2 - $line_num/2  )); echo "$line"
+    tput cup $(($i+2+$hpos)) $(( $width/2 - $line_num/2  )); echo "$line"
   done
 
-  l=$((${#title[@]}+5))
+  l=$((${#title[@]}+5+$hpos))
 
   for i in "${!prev[@]}"; do
     if [ -n "${prev[$i]}" ]; then
       line=${prev[$i]}
       stat=""
-      if [ "$(echo "$line"|grep -c '|')" -gt "0" ]; then
+      if [ "$(echo "$line"|grep -c '|')" -gt "0" -a "$skip_formatting" != "y" ]; then
         stat=$(trim $(echo "$line"|cut -d'|' -f2))
         line=$(trim $(echo "$line"|cut -d'|' -f1))
       fi
       if [ -n "$max" ]; then
         line="Step $step of $max - $line"
       fi
-      tput cup $l $inipos; echo $line
+      tput cup $l $wpos; echo $line
       if [ -n "$stat" ]; then
-      clean_stat=$(echo "$stat"|sed -e "s|\*\{3\}\([^\*]*\)\*\{3\}|\1|g"|sed -e "s|\#\{3\}\([^\#]*\)\#\{3\}|\1|g")
-      stat_num=${#clean_stat}
-      stat=$(echo "$stat"|sed -e "s|\*\{3\}\([^\*]*\)\*\{3\}|${bold}\1${norm}|g"|sed -e "s|\#\{3\}\([^\#]*\)\#\{3\}|${ul}\1${noul}|g")
-        tput cup $l $(($width - $stat_num - 1 ));  echo "$stat"
+        clean_stat=$(echo "$stat"|sed -e "s|\*\{3\}\([^\*]*\)\*\{3\}|\1|g"|sed -e "s|\#\{3\}\([^\#]*\)\#\{3\}|\1|g")
+        stat_num=${#clean_stat}
+        if [ "$skip_formatting" != "y" ]; then
+          stat=$(echo "$stat"|sed -e "s|\*\{3\}\([^\*]*\)\*\{3\}|${bold}\1${norm}|g"|sed -e "s|\#\{3\}\([^\#]*\)\#\{3\}|${ul}\1${noul}|g")
+        fi
+        tput cup $l $(($width - $stat_num - $wpos ));  echo "$stat"
       fi
       let "l+=1"
       let "step+=1"
@@ -666,24 +672,26 @@ display_status(){
   if [ -n "$current" ]; then
     line=$current;
     stat=""
-    if [ "$(echo "$line"|grep -c '|')" -gt "0" ]; then
+    if [ "$(echo "$line"|grep -c '|')" -gt "0" -a "$skip_formatting" != "y" ]; then
       stat=$(echo "$line"|cut -d'|' -f2)
       line=$(echo "$line"|cut -d'|' -f1)
     fi
     if [ -n "$max" ]; then
       line="Step $step of $max - $line"
     fi
-    tput cup $l $inipos && echo $line
+    tput cup $l $wpos && echo $line
     if [ -n "$stat" ]; then
       clean_stat=$(echo "$stat"|sed -e "s|\*\{3\}\([^\*]*\)\*\{3\}|\1|g"|sed -e "s|\#\{3\}\([^\#]*\)\#\{3\}|\1|g")
       stat_num=${#clean_stat}
-      stat=$(echo "$stat"|sed -e "s|\*\{3\}\([^\*]*\)\*\{3\}|${bold}\1${norm}|g"|sed -e "s|\#\{3\}\([^\#]*\)\#\{3\}|${ul}\1${noul}|g")
-      tput cup $l $(($width - $stat_num - 1 )); echo "$stat"
+      if [ "$skip_formatting" != "y" ]; then
+        stat=$(echo "$stat"|sed -e "s|\*\{3\}\([^\*]*\)\*\{3\}|${bold}\1${norm}|g"|sed -e "s|\#\{3\}\([^\#]*\)\#\{3\}|${ul}\1${noul}|g")
+      fi
+      tput cup $l $(($width - $stat_num - $wpos )); echo "$stat"
     fi
     let "l+=1"
   fi
   if [ -n "$status" ]; then
-    tput cup $(($height-4)) $inipos && echo -e "$status"
+    tput cup $(($height+$hpos-4)) $wpos && echo -e "$status"
   fi
 
   footer="Total elapsed time: $(timer $all_timer)"
@@ -691,18 +699,32 @@ display_status(){
     footer="Cycle elapsed time: $(timer $cycle_timer) | $footer"
   fi
   footer_num=$(echo "$footer"|tr -d "${bold}"|tr -d "${norm}"|tr -d "${ul}"|tr -d "${noul}"|wc -m)
-  tput cup $(( $height - 1)) $(( $width/2 - $footer_num/2  )); echo "$footer"
+  tput cup $(( $height + $hpos - 1)) $(( $width/2 - $footer_num/2  )); echo "$footer"
 
-  tput cup $(( $height + 2 )) 0
+  tput cup $(( $height + $hpos + 2 )) 0
 
-  if [ -n "$display_smart" ]; then
-    echo "$display_smart"
+  if [ -f "$smart_output" ]; then
+    echo -e "\n\n\n\n"
+    init=$(($hpos+$height+4))
+    draw_canvas $init $height $width
+    line="S.M.A.R.T. Status"
+    line_num=$(echo "$line"|tr -d "${bold}"|tr -d "${norm}"|tr -d "${ul}"|tr -d "${noul}"|wc -m)
+    let l=($init + 2)
+    tput cup $(($l)) $(( $width/2 - $line_num/2  )); echo "${ul}$line${noul}"
+    let l+=5
+    while read line; do
+      tput cup $l $wpos && echo -n "$line" && echo -e ""
+      let l+=1
+    done < <(head -n -1 "$smart_output")
+    tput cup $(( $init + $height - 1)) $wpos; tail -n 1 "$smart_output"
+    tput cup $(( $init + $height + 2)) 0
   fi
 }
 
 ask_preclear(){
   local line
-  local inipos=4
+  local wpos=4
+  local hpos=0
   local max=""
   local width=$canvas_width
   local height=$canvas_height
@@ -711,44 +733,44 @@ ask_preclear(){
 
   tput reset
 
-  draw_canvas
+  draw_canvas $hpos $canvas_height $canvas_width
 
   for (( i = 0; i <= ${#title[@]}; i++ )); do
     line=${title[$i]}
     line_num=$(echo "$line"|tr -d "${bold}"|tr -d "${norm}"|tr -d "${ul}"|tr -d "${noul}"|wc -m)
-    tput cup $(($i+2)) $(( $width/2 - $line_num/2  )); echo "$line"
+    tput cup $(($i+2+$hpos)) $(( $width/2 - $line_num/2  )); echo "$line"
   done
 
-  l=$((${#title[@]}+5))
+  l=$((${#title[@]}+5+$hpos))
 
   if [ -n "${disk_info[family]}" ]; then
-    tput cup $l $inipos && echo "Model Family:   ${disk_info[family]}"
+    tput cup $l $wpos && echo "Model Family:   ${disk_info[family]}"
     let "l+=1"
   fi
   if [ -n "${disk_info[model]}" ]; then
-    tput cup $l $inipos && echo "Device Model:   ${disk_info[model]}"
+    tput cup $l $wpos && echo "Device Model:   ${disk_info[model]}"
     let "l+=1"
   fi
   if [ -n "${disk_info[serial]}" ]; then
-    tput cup $l $inipos && echo "Serial Number:  ${disk_info[serial]}"
+    tput cup $l $wpos && echo "Serial Number:  ${disk_info[serial]}"
     let "l+=1"
   fi
   if [ -n "${disk_info[size_human]}" ]; then
-    tput cup $l $inipos && echo "User Capacity:  ${disk_info[size_human]}"
+    tput cup $l $wpos && echo "User Capacity:  ${disk_info[size_human]}"
     let "l+=1"
   fi
   if [ -n "${disk_info[firmware]}" ]; then
-    tput cup $l $inipos && echo "Firmware:       ${disk_info[firmware]}"
+    tput cup $l $wpos && echo "Firmware:       ${disk_info[firmware]}"
     let "l+=1"
   fi
   if [ -n "${disk_info[device]}" ]; then
-    tput cup $l $inipos && echo "Disk Device:    ${disk_info[device]}"
+    tput cup $l $wpos && echo "Disk Device:    ${disk_info[device]}"
   fi
 
-  tput cup $(($l+4)) $inipos && echo "Type ${bold}Yes${norm} to proceed: "
-  tput cup $(($l+4)) $(($inipos+21)) && read answer
+  tput cup $(($l+4)) $wpos && echo "Type ${bold}Yes${norm} to proceed: "
+  tput cup $(($l+4)) $(($wpos+21)) && read answer
 
-  tput cup $(( $height - 1)) $inipos; 
+  tput cup $(( $height - 1)) $wpos; 
 
   if [[ "$answer" == "Yes" ]]; then
     tput cup $(( $height + 2 )) 0
@@ -785,10 +807,10 @@ compare_smart() {
   if [ -e "$final" -a -n "$title" ]; then
     sed -i " 1 s/$/|$title/" $final
   elif [ ! -f "$current" ]; then
-    echo "ATTRIBUTE|INITIAL VALUE" > $final
+    echo "ATTRIBUTE|INITIAL" > $final
     current=$initial
   else
-    echo "ATTRIBUTE|INITIAL VALUE|$title" > $final
+    echo "ATTRIBUTE|INITIAL|$title" > $final
   fi
 
   while read line; do
@@ -806,6 +828,7 @@ compare_smart() {
 
 output_smart() {
   local final="${all_files[smart_final]}"
+  local output="${all_files[smart_out]}"
   local device=$1
   local type=$2
   nfinal="${final}_$(( $RANDOM * 19318203981230 + 40 ))"
@@ -825,9 +848,8 @@ output_smart() {
     fi
     sed -i "/^$attr/ s/$/|${msg}/" $nfinal
   done < <(cat $nfinal | tail -n +2)
-  echo -e "${bold}SMART STATUS OVERVIEW${norm}\n"
-  cat $nfinal | column -t -s "|" -o '   '
-  echo -e "\n$(smartctl --health -d $type $device | sed -n '/SMART DATA SECTION/,/^$/p'| tail -n +2 | head -n 1)\n\n"
+  cat $nfinal | column -t -s '|' -o '   ' > $output
+  smartctl --health -d $type $device | sed -n '/SMART DATA SECTION/,/^$/p'| tail -n +2 | head -n 1 >> $output
 }
 
 ######################################################
@@ -842,7 +864,7 @@ cycles=1
 append display_step ""
 verify_mbr_only=n
 refresh_period=10
-canvas_width=92
+canvas_width=110
 canvas_height=20
 canvas_brick=#
 smart_type=auto
@@ -896,13 +918,15 @@ theDisk=$(echo $1|xargs)
 ######################################################
 
 # Disk properties
-append disk_properties 'device'     "$theDisk"
-append disk_properties 'size'       $(blockdev --getsize64 ${disk_properties[device]} 2>/dev/null)
-append disk_properties 'block_sz'   $(blockdev --getpbsz ${disk_properties[device]} 2>/dev/null)
-append disk_properties 'blocks'     $(( ${disk_properties[size]} / ${disk_properties[block_sz]} ))
-append disk_properties 'blocks_512' $(blockdev --getsz ${disk_properties[device]} 2>/dev/null)
-append disk_properties 'name'       $(basename ${disk_properties[device]} 2>/dev/null)
-append disk_properties 'parts'      $(grep -c "${disk_properties[name]}[0-9]" /proc/partitions 2>/dev/null)
+append disk_properties 'device'      "$theDisk"
+append disk_properties 'size'        $(blockdev --getsize64 ${disk_properties[device]} 2>/dev/null)
+append disk_properties 'block_sz'    $(blockdev --getpbsz ${disk_properties[device]} 2>/dev/null)
+append disk_properties 'blocks'      $(( ${disk_properties[size]} / ${disk_properties[block_sz]} ))
+append disk_properties 'blocks_512'  $(blockdev --getsz ${disk_properties[device]} 2>/dev/null)
+append disk_properties 'name'        $(basename ${disk_properties[device]} 2>/dev/null)
+append disk_properties 'parts'       $(grep -c "${disk_properties[name]}[0-9]" /proc/partitions 2>/dev/null)
+append disk_properties 'serial_long' $(udevadm info --query=property --name ${disk_properties[device]} 2>/dev/null|grep -Po 'ID_SERIAL=\K.*')
+append disk_properties 'serial'      $(udevadm info --query=property --name ${disk_properties[device]} 2>/dev/null|grep -Po 'ID_SERIAL_SHORT=\K.*')
 
 if [ "${disk_properties[parts]}" -gt 0 ]; then
   for part in $(seq 1 "${disk_properties[parts]}" ); do
@@ -919,20 +943,25 @@ if [ "$discard" -gt "0" ]; then
   read_stress=n
 fi
 
-# Parse SMART info
-while read line ; do
-  if [[ $line =~ Model\ Family:\ (.*) ]]; then
-    append disk_properties 'family' "$(echo "${BASH_REMATCH[1]}"|xargs)"
-  elif [[ $line =~ Device\ Model:\ (.*) ]]; then
-    append disk_properties 'model' "$(echo "${BASH_REMATCH[1]}"|xargs)"
-  elif [[ $line =~ Serial\ Number:\ (.*) ]]; then
-    append disk_properties 'serial' "$(echo "${BASH_REMATCH[1]}"|xargs)"
-  elif [[ $line =~ User\ Capacity:\ (.*) ]]; then
-    append disk_properties 'size_human' "$(echo "${BASH_REMATCH[1]}"|xargs)"
-  elif [[ $line =~ Firmware\ Version:\ (.*) ]]; then
-    append disk_properties 'firmware' "$(echo "${BASH_REMATCH[1]}"|xargs)"
-  fi
-done < <(smartctl --info -d sat,auto "$theDisk")
+smartInfo=$(smartctl --info -d $smart_type "$theDisk" 2>&1)
+if [[ $smartInfo =~ Identity\ failed ]]; then
+  disable_smart=y
+fi
+
+if [ "$disable_smart" != "y" ]; then
+  # Parse SMART info
+  while read line ; do
+    if [[ $line =~ Model\ Family:\ (.*) ]]; then
+      append disk_properties 'family' "$(echo "${BASH_REMATCH[1]}"|xargs)"
+    elif [[ $line =~ Device\ Model:\ (.*) ]]; then
+      append disk_properties 'model' "$(echo "${BASH_REMATCH[1]}"|xargs)"
+    elif [[ $line =~ User\ Capacity:\ (.*) ]]; then
+      append disk_properties 'size_human' "$(echo "${BASH_REMATCH[1]}"|xargs)"
+    elif [[ $line =~ Firmware\ Version:\ (.*) ]]; then
+      append disk_properties 'firmware' "$(echo "${BASH_REMATCH[1]}"|xargs)"
+    fi
+  done < <(echo -n "$smartInfo")
+fi
 
 # Used files
 append all_files 'dir'           "/tmp/.preclear/${disk_properties[name]}"
@@ -943,6 +972,7 @@ append all_files 'pid'           "${all_files[dir]}/pid"
 append all_files 'stat'          "/tmp/preclear_stat_${disk_properties[name]}"
 append all_files 'smart_prefix'  "${all_files[dir]}/smart_"
 append all_files 'smart_final'   "${all_files[dir]}/smart_final"
+append all_files 'smart_out'     "${all_files[dir]}/smart_out"
 mkdir -p "${all_files[dir]}"
 trap "rm -rf ${all_files[dir]}" EXIT;
 
@@ -969,7 +999,7 @@ fi
 all_timer=$(timer)
 
 # set the default canvas
-draw_canvas $canvas_height $canvas_width >/dev/null
+# draw_canvas $canvas_height $canvas_width >/dev/null
 
 ######################################################
 ##                                                  ##
@@ -1072,11 +1102,11 @@ all_timer=$(timer)
 append display_title "${ul}unRAID Server Pre-Clear of disk${noul} ${bold}$theDisk${norm}"
 
 # Export initial SMART status
-save_smart_info $theDisk $smart_type "cycle_initial_start"
+[ "$disable_smart" != "y" ] && save_smart_info $theDisk $smart_type "cycle_initial_start"
 
 # Add current SMART status to display_smart
-compare_smart "cycle_initial_start"
-display_smart=$(output_smart $theDisk $smart_type)
+[ "$disable_smart" != "y" ] && compare_smart "cycle_initial_start"
+[ "$disable_smart" != "y" ] && output_smart $theDisk $smart_type
 
 for cycle in $(seq $cycles); do
   # Set a cycle timer
@@ -1098,11 +1128,11 @@ for cycle in $(seq $cycles); do
   fi
 
   # Export initial SMART status
-  save_smart_info $theDisk $smart_type "cycle_${cycle}_start"
+  [ "$disable_smart" != "y" ] && save_smart_info $theDisk $smart_type "cycle_${cycle}_start"
 
   # Do a preread if not skipped
   if [ "$skip_preread" != "y" ]; then
-    display_status "Pre-Read in progress ..." ""
+    display_status "Pre-Read in progress ..." ''
     if read_entire_disk no-verify preread average; then
       append display_step "Pre-read verification:|${average} ***SUCCESS***"
       display_status
@@ -1116,18 +1146,18 @@ for cycle in $(seq $cycles); do
   fi
 
   # Zero the disk
-  display_status "Zeroing in progress ..." ""
+  display_status "Zeroing in progress ..." ''
   write_zeroes average
   sleep 10
   append display_step "Zeroing the disk:|${average} ***SUCCESS***"
   sleep 10
 
   # Write unRAID's preclear signature to the disk
-  display_status "Writing unRAID's Preclear signature to the disk ..." ""
+  display_status "Writing unRAID's Preclear signature to the disk ..." ''
   echo "${disk_properties[name]}|NN|Writing unRAID's Preclear signature|$$" > ${all_files[stat]}
   write_signature 64
   sleep 10
-  append display_step "Writing unRAID's Preclear signature:|***SUCCESS*** "
+  append display_step "Writing unRAID's Preclear signature:|***SUCCESS***"
   echo "${disk_properties[name]}|NN|Writing unRAID's Preclear signature finished|$$" > ${all_files[stat]}
   sleep 10
 
@@ -1141,7 +1171,7 @@ for cycle in $(seq $cycles); do
   else
     append display_step "Verifying unRAID's Preclear signature:|***FAIL*** "
     display_status
-    echo "--> FAIL: unRAID's Preclear signature not valid. \n\n"
+    echo -e "--> FAIL: unRAID's Preclear signature not valid. \n\n"
     echo "${disk_properties[name]}|NY|unRAID's signature on the MBR failed - Aborted|$$" > ${all_files[stat]}
     exit 1
   fi
@@ -1163,16 +1193,30 @@ for cycle in $(seq $cycles); do
     fi
   fi
   # Export final SMART status for cycle
-  save_smart_info $theDisk $smart_type "cycle_${cycle}_end"
+  [ "$disable_smart" != "y" ] && save_smart_info $theDisk $smart_type "cycle_${cycle}_end"
   # Compare start/end values
-  compare_smart "cycle_${cycle}_start" "cycle_${cycle}_end" "CYCLE $cycle"
+  [ "$disable_smart" != "y" ] && compare_smart "cycle_${cycle}_start" "cycle_${cycle}_end" "CYCLE $cycle"
   # Add current SMART status to display_smart
-  display_smart=$(output_smart $theDisk $smart_type)
-  display_status
+  [ "$disable_smart" != "y" ] && output_smart $theDisk $smart_type
+  display_status '' ''
+
 done
 
-echo -e "--> ATENTION: Please take a look into the SMART report above for drive health issues.\n\n"
-
-echo -e "\n--> RESULT: Preclear finished succesfully./n/n"
-
 echo "${disk_properties[name]}|NN|Preclear Finished Successfully!|$$" > ${all_files[stat]};
+echo -e "\n--> ATENTION: Please take a look into the SMART report above for drive health issues.\n"
+echo -e "--> RESULT: Preclear finished succesfully.\n\n"
+
+# Saving report
+report="${all_files[dir]}/report"
+display_status '' '' 'y'> $report
+echo -e "\n--> ATENTION: Please take a look into the SMART report above for drive health issues.\n" >> $report
+echo -e "--> RESULT: Preclear finished succesfully.\n\n" >> $report
+
+# Clear report from formatting characters
+sed -i -r 's%(\x9B|\x1B\[)[0-?]*[@-~]%%g' $report
+sed -i -e 's/####/#/g' $report
+
+# Save report to Flash disk
+mkdir -p /boot/preclear_reports/
+todos < $report > /boot/preclear_reports/preclear_report_${disk_properties[serial_long]}.txt
+

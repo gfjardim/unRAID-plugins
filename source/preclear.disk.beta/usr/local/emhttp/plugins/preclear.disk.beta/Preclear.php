@@ -12,7 +12,7 @@ $log_file       = "/var/log/{$plugin}.log";
 $script_file    = "/usr/local/emhttp/plugins/${plugin}/script/preclear_disk.sh";
 $script_version = (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>/dev/null|cut -d: -f2")) : NULL;
 $noprompt       = $script_version ? (strpos(file_get_contents($script_file), "noprompt") ? TRUE : FALSE ) : FALSE;
-$VERBOSE        = TRUE;
+// $VERBOSE        = TRUE;
 
 if (isset($_POST['display'])) $display = $_POST['display'];
 
@@ -367,7 +367,7 @@ switch ($_GET['action']) {
     if ( $content === NULL ) {
       echo "<script>window.close();</script>";
     }
-    echo "<pre>".preg_replace("#\n+#", "<br>", $content)."</pre>";
+    echo "<pre>".preg_replace("#\n{5,}#", "<br>", $content)."</pre>";
     echo "<script>document.title='Preclear for disk /dev/{$device} ';$(function(){setTimeout('location.reload()',5000);});</script>";
     break;
 }
