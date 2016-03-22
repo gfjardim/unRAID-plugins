@@ -1,2 +1,0 @@
-#!/bin/bash
-/usr/local/emhttp/plugins/unassigned.devices/scripts/rc.unassigned umount all
