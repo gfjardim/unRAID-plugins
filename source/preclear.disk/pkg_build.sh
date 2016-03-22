@@ -8,16 +8,17 @@ version=$(date +"%Y.%m.%d")
 package="${archive}/${plugin}-%s.txz"
 md5="${archive}/${plugin}-%s.md5"
 
-for x in "" a b c d e d f g h ; do
-  package=$(printf "$package" "${version}${x}")
+for x in '' a b c d e d f g h ; do
+  pkg=$(printf "$package" "${version}${x}")
   md5=$(printf "$md5" "${version}${x}")
-  if [[ ! -f $package ]]; then
+  if [[ ! -f "$pkg" ]]; then
+    package=$pkg
     version="${version}${x}"
     break
   fi
 done
 
-sed -i -e "s#\(ENTITY\s*version[^\"]*\).*#\1\"${version}\"#" "$plg_file"
+sed -i -e "s#\(ENTITY\s*version[^\"]*\).*#\1\"${version}\">#" "$plg_file"
 
 mkdir -p $tmpdir
 cd "$DIR"

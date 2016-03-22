@@ -10,7 +10,7 @@ $plugin         = "preclear.disk";
 $state_file     = "/var/state/{$plugin}/state.ini";
 $log_file       = "/var/log/{$plugin}.log";
 $script_file    = "/boot/config/plugins/preclear.disk/preclear_disk.sh";
-$script_version =  (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>/dev/null|cut -d: -f2")) : NULL;
+$script_version = (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>/dev/null|cut -d: -f2")) : NULL;
 $noprompt       = $script_version ? (strpos(file_get_contents($script_file), "noprompt") ? TRUE : FALSE ) : FALSE;
 // $VERBOSE        = TRUE;
 
@@ -128,57 +128,18 @@ function save_ini_file($file, $array) {
   }
   file_put_contents($file, implode(PHP_EOL, $res));
 }
-// function get_unasigned_disks() {
-//   $disks = $paths = $unraid_disks = $unraid_cache = array();
-//   foreach (listDir("/dev/disk/by-id") as $p) {
-//     $r = realpath($p);
-//     if (!is_bool(strpos($r, "/dev/sd")) || !is_bool(strpos($r, "/dev/hd"))) {
-//       $paths[$r] = $p;
-//     }
-//   }
-//   natsort($paths);
-//   $unraid_flash = realpath("/dev/disk/by-label/UNRAID");
-//   foreach (parse_ini_string(shell_exec("/usr/bin/cat /proc/mdcmd 2>/dev/null")) as $k => $v) {
-//     if (strpos($k, "rdevName") !== FALSE && strlen($v)) {
-//       $unraid_disks[] = realpath("/dev/$v");
-//     }
-//   }
-//   foreach ($unraid_disks as $k) {$o .= "  $k\n";}; //debug("UNRAID DISKS:\n$o", "DEBUG");
-//   foreach (parse_ini_file("/boot/config/disk.cfg") as $k => $v) {
-//     if (strpos($k, "cacheId") !== FALSE && strlen($v)) {
-//       foreach ( preg_grep("#".$v."$#i", $paths) as $c) $unraid_cache[] = realpath($c);
-//     }
-//   }
-//   foreach ($unraid_cache as $k) {$g .= "  $k\n";}; //debug("UNRAID CACHE:\n$g", "DEBUG");
-//   foreach ($paths as $path => $d) {
-//     if (preg_match("#^(.(?!wwn|part))*$#", $d)) {
-//       if (! in_array($path, $unraid_disks) && ! in_array($path, $unraid_cache) && strpos($unraid_flash, $path) === FALSE) {
-//         if (in_array($path, array_map(function($ar){return $ar['device'];},$disks)) ) continue;
-//         $m = array_values(preg_grep("#$d.*-part\d+#", $paths));
-//         natsort($m);
-//         $disks[$d] = array("device"=>$path,"type"=>"ata","partitions"=>$m);
-//         //debug("Unassigned disk: $d", "DEBUG");
-//       } else {
-//         //debug("Discarded: => $d ($path)", "DEBUG");
-//         continue;
-//       }
-//     } 
-//   }
-//   return $disks;
-// }
 function get_unasigned_disks() {
   $paths          = listDir("/dev/disk/by-id");
   $disks_id       = preg_grep("#wwn-|-part#", $paths, PREG_GREP_INVERT);
   $disks_real     = array_map(function($p){return realpath($p);}, $disks_id);
   exec("/usr/bin/strings /boot/config/super.dat 2>/dev/null|grep -Po '.{10,}'", $disks_serial);
+  exec("udevadm info --query=property --name /dev/disk/by-label/UNRAID 2>/dev/null|grep -Po 'ID_SERIAL=\K.*'", $flash_serial);
   $disks_cfg      = is_file("/boot/config/disk.cfg") ? parse_ini_file("/boot/config/disk.cfg") : array();
   $cache_serial   = array_flip(preg_grep("#cacheId#i", array_flip($disks_cfg)));
-  $flash          = realpath("/dev/disk/by-label/UNRAID");
-  $flash_serial   = array_filter($paths, function($p) use ($flash) {if(!is_bool(strpos($flash,realpath($p)))) return basename($p);});
   $unraid_serials = array_merge($disks_serial,$cache_serial,$flash_serial);
   $unraid_disks   = array();
   foreach($unraid_serials as $serial) {
-    $unraid_disks = array_merge($unraid_disks, preg_grep("#".preg_quote($serial, "#")."#", $disks_id));
+    $unraid_disks = array_merge($unraid_disks, preg_grep("#-".preg_quote($serial, "#")."#", $disks_id));
   }
   $unraid_real = array_map(function($p){return realpath($p);}, $unraid_disks);
   $unassigned  = array_flip(array_diff(array_combine($disks_id, $disks_real), $unraid_real));
@@ -327,26 +288,32 @@ switch ($_POST['action']) {
     break;
 
   case 'start_preclear':
-    $device = urldecode($_POST['device']);
-    $op       = (isset($_POST['op']) && $_POST['op'] != "0") ? " ".urldecode($_POST['op']) : "";
-    $notify   = (isset($_POST['-o']) && $_POST['-o'] > 0) ? " -o ".urldecode($_POST['-o']) : "";
-    $mail     = (isset($_POST['-M']) && $_POST['-M'] > 0 && intval($_POST['-o']) > 0) ? " -M ".urldecode($_POST['-M']) : "";
-    $passes   = isset($_POST['-c']) ? " -c ".urldecode($_POST['-c']) : "";
-    $read_sz  = (isset($_POST['-r']) && $_POST['-r'] != 0) ? " -r ".urldecode($_POST['-r']) : "";
-    $write_sz = (isset($_POST['-w']) && $_POST['-w'] != 0) ? " -w ".urldecode($_POST['-w']) : "";
-    $pre_read = (isset($_POST['-W']) && $_POST['-W'] == "on") ? " -W" : "";
+    $device    = urldecode($_POST['device']);
+    $op        = (isset($_POST['op']) && $_POST['op'] != "0") ? urldecode($_POST['op']) : "";
+    $notify    = (isset($_POST['-o']) && $_POST['-o'] > 0) ? " -o ".urldecode($_POST['-o']) : "";
+    $mail      = (isset($_POST['-M']) && $_POST['-M'] > 0 && intval($_POST['-o']) > 0) ? " -M ".urldecode($_POST['-M']) : "";
+    $passes    = isset($_POST['-c']) ? " -c ".urldecode($_POST['-c']) : "";
+    $read_sz   = (isset($_POST['-r']) && $_POST['-r'] != 0) ? " -r ".urldecode($_POST['-r']) : "";
+    $write_sz  = (isset($_POST['-w']) && $_POST['-w'] != 0) ? " -w ".urldecode($_POST['-w']) : "";
+    $pre_read  = (isset($_POST['-W']) && $_POST['-W'] == "on") ? " -W" : "";
+    $post_read = (isset($_POST['-X']) && $_POST['-X'] == "on") ? " -X" : "";
     $fast_read = (isset($_POST['-f']) && $_POST['-f'] == "on") ? " -f" : "";
-    $noprompt = $noprompt ? " -J" : "";
+    $noprompt  = $noprompt ? " -J" : "";
     $wait_confirm = (! $op || $op == " -z" || $op == " -V") ? TRUE : FALSE;
+    if ($post_read && $pre_read) {
+      $post_read = " -n";
+      $pre_read = "";
+    }
     if (! $op ){
-      $cmd = "$script_file {$op}{$mail}{$notify}{$passes}{$read_sz}{$write_sz}{$pre_read}{$fast_read}{$noprompt} /dev/$device";
+      $cmd = "$script_file {$op}{$mail}{$notify}{$passes}{$read_sz}{$write_sz}{$pre_read}{$post_read}{$fast_read}{$noprompt} /dev/$device";
       @file_put_contents("/tmp/preclear_stat_{$device}","{$device}|NN|Starting...");
-    } else if ($op == " -V"){
-      $cmd = "$script_file {$op}{$fast_read}{$mail}{$notify}{$noprompt} /dev/$device";
+    } else if ($op == "-V"){
+      $cmd = "$script_file {$op}{$fast_read}{$mail}{$notify}{$read_sz}{$write_sz}{$noprompt} /dev/$device";
       @file_put_contents("/tmp/preclear_stat_{$device}","{$device}|NN|Starting...");
     } else {
       $cmd = "$script_file {$op}{$noprompt} /dev/$device";
     }
+    $cmd = "$cmd 2>/tmp/preclear.log";
     // echo $cmd;
     // exit();
     tmux_kill_window("preclear_disk_{$device}");

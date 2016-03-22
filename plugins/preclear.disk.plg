@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2015.11.18">
+<!ENTITY version   "2016.03.22">
 <!ENTITY launch    "Settings/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -15,7 +15,10 @@
 <CHANGES>
 ##&name;
 
-###&version;
+###2016.03.22
+- Fix: removed parity drives not showing up
+
+###2015.11.18
 - Add: logging capabilities
 - Fix: php error if disk.cfg file doesn't exist
 
