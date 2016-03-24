@@ -363,7 +363,13 @@ switch ($_GET['action']) {
     $device = urldecode($_GET['device']);
     echo (is_file("webGui/scripts/dynamix.js")) ? "<script type='text/javascript' src='/webGui/scripts/dynamix.js'></script>" : 
                                                   "<script type='text/javascript' src='/webGui/javascript/dynamix.js'></script>";
-    $content = tmux_get_session("preclear_disk_".$device);
+    for ($i=0; $i < 20; $i++) { 
+      $content = tmux_get_session("preclear_disk_".$device);
+      if (preg_match("%π%", $content)) {
+        break;
+      }
+      sleep(0.5);
+    }
     if ( $content === NULL ) {
       echo "<script>window.close();</script>";
     }

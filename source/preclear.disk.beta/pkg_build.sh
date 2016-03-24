@@ -10,9 +10,9 @@ md5="${archive}/${plugin}-%s.md5"
 
 for x in '' a b c d e d f g h ; do
   pkg=$(printf "$package" "${version}${x}")
-  md5=$(printf "$md5" "${version}${x}")
   if [[ ! -f "$pkg" ]]; then
     package=$pkg
+    md5=$(printf "$md5" "${version}${x}")
     version="${version}${x}"
     break
   fi

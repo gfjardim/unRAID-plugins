@@ -342,7 +342,7 @@ write_zeroes(){
 
     status="Time elapsed: $(timer $time_start) | Write speed: $current_speed | Average speed: $average_speed MB/s"
     if [ "$cycles" -gt 1 ]; then
-      cycle_disp="($cycle of $cycles)"
+      cycle_disp=" ($cycle of $cycles)"
     fi
 
     echo "$disk_name|NN|Zeroing${cycle_disp}: ${percent_wrote}% @ $current_speed ($(timer $time_start))|$$" >$stat_file
@@ -357,7 +357,7 @@ write_zeroes(){
     fi
     if [ -f "$pause" ]; then
       display_status "Zeroing in progress:|###(${percent_wrote}% Done)### ***PAUSED***" "** PAUSED"
-    echo "$disk_name|NN|Zeroing${cycle_disp}: PAUSED|$$" >$stat_file
+      echo "$disk_name|NN|Zeroing${cycle_disp}: PAUSED|$$" >$stat_file
 
       kill -TSTP $dd_pid
       while [[ -f $pause ]]; do
@@ -450,10 +450,6 @@ read_entire_disk() {
     read_limit=$read_size
   else
     read_limit=134217728  # 128 MB
-    read_limit=402653184  # 384 MB
-    read_limit=671088640  # 640 MB
-    read_limit=1073741824 # 1GB
-    read_limit=268435456  # 256 MB
   fi
 
   if [ "$short_test" == "y" ]; then
@@ -484,10 +480,6 @@ read_entire_disk() {
 
   let total_chunks=($total_bytes / $chunk)
   
-  # echo total_bytes=[$total_bytes] bcount=[$bcount]
-  # echo chunk=[$chunk] total_chunks=[$total_chunks]
-  # echo bytes per read $(( $chunk * $bcount ))
-  #dd if=$disk bs=$chunk count=$bcount skip=$skip conv=noerror
   while [ "$skip" -le "$total_chunks" ]; do
 
     # Break loop if it's the end of the disk
@@ -558,7 +550,7 @@ read_entire_disk() {
 
     status="Time elapsed: $(timer $time_start) | Current speed: $read_speed | Average speed: $average_speed MB/s"
     if [ "$cycles" -gt 1 ]; then
-      cycle_disp="($cycle of $cycles)"
+      cycle_disp=" ($cycle of $cycles)"
     fi
     echo "$disk_name|NN|${read_type_s}${cycle_disp}: ${percent_read}% @ $read_speed ($(timer $time_start))|$$" > $stat_file
 
@@ -585,6 +577,7 @@ read_entire_disk() {
         sleep 1
       done
     fi
+
   done
   eval "$output='[$(timer $time_start) @ $average_speed MB/s']"
 }
@@ -627,6 +620,7 @@ display_status(){
   local hpos=1
   local skip_formatting=$3
   local step=1
+  local out="${all_files[dir]}/display_out"
 
   eval "local -A prev=$(array_content display_step)"
   eval "local -A title=$(array_content display_title)"
@@ -635,7 +629,7 @@ display_status(){
     tput reset
   fi
 
-  draw_canvas $hpos $height $width 
+  draw_canvas $hpos $height $width
 
   for (( i = 0; i <= ${#title[@]}; i++ )); do
     line=${title[$i]}
@@ -643,7 +637,7 @@ display_status(){
     tput cup $(($i+2+$hpos)) $(( $width/2 - $line_num/2  )); echo "$line"
   done
 
-  l=$((${#title[@]}+5+$hpos))
+  l=$((${#title[@]}+4+$hpos))
 
   for i in "${!prev[@]}"; do
     if [ -n "${prev[$i]}" ]; then
@@ -701,23 +695,25 @@ display_status(){
   footer_num=$(echo "$footer"|tr -d "${bold}"|tr -d "${norm}"|tr -d "${ul}"|tr -d "${noul}"|wc -m)
   tput cup $(( $height + $hpos - 1)) $(( $width/2 - $footer_num/2  )); echo "$footer"
 
-  tput cup $(( $height + $hpos + 2 )) 0
-
   if [ -f "$smart_output" ]; then
     echo -e "\n\n\n\n"
-    init=$(($hpos+$height+4))
+    init=$(($hpos+$height+3))
     draw_canvas $init $height $width
     line="S.M.A.R.T. Status"
     line_num=$(echo "$line"|tr -d "${bold}"|tr -d "${norm}"|tr -d "${ul}"|tr -d "${noul}"|wc -m)
     let l=($init + 2)
-    tput cup $(($l)) $(( $width/2 - $line_num/2  )); echo "${ul}$line${noul}"
-    let l+=5
+    tput cup $(($l)) $(( $width/2 - $line_num/2 )); echo "${ul}$line${noul}"
+    let l+=3
     while read line; do
       tput cup $l $wpos && echo -n "$line" && echo -e ""
       let l+=1
     done < <(head -n -1 "$smart_output")
     tput cup $(( $init + $height - 1)) $wpos; tail -n 1 "$smart_output"
+    tput cup $(( $init + $height )) $width; echo "π"
     tput cup $(( $init + $height + 2)) 0
+  else
+    tput cup $(( $height + $hpos )) $width; echo "π"
+    tput cup $(( $height + $hpos + 2 )) 0
   fi
 }
 
@@ -767,8 +763,8 @@ ask_preclear(){
     tput cup $l $wpos && echo "Disk Device:    ${disk_info[device]}"
   fi
 
-  tput cup $(($l+4)) $wpos && echo "Type ${bold}Yes${norm} to proceed: "
-  tput cup $(($l+4)) $(($wpos+21)) && read answer
+  tput cup $(($height - 4)) $wpos && echo "Type ${bold}Yes${norm} to proceed: "
+  tput cup $(($height - 4)) $(($wpos+21)) && read answer
 
   tput cup $(( $height - 1)) $wpos; 
 
@@ -786,17 +782,26 @@ save_smart_info() {
   local name=$3
   local device=$1
   local type=$2
-  local valid_attributes=" 4 5 9 183 187 188 196 197 198 199 242 "
+  local valid_attributes=" 4 5 9 183 184 187 190 194 196 197 198 199 "
+  local valid_temp=" 190 194 "
   local smart_file="${all_files[smart_prefix]}${name}"
+  local found_temp=n
   cat /dev/null > $smart_file
 
   while read line; do
     attr=$(echo $line | cut -d'|' -f1)
     if [[ $valid_attributes =~ [[:space:]]$attr[[:space:]] ]]; then
-      echo $line >> $smart_file
+      if [[ $valid_temp =~ [[:space:]]$attr[[:space:]] ]]; then
+        if [[ $found_temp != "y" ]]; then
+          echo $line >> $smart_file
+          found_temp=y
+        fi
+      else
+        echo $line >> $smart_file
+      fi
     fi
   done < <(smartctl --attributes -d $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" | \
-           grep -v "ATTRIBUTE_NAME" | grep -v "^$" | awk '{ print $1 "|" $2 "|" $NF}')
+           grep -v "ATTRIBUTE_NAME" | grep -v "^$" | awk '{ print $1 "|" $2 "|" $10}')
 }
 
 compare_smart() {
@@ -816,6 +821,7 @@ compare_smart() {
   while read line; do
     attr=$(echo $line | cut -d'|' -f1)
     name=$(echo $line | cut -d'|' -f2)
+    name="${attr}-${name}"
     nvalue=$(echo $line | cut -d'|' -f3)
     ivalue=$(cat $initial| grep "^${attr}"|cut -d'|' -f3)
     if [ "$(cat $final 2>/dev/null|grep -c "$name")" -gt "0" ]; then
@@ -834,21 +840,30 @@ output_smart() {
   nfinal="${final}_$(( $RANDOM * 19318203981230 + 40 ))"
   cp -f "$final" "$nfinal"
   sed -i " 1 s/$/|STATUS/" $nfinal
+  status=$(smartctl --attributes -d $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" |\
+           grep -v "ATTRIBUTE_NAME" | grep -v "^$" | awk '{print $1 "-" $2 "|" $9 }')
   while read line; do
     attr=$(echo $line | cut -d'|' -f1)
     inival=$(echo "$line" | cut -d'|' -f2)
     lasval=$(echo "$line" | grep -o '[^|]*$')
     let diff=($lasval - $inival)
     if [ "$diff" -gt "0" ]; then
-      msg="Increased by '$diff'"
+      msg="Up $diff"
     elif [ "$diff" -lt "0" ]; then
-      msg="Decreased by '$diff'"
+      diff=$(echo $diff | sed 's/-//g')
+      msg="Down $diff"
     else
-      msg="Not changed"
+      msg="-"
+    fi
+    stat=$(echo $status|grep -Po "${attr}[^\s]*")
+    if [[ $stat =~ FAILING_NOW ]]; then
+      msg="$msg|->FAILING NOW!<-"
+    elif [[ $stat =~ In_the_past ]]; then
+      msg="$msg|->Failed in Past<-"
     fi
     sed -i "/^$attr/ s/$/|${msg}/" $nfinal
   done < <(cat $nfinal | tail -n +2)
-  cat $nfinal | column -t -s '|' -o '   ' > $output
+  cat $nfinal | column -t -s '|' > $output
   smartctl --health -d $type $device | sed -n '/SMART DATA SECTION/,/^$/p'| tail -n +2 | head -n 1 >> $output
 }
 
@@ -864,14 +879,14 @@ cycles=1
 append display_step ""
 verify_mbr_only=n
 refresh_period=10
-canvas_width=110
+canvas_width=123
 canvas_height=20
 canvas_brick=#
 smart_type=auto
 opts_long="frequency:,notify:,skip-preread,skip-postread,read-size:,write-size:,read-blocks:,"
-opts_long+="test,no-stress,list,cycles:,signature,verify,no-prompt,version,preclear-only"
+opts_long+="test,no-stress,list,cycles:,signature,verify,no-prompt,version,preclear-only,format-html"
 
-OPTS=$(getopt -o f:n:sSr:w:b:tdlc:ujvo \
+OPTS=$(getopt -o f:n:sSr:w:b:tdlc:ujvom \
       --long $opts_long -n "$(basename $0)" -- "$@")
 
 if [ "$?" -ne "0" ]; then
@@ -898,6 +913,7 @@ while true ; do
     -j|--no-prompt)     no_prompt=y;                         shift 1;;
     -v|--version)       echo "$0 version: $version"; exit 0; shift 1;;
     -o|--preclear-only) write_disk_mbr=y;                    shift 1;;
+    -m|--format-html)   format_html=y;                       shift 1;;
 
     --) shift ; break ;;
     * ) echo "Internal error!" ; exit 1 ;;
@@ -977,7 +993,15 @@ mkdir -p "${all_files[dir]}"
 trap "rm -rf ${all_files[dir]}" EXIT;
 
 # Set terminal variables
-if [ -x /usr/bin/tput ]; then
+if [ "$format_html" == "y" ]; then
+  clearscreen=`tput clear`
+  goto_top=`tput cup 0 1`
+  screen_line_three=`tput cup 3 1`
+  bold="&lt;b&gt;"
+  norm="&lt;/b&gt;"
+  ul="&lt;span style=\"text-decoration: underline;\"&gt;"
+  noul="&lt;/span&gt;"
+elif [ -x /usr/bin/tput ]; then
   clearscreen=`tput clear`
   goto_top=`tput cup 0 1`
   screen_line_three=`tput cup 3 1`
@@ -1020,6 +1044,11 @@ if [ -f "${all_files[pid]}" ]; then
 else
   echo "$$" > ${all_files[pid]}
 fi
+
+# [ "$disable_smart" != "y" ] && save_smart_info $theDisk $smart_type "cycle_initial_start"
+# [ "$disable_smart" != "y" ] && compare_smart "cycle_initial_start"
+# [ "$disable_smart" != "y" ] && output_smart $theDisk $smart_type
+# cat "${all_files[smart_out]}"
 
 if ! is_preclear_candidate $theDisk; then
   echo -e "\n${bold}The disk '$theDisk' is part of unRAID's array, or is assigned as a cache device.${norm}"
@@ -1203,13 +1232,13 @@ for cycle in $(seq $cycles); do
 done
 
 echo "${disk_properties[name]}|NN|Preclear Finished Successfully!|$$" > ${all_files[stat]};
-echo -e "\n--> ATENTION: Please take a look into the SMART report above for drive health issues.\n"
+echo -e "\n--> ATTENTION: Please take a look into the SMART report above for drive health issues.\n"
 echo -e "--> RESULT: Preclear finished succesfully.\n\n"
 
 # Saving report
 report="${all_files[dir]}/report"
 display_status '' '' 'y'> $report
-echo -e "\n--> ATENTION: Please take a look into the SMART report above for drive health issues.\n" >> $report
+echo -e "\n--> ATTENTION: Please take a look into the SMART report above for drive health issues.\n" >> $report
 echo -e "--> RESULT: Preclear finished succesfully.\n\n" >> $report
 
 # Clear report from formatting characters

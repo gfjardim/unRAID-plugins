@@ -56,8 +56,8 @@ $numdisks = count(get_unasigned_disks())-1;
     },"json").always(function(){setTimeout('get_content()',<?=$display['refresh'] ? $display['refresh'] : "10000";?>);});
   }
   function openPreclear(device) {
-    var width=890;
-    var height=700;
+    var width=985;
+    var height=730;
     var top = (screen.height-height)/2;
     var left = (screen.width-width)/2;
     var options = 'resizeable=yes,scrollbars=yes,height='+height+',width='+width+',top='+top+',left='+left;
