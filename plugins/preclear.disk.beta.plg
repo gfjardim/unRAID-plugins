@@ -174,6 +174,9 @@ fi
 chmod +x /usr/local/emhttp/plugins/&name;/script/preclear_disk.sh
 chmod -R +x /usr/local/emhttp/plugins/&name;/event/
 
+# Make dir
+mkdir -p /tmp/.preclear/
+
 # Cleaning old source files
 find /boot/config/plugins/&name;/ -type f -iname "&name;*.txz" ! -iname "*&version;*" -delete
 find /boot/config/plugins/&name;/ -type f -iname "&name;*.md5" ! -iname "*&version;*" -delete
