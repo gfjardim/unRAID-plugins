@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk.beta">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2016.03.24">
+<!ENTITY version   "2016.03.24a">
 <!ENTITY launch    "Settings/PreclearBeta">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,9 @@
 
 <CHANGES>
 ##&name;
+
+###2016.03.24a
+- Fix: better smartctl device testing
 
 ###2016.03.24
 - Fix: displaying negative numbers

@@ -782,7 +782,7 @@ save_smart_info() {
   local name=$3
   local device=$1
   local type=$2
-  local valid_attributes=" 4 5 9 183 184 187 190 194 196 197 198 199 "
+  local valid_attributes=" 5 9 183 184 187 190 194 196 197 198 199 "
   local valid_temp=" 190 194 "
   local smart_file="${all_files[smart_prefix]}${name}"
   local found_temp=n
@@ -959,10 +959,16 @@ if [ "$discard" -gt "0" ]; then
   read_stress=n
 fi
 
-smartInfo=$(smartctl --info -d $smart_type "$theDisk" 2>&1)
-if [[ $smartInfo =~ Identity\ failed ]]; then
-  disable_smart=y
-fi
+# Test suitable device type for SMART, and disable it if not found.
+disable_smart=y
+for type in scsi ata auto sat,auto sat,12 usbsunplus usbcypress usbjmicron usbjmicron,x ; do
+  smartInfo=$(smartctl --info -d $type "$theDisk" 2>&1)
+  if [[ $smartInfo =~ device\ has\ SMART\ capability ]]; then
+    disable_smart=n
+    smart_type=$type
+    break
+  fi
+done
 
 if [ "$disable_smart" != "y" ]; then
   # Parse SMART info
@@ -1049,6 +1055,7 @@ fi
 # [ "$disable_smart" != "y" ] && compare_smart "cycle_initial_start"
 # [ "$disable_smart" != "y" ] && output_smart $theDisk $smart_type
 # cat "${all_files[smart_out]}"
+# exit 0
 
 if ! is_preclear_candidate $theDisk; then
   echo -e "\n${bold}The disk '$theDisk' is part of unRAID's array, or is assigned as a cache device.${norm}"
