@@ -132,7 +132,7 @@ libevent-2.0.21-x86_64-1.txz
 <!--
 ncurses-5.9-x86_64-2.txz
 -->
-<FILE Name="/boot/config/plugins/&name;/ncurses-5.9-x86_64-2.txz" Run="installpkg">
+<FILE Name="/boot/config/plugins/&name;/ncurses-5.9-x86_64-2.txz" Run="upgradepkg --install-new">
 <URL>http://slackware.osuosl.org/slackware64-14.1/slackware64/l/ncurses-5.9-x86_64-2.txz</URL>
 <MD5>9134fa31097ee352a1f1662e3f6bcb3f</MD5>
 </FILE>
