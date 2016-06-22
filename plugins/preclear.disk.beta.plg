@@ -145,18 +145,9 @@ The 'plugin' package MD5 hash.
 <MD5>7a755ece3e378f244a3c327369e7f2ac</MD5>
 </FILE>
 
-<<<<<<< Updated upstream
-<!--
-ncurses-5.9-x86_64-2.txz
--->
-<FILE Name="/boot/config/plugins/&name;/ncurses-5.9-x86_64-2.txz" Run="upgradepkg --install-new">
-<URL>http://slackware.osuosl.org/slackware64-14.1/slackware64/l/ncurses-5.9-x86_64-2.txz</URL>
-<MD5>9134fa31097ee352a1f1662e3f6bcb3f</MD5>
-=======
-<FILE Name="/boot/config/plugins/&name;/ncurses-&ncurses;.txz" Run="installpkg">
+<FILE Name="/boot/config/plugins/&name;/ncurses-&ncurses;.txz" Run="upgradepkg --install-new">
 <URL>&gitURL;/source/packages/ncurses-&ncurses;.txz</URL>
 <MD5>c2d2b01f021dc2f4752c4fff02f65fd5</MD5>
->>>>>>> Stashed changes
 </FILE>
 
 <!--
@@ -200,7 +191,7 @@ echo ""
 echo "-----------------------------------------------------------"
 echo " &name; has been installed."
 echo " This plugin requires Dynamix webGui to operate"
-echo " Copyright 2015, gfjardim"
+echo " Copyright 2015-2016, gfjardim"
 echo " Version: &version;"
 echo "-----------------------------------------------------------"
 echo ""
