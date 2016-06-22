@@ -145,7 +145,7 @@ The 'plugin' package MD5 hash.
 <MD5>7a755ece3e378f244a3c327369e7f2ac</MD5>
 </FILE>
 
-<FILE Name="/boot/config/plugins/&name;/ncurses-&ncurses;.txz" Run="upgradepkg --install-new">
+<FILE Name="/boot/config/plugins/&name;/ncurses-&ncurses;.txz" Run="installpkg">
 <URL>&gitURL;/source/packages/ncurses-&ncurses;.txz</URL>
 <MD5>c2d2b01f021dc2f4752c4fff02f65fd5</MD5>
 </FILE>
