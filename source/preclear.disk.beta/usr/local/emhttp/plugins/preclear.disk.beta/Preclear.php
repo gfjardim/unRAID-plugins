@@ -219,7 +219,7 @@ function get_disk_info($device, $reload=FALSE){
   $disk['size']         = sprintf("%s %s", my_scale($attrs['SIZE'] , $unit), $unit);
   $d1=time();
   $disk['temperature']  = get_temp($device);
-  debug("get_temp($device):".(time() - $d1),'DEBUG');
+  debug("get_temp($device): ".(time() - $d1),'DEBUG');
   return $disk;
 }
 function is_disk_running($dev) {
@@ -266,27 +266,21 @@ switch ($_POST['action']) {
         $disks_o .= "<td><span class='toggle-hdd' hdd='{$disk_name}'><i class='glyphicon glyphicon-hdd hdd'></i>".($p?"<span style='margin:4px;'></span>":"<i class='glyphicon glyphicon-plus-sign glyphicon-append'></i>").$serial."</td>";
         $disks_o .= "<td>{$temp}</td>";
         $status = $disk_mounted ? "Disk mounted" : "<a class='exec' onclick='start_preclear(\"{$disk_name}\")'>Start Preclear</a>";
-        if (tmux_is_session("preclear_disk_{$disk_name}")) {
-          $status = "<a class='exec' onclick='openPreclear(\"{$disk_name}\");' title='Preview'><i class='glyphicon glyphicon-eye-open'></i></a>";
-          $status = "{$status}<a title='Clear' style='color:#CC0000;' class='exec' onclick='remove_session(\"{$disk_name}\");'> <i class='glyphicon glyphicon-remove hdd'></i></a>";
-        }
         debug("Starting get preclear status: ".(time() - $start_time),'DEBUG');
         if (is_file("/tmp/preclear_stat_{$disk_name}")) {
           $preclear = explode("|", file_get_contents("/tmp/preclear_stat_{$disk_name}"));
-          if (count($preclear) > 3) {
-            if (file_exists( "/proc/".trim($preclear[3]))) {
-              $status = "<span style='color:#478406;'>{$preclear[2]}</span>";
-              if (tmux_is_session("preclear_disk_{$disk_name}")) $status = "$status<a class='exec' onclick='openPreclear(\"{$disk_name}\");' title='Preview'><i class='glyphicon glyphicon-eye-open'></i></a>";
-              $status = "{$status}<a class='exec' title='Stop Preclear' style='color:#CC0000;' onclick='stop_preclear(\"{$serial}\",\"{$disk_name}\");'> <i class='glyphicon glyphicon-remove hdd'></i></a>";
-            } else {
-              $status = "<span >{$preclear[2]}</span>";
-              if (tmux_is_session("preclear_disk_{$disk_name}")) $status = "$status<a class='exec' onclick='openPreclear(\"{$disk_name}\");' title='Preview'><i class='glyphicon glyphicon-eye-open'></i></a>";
-              $status = "{$status}<a class='exec' style='color:#CC0000;font-weight:bold;' onclick='clear_preclear(\"{$disk_name}\");' title='Clear stats'> <i class='glyphicon glyphicon-remove hdd'></i></a>";
-            } 
-          } else {
-            $status = "<span >{$preclear[2]}</span>";
+          if (file_exists( "/proc/".trim($preclear[3]))) {
+            $status = "<span style='color:#478406;'>{$preclear[2]}</span>";
             if (tmux_is_session("preclear_disk_{$disk_name}")) $status = "$status<a class='exec' onclick='openPreclear(\"{$disk_name}\");' title='Preview'><i class='glyphicon glyphicon-eye-open'></i></a>";
-            $status = "{$status}<a class='exec' style='color:#CC0000;font-weight:bold;'onclick='stop_preclear(\"{$serial}\",\"{$disk_name}\");' title='Clear stats'> <i class='glyphicon glyphicon-remove hdd'></i></a>";
+            $status = "{$status}<a class='exec' title='Stop Preclear' style='color:#CC0000;' onclick='stop_preclear(\"{$serial}\",\"{$disk_name}\");'> <i class='glyphicon glyphicon-remove hdd'></i></a>";
+          } else {
+            if (preg_match("#failed|FAIL#", $preclear[2])) {
+              $status = "<span style='color:#CC0000;'>{$preclear[2]}</span>";
+            } else {
+              $status = "<span style='color:#478406;'>{$preclear[2]}</span>";
+            }
+            if (tmux_is_session("preclear_disk_{$disk_name}")) $status = "$status<a class='exec' onclick='openPreclear(\"{$disk_name}\");' title='Preview'><i class='glyphicon glyphicon-eye-open'></i></a>";
+            $status = "{$status}<a class='exec' style='color:#CC0000;font-weight:bold;' onclick='clear_preclear(\"{$disk_name}\");' title='Clear stats'> <i class='glyphicon glyphicon-remove hdd'></i></a>";
           } 
         }
         debug("finished get preclear status: ".(time() - $start_time),'DEBUG');
@@ -303,37 +297,58 @@ switch ($_POST['action']) {
     echo json_encode(array("disks" => $disks_o, "info" => json_encode($disks)));
     break;
 
+  case 'get_status':
+    $disk_name = urldecode($_POST['device']);
+    $serial    = urldecode($_POST['serial']);
+    if (is_file("/tmp/preclear_stat_{$disk_name}")) {
+      $preclear = explode("|", file_get_contents("/tmp/preclear_stat_{$disk_name}"));
+      if (file_exists( "/proc/".trim($preclear[3]))) {
+        $status = "<span style='color:#478406;'>{$preclear[2]}</span>";
+        if (tmux_is_session("preclear_disk_{$disk_name}")) $status = "$status<a class='exec' onclick='openPreclear(\"{$disk_name}\");' title='Preview'><i class='glyphicon glyphicon-eye-open'></i></a>";
+        $status = "{$status}<a class='exec' title='Stop Preclear' style='color:#CC0000;' onclick='stop_preclear(\"{$serial}\",\"{$disk_name}\");'> <i class='glyphicon glyphicon-remove hdd'></i></a>";
+      } else {
+        if (preg_match("#failed|FAIL#", $preclear[2])) {
+          $status = "<span style='color:#CC0000;'>{$preclear[2]}</span>";
+        } else {
+          $status = "<span style='color:#478406;'>{$preclear[2]}</span>";
+        }
+        if (tmux_is_session("preclear_disk_{$disk_name}")) $status = "$status<a class='exec' onclick='openPreclear(\"{$disk_name}\");' title='Preview'><i class='glyphicon glyphicon-eye-open'></i></a>";
+        $status = "{$status}<a class='exec' style='color:#CC0000;font-weight:bold;' onclick='clear_preclear(\"{$disk_name}\");' title='Clear stats'> <i class='glyphicon glyphicon-remove hdd'></i></a>";
+      }
+    echo json_encode(array("status" => $status));
+    }
+    break;
+
   case 'start_preclear':
     $device    = urldecode($_POST['device']);
+    $session   = "preclear_disk_{$device}";
     $op        = (isset($_POST['op']) && $_POST['op'] != "0") ? urldecode($_POST['op']) : "";
-    // $notify    = (isset($_POST['-o']) && $_POST['-o'] > 0) ? " -o ".urldecode($_POST['-o']) : "";
-    // $mail      = (isset($_POST['-M']) && $_POST['-M'] > 0 && intval($_POST['-o']) > 0) ? " -M ".urldecode($_POST['-M']) : "";
-    $cycles    = isset($_POST['--cycles']) ? " --cycles ".urldecode($_POST['--cycles']) : "";
+    $notify    = (isset($_POST['--notify']) && $_POST['--notify'] > 0) ? " --notify ".urldecode($_POST['--notify']) : "";
+    $frequency = (isset($_POST['--frequency']) && $_POST['--frequency'] > 0 && intval($_POST['--notify']) > 0) ? " --frequency ".urldecode($_POST['--frequency']) : "";
+    $cycles    = (isset($_POST['--cycles'])) ? " --cycles ".urldecode($_POST['--cycles']) : "";
     $read_sz   = (isset($_POST['--read-size']) && $_POST['--read-size'] != 0) ? " --read-size ".urldecode($_POST['--read-size']) : "";
-    // $write_sz  = (isset($_POST['-w']) && $_POST['-w'] != 0) ? " -w ".urldecode($_POST['-w']) : "";
     $pre_read  = (isset($_POST['--skip-preread']) && $_POST['--skip-preread'] == "on") ? " --skip-preread" : "";
     $post_read = (isset($_POST['--skip-postread']) && $_POST['--skip-postread'] == "on") ? " --skip-postread" : "";
-    // $fast_read = (isset($_POST['-f']) && $_POST['-f'] == "on") ? " -f" : "";
-
     $noprompt  = " --no-prompt";
+    // $fast_read = (isset($_POST['-f']) && $_POST['-f'] == "on") ? " -f" : "";
+    // $write_sz  = (isset($_POST['-w']) && $_POST['-w'] != 0) ? " -w ".urldecode($_POST['-w']) : "";
     // $wait_confirm = (! $op || $op == " -z" || $op == " -V") ? TRUE : FALSE;
 
     if (!$op) {
-      $cmd = "$script_file {$op}{$cycles}{$read_sz}{$pre_read}{$post_read}{$noprompt} /dev/$device";
+      $cmd = "$script_file {$op}${notify}${frequency}{$cycles}{$read_sz}{$pre_read}{$post_read}{$noprompt} /dev/$device";
     } else {
-      $cmd = "$script_file {$op}{$read_sz} /dev/$device";
+      $cmd = "$script_file {$op}${notify}${frequency}{$read_sz} /dev/$device";
     }
     @file_put_contents("/tmp/preclear_stat_{$device}","{$device}|NN|Starting...");
 
-    tmux_kill_window("preclear_disk_{$device}");
-    tmux_new_session("preclear_disk_{$device}");
-    tmux_send_command("preclear_disk_{$device}", $cmd);
-    sleep(2);
+    tmux_kill_window($session);
+    tmux_new_session($session);
+    tmux_send_command($session, $cmd);
     if ($wait_confirm && ! $noprompt) {
       foreach(range(0, 30) as $x) {
-        if ( strpos(tmux_get_session("preclear_disk_{$device}"), "Answer Yes to continue") ) {
+        if ( strpos(tmux_get_session($session), "Answer Yes to continue") ) {
           sleep(1);
-          tmux_send_command("preclear_disk_{$device}", "Yes");
+          tmux_send_command($session, "Yes");
           break;
         } else {
           sleep(1);
@@ -354,6 +369,16 @@ switch ($_POST['action']) {
     @unlink("/tmp/preclear_stat_{$device}");
     echo "<script>parent.location=parent.location;</script>";
     break;
+  case 'get_preclear':
+    $device = urldecode($_POST['device']);
+    $content = tmux_get_session("preclear_disk_".$device);
+    if (preg_match("%π%", $content)) {
+      $output .= "<pre>".preg_replace("#\n{5,}#", "<br>", $content)."</pre>";
+    } else {
+      $output .= "";
+    }
+    echo json_encode(array("content" => $output));
+    break;
   case 'send_log':
     return sendLog();
     break;
@@ -361,20 +386,33 @@ switch ($_POST['action']) {
 switch ($_GET['action']) {
   case 'show_preclear':
     $device = urldecode($_GET['device']);
-    echo (is_file("webGui/scripts/dynamix.js")) ? "<script type='text/javascript' src='/webGui/scripts/dynamix.js'></script>" : 
-                                                  "<script type='text/javascript' src='/webGui/javascript/dynamix.js'></script>";
-    for ($i=0; $i < 20; $i++) { 
-      $content = tmux_get_session("preclear_disk_".$device);
-      if (preg_match("%π%", $content)) {
-        break;
+    ?>
+    <?if (is_file("webGui/scripts/dynamix.js")):?>
+    <script type='text/javascript' src='/webGui/scripts/dynamix.js'></script>
+    <?else:?>
+    <script type='text/javascript' src='/webGui/javascript/dynamix.js'></script>
+    <?endif;?>
+    <script>
+      var timers = {};
+      var URL = "/plugins/<?=$plugin;?>/Preclear.php";
+      var device = "<?=$device;?>";
+      function get_preclear() {
+        clearTimeout(timers.preclear);
+        $.post(URL,{action:"get_preclear",device:device},function(data) {
+          if (data.content) {
+            $("#data_content").html(data.content);
+          }
+        },"json").always(function() {
+          timers.preclear=setTimeout('get_preclear()',5000);
+        });
       }
-      sleep(0.5);
-    }
-    if ( $content === NULL ) {
-      echo "<script>window.close();</script>";
-    }
-    echo "<pre>".preg_replace("#\n{5,}#", "<br>", $content)."</pre>";
-    echo "<script>document.title='Preclear for disk /dev/{$device} ';$(function(){setTimeout('location.reload()',5000);});</script>";
+      $(function() {
+        document.title='Preclear for disk /dev/<?=$device;?> ';
+        get_preclear();
+      });
+    </script>
+    <div id="data_content"></div>
+    <?
     break;
 }
 

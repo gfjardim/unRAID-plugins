@@ -3,9 +3,9 @@ LC_CTYPE=C
 export LC_CTYPE
 
 # Version
-version="0.5-beta"
+version="0.6-beta"
 
-# Lets make sure some features are supported by BASH
+# Let's make sure some features are supported by BASH
 BV=$(echo $BASH_VERSION|tr '.' "\n"|grep -Po "^\d+"|xargs printf "%.2d\n"|tr -d '\040\011\012\015')
 if [ "$BV" -lt "040253" ]; then
   echo -e "Sorry, your BASH version isn't supported.\nThe minimum required version is 4.2.53.\nPlease update."
@@ -115,11 +115,14 @@ send_mail() {
   description=$(echo ${2} | tr "'" '`' )
   message=$(echo ${3} | tr "'" '`' )
   recipient=${4}
-  if [ -f "$notify_script" ]; then
-    $notify_script -e "Preclear ${model} ${serial}" -s """${subject}""" -d """${description}""" -m """${message}""" -i "normal ${notify_channels}"
-  else
-    echo -e "${message}" | mail -s "${subject}" "${recipient}"
+  if [ -f "/usr/local/sbin/notify" ]; then # unRAID 6.0
+    notify_script="/usr/local/sbin/notify"
+  elif [ -f "/usr/local/emhttp/plugins/dynamix/scripts/notify" ]; then # unRAID 6.1
+    notify_script="/usr/local/emhttp/plugins/dynamix/scripts/notify"
+  else # unRAID pre 6.0
+    return 1
   fi
+  $notify_script -e "Preclear ${model} ${serial}" -s """${subject}""" -d """${description}""" -m """${message}""" -i "normal ${notify_channel}"
 }
 
 append() {
@@ -291,6 +294,7 @@ write_zeroes(){
   local dd_output=${all_files[dd_out]}
   local disk=${disk_properties[device]}
   local disk_name=${disk_properties[name]}
+  local disk_blocks=${disk_properties[blocks]}
   local pause=${all_files[pause]}
   local percent_wrote
   local short_test=$short_test
@@ -315,15 +319,27 @@ write_zeroes(){
     write_bs="2048k"
   fi
 
+  # Empty the MBR partition table
+  dd if=/dev/zero bs=512 count=100 of=$disk >/dev/null 2>&1
+  blockdev --rereadpt $disk
+
   if [ "$short_test" == "y" ]; then
-    nice -n $niceness dd if=/dev/zero bs=2048k seek=1 of=$disk count=512 2> $dd_output &
+    nice -n $niceness dd if=/dev/zero bs=2048k     seek=1 conv=fdatasync of=$disk count=512 2> $dd_output &
   else
-    nice -n $niceness dd if=/dev/zero bs=$write_bs seek=1 of=$disk        2> $dd_output &
+    nice -n $niceness dd if=/dev/zero bs=$write_bs seek=1 conv=fdatasync of=$disk           2> $dd_output &
   fi
   dd_pid=$!
 
-  # if we are interrupted, kill the background zero of the disk.
+  # if we are interrupted, kill the background zeroing of the disk.
   trap 'kill -9 $dd_pid 2>/dev/null;exit' 2
+
+  # Send initial notification
+  if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 3 ] ; then
+    report_out="Zeroing Started on $disk_name.\\n Disk temperature: $(get_disk_temp $disk $smart_type)\\n"
+    send_mail "Zeroing Started on $disk_name." "Zeroing Started on $disk_name. Cycle $cycle of ${cycles}. " "$report_out"
+    next_notify=25
+  fi
+
   while kill -0 $dd_pid >/dev/null 2>&1; do
     sleep 3 && kill -USR1 $dd_pid 2>/dev/null && sleep 2
     # ensure bytes_wrote is a number
@@ -365,8 +381,32 @@ write_zeroes(){
       done
       kill -CONT $dd_pid
     fi
+
+    # Send mid notification
+    if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -eq 4 ] && [ "$percent_wrote" -ge "$next_notify" ] && [ "$percent_wrote" -ne 100 ]; then
+      disktemp="$(get_disk_temp $disk $smart_type)"
+      report_out="Zeroing in progress on $disk_name: ${percent_wrote}% complete.\\n"
+      report_out+="Wrote $(format_number ${bytes_wrote}) of ${tb_formatted} @ ${current_speed} \\n"
+      report_out+="Disk temperature: ${disktemp}\\n"
+      report_out+="Cycle's Elapsed Time: $(timer ${cycle_timer})\\n"
+      report_out+="Total Elapsed time: $(timer ${all_timer})"
+      send_mail "Zeroing in Progress on ${disk_name}." "Zeroing in Progress on ${disk_name}: ${percent_wrote}% @ ${current_speed}. Temp: ${disktemp}. Cycle ${cycle} of ${cycles}." "${report_out}"
+      let next_notify=($next_notify + 25)
+    fi
   done
-  eval "$output='[$(timer $time_start) @ $average_speed MB/s']"
+
+  # Send final notification
+  if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 3 ] ; then
+    report_out="Zeroing finished on $disk_name.\\n"
+    report_out+="Wrote $(format_number ${bytes_wrote}) of ${tb_formatted} @ ${current_speed} \\n"
+    report_out+="Disk temperature: $(get_disk_temp $disk $smart_type).\\n"
+    report_out+="Zeroing Elapsed Time: $(timer $time_start).\\n"
+    report_out+="Cycle's Elapsed Time: $(timer $cycle_timer).\\n"
+    report_out+="Total Elapsed time: $(timer $all_timer)."
+    send_mail "Zeroing Finished on $disk_name." "Zeroing Finished on $disk_name. Cycle ${cycle} of ${cycles}." "$report_out"
+  fi
+
+  eval "$output='$(timer $time_start) @ $average_speed MB/s'"
 }
 
 format_number() {
@@ -414,11 +454,13 @@ read_entire_disk() {
   local post_read_err read_chunk   read_limit read_speed  rsum      skip_b1         skip_b2 
   local skip_b3       skip_p1      skip_p2    skip_p3     skip_p4   skip_p5         time_start
   local time_current  time_display read_type  read_type_s total_bytes
+  local bytes_read=0
   local cycle=$cycle
   local cycles=$cycles
   local dd_output=${all_files[dd_out]}
   local disk=${disk_properties[device]}
   local disk_name=${disk_properties[name]}
+  local disk_blocks=${disk_properties[blocks_512]}
   local pause=${all_files[pause]}
   local short_test=$short_test
   local read_size=$read_size
@@ -460,6 +502,7 @@ read_entire_disk() {
     fi
   else
     total_bytes=${disk_properties[size]}
+    total_bytes=$(( $disk_blocks * 512))
   fi
   tb_formatted=$(format_number $total_bytes)
 
@@ -472,20 +515,30 @@ read_entire_disk() {
 
   # Number of chunks to be read every loop
   bcount=200
-  for i in $(seq 100 100000); do
+  for i in $(seq 100 10000000); do
     if [ "$(( $chunk * $i ))" -le "$read_limit" ]; then
       bcount=$i
+    else
+      break
     fi
   done
 
-  let total_chunks=($total_bytes / $chunk)
-  
-  while [ "$skip" -le "$total_chunks" ]; do
+  total_chunks=$(( $total_bytes / $chunk ))
 
-    # Break loop if it's the end of the disk
+  # Send initial notification
+  if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 3 ] ; then
+    report_out="$read_type_s Started on $disk_name.\\n Disk temperature: $(get_disk_temp $disk $smart_type)\\n"
+    send_mail "$read_type_s Started on $disk_name." "$read_type_s Started on $disk_name. Cycle $cycle of ${cycles}. " "$report_out"
+    next_notify=25
+  fi
+
+  # Remove the count limit and signal if in the end of the disk
+  while [ "$skip" -le "$total_chunks" ]; do
     if [ "$skip" -eq "$total_chunks" ]; then
-      # echo end_of_disk
-      break
+      end_of_disk=y
+      dd_count=""
+    else
+      dd_count="count=$bcount"
     fi
 
     # Stress the disk if requested
@@ -521,7 +574,7 @@ read_entire_disk() {
       kill -0 $skip_p5 2>/dev/null && wait $skip_p5
     fi
     
-    # do the read
+    # Do the disk read
     if [ "$verify" == "verify" ]; then
       # first block must be treated differently
       if [ "$skip" -eq "0" ]; then
@@ -535,16 +588,14 @@ read_entire_disk() {
         return 1
       fi
     else
-      dd if=$disk of=/dev/null bs=$chunk count=$bcount skip=$skip conv=noerror iflag=fullblock >$dd_output 2>&1
+      dd if=$disk of=/dev/null bs=$chunk $dd_count skip=$skip >$dd_output 2>&1
     fi
-
-    # update the skip count
-    let skip=($skip + $bcount)
-
-    # calculate the current status
-    let bytes_read=($skip * $chunk)
-    let percent_read=( $bytes_read*100/$total_bytes)
+    
+    # Calculate the current status
     time_current=$(timer)
+    readed_bytes=$(awk 'END{print $1}' $dd_output|xargs)
+    bytes_read=$(( $bytes_read + $readed_bytes ))
+    percent_read=$(( $bytes_read*100/$total_bytes ))
     read_speed=$(awk -F',' 'END{print $NF}' $dd_output|xargs)
     average_speed=$(($bytes_read / ($time_current - $time_start) / 1000000 ))
 
@@ -553,6 +604,18 @@ read_entire_disk() {
       cycle_disp=" ($cycle of $cycles)"
     fi
     echo "$disk_name|NN|${read_type_s}${cycle_disp}: ${percent_read}% @ $read_speed ($(timer $time_start))|$$" > $stat_file
+
+    # Send mid notification
+    if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -eq 4 ] && [ "$percent_read" -ge "$next_notify" ] && [ "$percent_read" -ne 100 ]; then
+      disktemp="$(get_disk_temp $disk $smart_type)"
+      report_out="${read_type_s} in progress on $disk_name: ${percent_read}% complete.\\n"
+      report_out+="Read $(format_number ${bytes_read}) of ${tb_formatted} @ ${read_speed} \\n"
+      report_out+="Disk temperature: ${disktemp}\\n"
+      report_out+="Cycle's Elapsed Time: $(timer ${cycle_timer}).\\n"
+      report_out+="Total Elapsed time: $(timer ${all_timer})."
+      send_mail "$read_type_s in Progress on ${disk_name}." "${read_type_s} in Progress on ${disk_name}: ${percent_read}% @ ${read_speed}. Temp: ${disktemp}. Cycle ${cycle} of ${cycles}." "${report_out}"
+      let next_notify=($next_notify + 25)
+    fi
 
     if [ -z "${time_display}" ]; then
       time_display=$(( $(timer) - $refresh_period ))
@@ -563,13 +626,7 @@ read_entire_disk() {
       fi
     fi
 
-    # if the next chunk to be read exceedes the total_chunks value, decrease the bcount value
-    let next_chunk_read=($skip + $bcount )
-    if [ $next_chunk_read -gt $total_chunks ]; then
-      let bcount=($total_chunks - $skip)
-    fi
-
-    # pause if requested
+    # Pause if requested
     if [ -f "$pause" ]; then
       display_status "$read_type|###(${percent_read}% Done)### ***PAUSED***" "** PAUSED"
       echo "$disk_name|NN|${read_type_s}${cycle_disp}: PAUSED|$$" > $stat_file
@@ -578,8 +635,27 @@ read_entire_disk() {
       done
     fi
 
+    # Update the skip count
+    let skip=($skip + $bcount)
+
+    # Break if it's the end of the disk
+    if [ "$end_of_disk" == "y" ]; then
+      break
+    fi
   done
-  eval "$output='[$(timer $time_start) @ $average_speed MB/s']"
+
+  # Send final notification
+  if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 3 ] ; then
+    report_out="$read_type_s finished on $disk_name.\\n"
+    report_out+="Read $(format_number $bytes_read) of $tb_formatted @ $average_speed MB/s\\n"
+    report_out+="Disk temperature: $(get_disk_temp $disk $smart_type).\\n"
+    report_out+="$read_type_s Elapsed Time: $(timer $time_start).\\n"
+    report_out+="Cycle's Elapsed Time: $(timer $cycle_timer).\\n"
+    report_out+="Total Elapsed time: $(timer $all_timer)."
+    send_mail "$read_type_s Finished on $disk_name." "$read_type_s Finished on $disk_name. Cycle ${cycle} of ${cycles}." "$report_out"
+  fi
+
+  eval "$output='$(timer $time_start) @ $average_speed MB/s'"
 }
 
 draw_canvas(){
@@ -863,8 +939,29 @@ output_smart() {
     fi
     sed -i "/^$attr/ s/$/|${msg}/" $nfinal
   done < <(cat $nfinal | tail -n +2)
-  cat $nfinal | column -t -s '|' > $output
+  cat $nfinal | column -t -s '|' -o '    '> $output
   smartctl --health -d $type $device | sed -n '/SMART DATA SECTION/,/^$/p'| tail -n +2 | head -n 1 >> $output
+}
+
+get_disk_temp() {
+  local device=$1
+  local type=$2
+  local valid_temp=" 190 194 "
+  local temp=0
+  if [ -z "$type" ]; then
+    echo "n/a"
+    return 0
+  fi
+
+  while read line; do
+    attr=$(echo $line | cut -d'|' -f1)
+    if [[ $valid_temp =~ [[:space:]]$attr[[:space:]] ]]; then
+      echo "$(echo $line | cut -d'|' -f3)oC"
+      return 0
+    fi
+  done < <(smartctl --attributes -d $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" | \
+           grep -v "ATTRIBUTE_NAME" | grep -v "^$" | awk '{ print $1 "|" $2 "|" $10}')
+  echo "n/a"
 }
 
 ######################################################
@@ -878,11 +975,13 @@ read_stress=y
 cycles=1
 append display_step ""
 verify_mbr_only=n
-refresh_period=10
+refresh_period=30
 canvas_width=123
 canvas_height=20
 canvas_brick=#
 smart_type=auto
+notify_channel=0
+notify_freq=0
 opts_long="frequency:,notify:,skip-preread,skip-postread,read-size:,write-size:,read-blocks:,"
 opts_long+="test,no-stress,list,cycles:,signature,verify,no-prompt,version,preclear-only,format-html"
 
@@ -983,6 +1082,7 @@ if [ "$disable_smart" != "y" ]; then
       append disk_properties 'firmware' "$(echo "${BASH_REMATCH[1]}"|xargs)"
     fi
   done < <(echo -n "$smartInfo")
+  append disk_properties 'temp' $(get_disk_temp $theDisk $smart_type)
 fi
 
 # Used files
@@ -1088,7 +1188,10 @@ if [ "$verify_disk_mbr" == "y" ]; then
     append display_step "Verifying unRAID's signature:| ***FAIL***"
     echo "${disk_properties[name]}|NY|Verifying unRAID's signature on the MBR failed|$$" > ${all_files[stat]}
     display_status
-    echo Failed
+    echo -e "--> RESULT: FAIL! $theDisk DOESN'T have a valid unRAID MBR signature!!!\n\n"
+    if [ "$notify_channel" -gt 0 ]; then
+      send_mail "FAIL! $theDisk DOESN'T have a valid unRAID MBR signature!!!" "$theDisk DOESN'T have a valid unRAID MBR signature!!!" "$theDisk DOESN'T have a valid unRAID MBR signature!!!"
+    fi
     exit 1
   fi
   if [ "$max_steps" -eq "2" ]; then
@@ -1101,11 +1204,19 @@ if [ "$verify_disk_mbr" == "y" ]; then
     else
       append display_step "Verifying if disk is zeroed:|***FAIL***"
       echo "${disk_properties[name]}|NY|Verifying if disk is zeroed: FAIL|$$" > ${all_files[stat]}
-      exit 1
       display_status
+      echo -e "--> RESULT: FAIL! $theDisk IS NOT zeroed!!!\n\n"
+      if [ "$notify_channel" -gt 0 ]; then
+        send_mail "FAIL! $theDisk IS NOT zeroed!!!" "FAIL! $theDisk IS NOT zeroed!!!" "FAIL! $theDisk IS NOT zeroed!!!"
+      fi
+      exit 1
     fi
   fi
+  if [ "$notify_channel" -gt 0 ]; then
+    send_mail "Disk $theDisk has been verified precleared!" "Disk $theDisk has been verified precleared!" "Disk $theDisk has been verified precleared!"
+  fi
   echo "${disk_properties[name]}|NN|The disk is Precleared!|$$" > ${all_files[stat]}
+  echo -e "--> RESULT: SUCCESS! Disk $theDisk has been verified precleared!\n\n"
   exit 0
 fi
 
@@ -1169,8 +1280,8 @@ for cycle in $(seq $cycles); do
   # Do a preread if not skipped
   if [ "$skip_preread" != "y" ]; then
     display_status "Pre-Read in progress ..." ''
-    if read_entire_disk no-verify preread average; then
-      append display_step "Pre-read verification:|${average} ***SUCCESS***"
+    if read_entire_disk no-verify preread preread_average; then
+      append display_step "Pre-read verification:|[${preread_average}] ***SUCCESS***"
       display_status
     else
       append display_step "Pre-read verification:|${bold}FAIL${norm}"
@@ -1183,9 +1294,9 @@ for cycle in $(seq $cycles); do
 
   # Zero the disk
   display_status "Zeroing in progress ..." ''
-  write_zeroes average
+  write_zeroes zeroing_average
   sleep 10
-  append display_step "Zeroing the disk:|${average} ***SUCCESS***"
+  append display_step "Zeroing the disk:|[${zeroing_average}] ***SUCCESS***"
   sleep 10
 
   # Write unRAID's preclear signature to the disk
@@ -1215,8 +1326,8 @@ for cycle in $(seq $cycles); do
   # Do a post-read if not skipped
   if [ "$skip_postread" != "y" ]; then
     display_status "Post-Read in progress ..." ""
-    if read_entire_disk verify postread average; then
-      append display_step "Post-Read verification:|${average} ***SUCCESS*** "
+    if read_entire_disk verify postread postread_average; then
+      append display_step "Post-Read verification:|[${postread_average}] ***SUCCESS*** "
       display_status
       echo "${disk_properties[name]}|NY|Post-Read verification successful|$$" > ${all_files[stat]}
     else
@@ -1236,6 +1347,19 @@ for cycle in $(seq $cycles); do
   [ "$disable_smart" != "y" ] && output_smart $theDisk $smart_type
   display_status '' ''
 
+  # Send end of the cycle notification
+  if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 2 ]; then
+    report_out="Disk ${disk_properties[name]} has successfully finished a preclear cycle!\\n\\n"
+    report_out+="Finished Cycle $cycle of $cycles cycles.\\n"
+    [ "$skip_preread" != "y" ] && report_out+="Last Cycle's Pre-Read Time: ${preread_average}.\\n"
+    report_out+="Last Cycle's Zeroing Time: ${zeroing_average}.\\n"
+    [ "$skip_postread" != "y" ] && report_out+="Last Cycle's Post-Read Time: ${postread_average}.\\n"
+    report_out+="Last Cycle's Elapsed TIme: $(timer cycle_timer)\\n"
+    report_out+="Disk Start Temperature: ${disk_properties[temp]}\n"
+    report_out+="Disk Current Temperature: $(get_disk_temp $theDisk $smart_type)\\n"
+    [ "$cycles" -gt 1 ] && report_out+="\\nStarting a new cycle.\\n"
+    send_mail "Disk ${disk_properties[name]} PASSED cycle ${cycle}!" "Preclear: Disk ${disk_properties[name]} PASSED cycle ${cycle}!" "$report_out"
+  fi
 done
 
 echo "${disk_properties[name]}|NN|Preclear Finished Successfully!|$$" > ${all_files[stat]};
@@ -1254,5 +1378,21 @@ sed -i -e 's/####/#/g' $report
 
 # Save report to Flash disk
 mkdir -p /boot/preclear_reports/
-todos < $report > /boot/preclear_reports/preclear_report_${disk_properties[serial_long]}.txt
+date_formated=$(date "+%Y.%m.%d-%H:%M:%S")
+todos < $report > /boot/preclear_reports/preclear_report_${disk_properties[serial]}_${date_formated}.txt
 
+# Send end of the script notification
+if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 1 ]; then
+  report_out="Disk ${disk_properties[name]} has successfully finished a preclear cycle!\\n\\n"
+  report_out+="Ran $cycles cycles.\\n"
+  [ "$skip_preread" != "y" ] && report_out+="Last Cycle's Pre-Read Time: ${preread_average}.\\n"
+  report_out+="Last Cycle's Zeroing Time: ${zeroing_average}.\\n"
+  [ "$skip_postread" != "y" ] && report_out+="Last Cycle's Post-Read Time: ${postread_average}.\\n"
+  report_out+="Last Cycle's Elapsed TIme: $(timer cycle_timer)\\n"
+  report_out+="Disk Start Temperature: ${disk_properties[temp]}\n"
+  report_out+="Disk Current Temperature: $(get_disk_temp $theDisk $smart_type)\\n"
+  report_out+="\\n\\nS.M.A.R.T. Report\\n"
+  while read -r line; do report_out+="${line}\\n"; done < ${all_files[smart_out]}
+  report_out+="\\n\\n"
+  send_mail "Preclear: PASS! Preclearing Disk ${disk_properties[name]} Finished!!!" "Preclear: PASS! Preclearing Disk ${disk_properties[name]} Finished!!! Cycle ${cycle} of ${cycles}" "${report_out}"
+fi

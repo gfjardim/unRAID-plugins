@@ -4,16 +4,27 @@
 <!ENTITY name      "preclear.disk.beta">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2016.03.24a">
+<!ENTITY version   "2016.06.22">
 <!ENTITY launch    "Settings/PreclearBeta">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
+
+<!ENTITY tmux     "2.1-x86_64-3">
+<!ENTITY libevent "2.0.22-x86_64-1">
+<!ENTITY ncurses  "5.9-x86_64-4">
 ]>
 
 <PLUGIN name="&name;" author="&author;" launch="&launch;" version="&version;" pluginURL="&pluginURL;">
 
 <CHANGES>
 ##&name;
+
+###2016.06.22
+- Add: Notification capability
+- Fix: Move Preclear icon to Tools
+- Fix: Fix unknown terminal "screen" error
+- Fix: Preclear script not reading the end of the disk
+- Update: tmux (2.1), libevent (2.0.22) and ncurses (5.9-4)
 
 ###2016.03.24a
 - Fix: better smartctl device testing
@@ -124,28 +135,28 @@ The 'plugin' package MD5 hash.
 <URL>&gitURL;/archive/&name;-&version;.md5</URL>
 </FILE>
 
-<!--
-tmux-1.8-x86_64-1.txz
--->
-<FILE Name="/boot/config/plugins/&name;/tmux-1.8-x86_64-1.txz" Run="upgradepkg --install-new">
-<URL>http://slackware.osuosl.org/slackware64-14.1/slackware64/ap/tmux-1.8-x86_64-1.txz</URL>
-<MD5>2a36cb120c8cdd584262442ed3f18f34</MD5>
+<FILE Name="/boot/config/plugins/&name;/tmux-&tmux;.txz" Run="upgradepkg --install-new">
+<URL>&gitURL;/source/packages/tmux-&tmux;.txz</URL>
+<MD5>8f4a1200f68308d026792bb730ee43d9</MD5>
 </FILE>
 
-<!--
-libevent-2.0.21-x86_64-1.txz
--->
-<FILE Name="/boot/config/plugins/&name;/libevent-2.0.21-x86_64-1.txz" Run="upgradepkg --install-new">
-<URL>http://slackware.osuosl.org/slackware64-14.1/slackware64/l/libevent-2.0.21-x86_64-1.txz</URL>
-<MD5>48fe596d36a4585fc5b23ecfee09b0d3</MD5>
+<FILE Name="/boot/config/plugins/&name;/libevent-&libevent;.txz" Run="upgradepkg --install-new">
+<URL>&gitURL;/source/packages/libevent-&libevent;.txz</URL>
+<MD5>7a755ece3e378f244a3c327369e7f2ac</MD5>
 </FILE>
 
+<<<<<<< Updated upstream
 <!--
 ncurses-5.9-x86_64-2.txz
 -->
 <FILE Name="/boot/config/plugins/&name;/ncurses-5.9-x86_64-2.txz" Run="upgradepkg --install-new">
 <URL>http://slackware.osuosl.org/slackware64-14.1/slackware64/l/ncurses-5.9-x86_64-2.txz</URL>
 <MD5>9134fa31097ee352a1f1662e3f6bcb3f</MD5>
+=======
+<FILE Name="/boot/config/plugins/&name;/ncurses-&ncurses;.txz" Run="installpkg">
+<URL>&gitURL;/source/packages/ncurses-&ncurses;.txz</URL>
+<MD5>c2d2b01f021dc2f4752c4fff02f65fd5</MD5>
+>>>>>>> Stashed changes
 </FILE>
 
 <!--
@@ -180,6 +191,10 @@ mkdir -p /tmp/.preclear/
 # Cleaning old source files
 find /boot/config/plugins/&name;/ -type f -iname "&name;*.txz" ! -iname "*&version;*" -delete
 find /boot/config/plugins/&name;/ -type f -iname "&name;*.md5" ! -iname "*&version;*" -delete
+
+find /boot/config/plugins/&name;/ -type f -iname "tmux*.txz"     ! -iname "*&tmux;*" -delete
+find /boot/config/plugins/&name;/ -type f -iname "libevent*.txz" ! -iname "*&libevent;*" -delete
+find /boot/config/plugins/&name;/ -type f -iname "ncurses*.txz"  ! -iname "*&ncurses;*" -delete
 
 echo ""
 echo "-----------------------------------------------------------"

@@ -1,4 +1,4 @@
-Menu="Utilities"
+Menu="DiskUtilities"
 Title="Preclear Disk Beta"
 Icon="preclear.disk.png"
 ---
@@ -55,6 +55,9 @@ $numdisks = count(get_unasigned_disks())-1;
       }
     },"json").always(function(){setTimeout('get_content()',<?=$display['refresh'] ? $display['refresh'] : "10000";?>);});
   }
+  function get_status() {
+
+  }
   function openPreclear(device) {
     var width=985;
     var height=730;
@@ -89,6 +92,10 @@ $numdisks = count(get_unasigned_disks())-1;
           opts["device"] = device;
           opts["op"] = getVal(this, "op");
           opts["--cycles"]        = getVal(this, "--cycles");
+          opts["--notify"]        = getVal(this, "preclear_notify1") == "on" ? 1 : 0;
+          opts["--notify"]       += getVal(this, "preclear_notify2") == "on" ? 2 : 0;
+          opts["--notify"]       += getVal(this, "preclear_notify3") == "on" ? 4 : 0;
+          opts["--frequency"]     = getVal(this, "--frequency");
           opts["--read-size"]     = getVal(this, "--read-size");
           opts["--skip-preread"]  = getVal(this, "--skip-preread");
           opts["--skip-postread"] = getVal(this, "--skip-postread");
@@ -136,7 +143,6 @@ $numdisks = count(get_unasigned_disks())-1;
     $.post(URL,{action:"clear_preclear",device:device}).always(function(){window.location=window.location.pathname+window.location.hash;});
   }
   function toggleSettings(el) {
-    console.log(el.selectedIndex);
     if(el.selectedIndex > 0 && el.selectedIndex != 2){
       $(el).parent().siblings('.clear_options').css('display','none');
       $(el).parent().siblings('.test_options').css('display','none');
@@ -145,11 +151,24 @@ $numdisks = count(get_unasigned_disks())-1;
       $(el).parent().siblings('.clear_options').css('display','none');
       $(el).parent().siblings('.test_options').css('display','none');
       $(el).parent().siblings('.clear_verify_options').css('display','block');
-
     } else {
       $(el).parent().siblings('.clear_options').css('display','block');
       $(el).parent().siblings('.test_options').css('display','block');
       $(el).parent().siblings('.clear_verify_options').css('display','block');
+    }
+  }
+  function toggleFrequency(el) {
+    var disabled = true;
+    var sel=$(el).parent().parent().find("select[name='--frequency']");
+    $(el).siblings("*[type='checkbox']").addBack().each(function(v, e){
+      if ($(e).is(':checked')) {
+        disabled = false;
+      }
+    });
+    if (disabled) {
+      sel.attr('disabled', 'disabled');
+    } else {
+      sel.removeAttr('disabled');
     }
   }
   function toggleNotification(el) {
@@ -185,34 +204,23 @@ $numdisks = count(get_unasigned_disks())-1;
         <select name="--cycles"><?for ($i=1; $i <= 5; $i++){echo "<option value='$i'>$i</option>";}?></select>
       </dd>
     </div>
-    <?if ($notifications):?>
+    <dt>Notifications:</dt>
+    <dd style="font-weight: normal;">
+      <input type="checkbox" name="preclear_notify1" onchange="toggleFrequency(this);">Browser &nbsp;
+      <input type="checkbox" name="preclear_notify2" onchange="toggleFrequency(this);">Email &nbsp;
+      <input type="checkbox" name="preclear_notify3" onchange="toggleFrequency(this);">Agents &nbsp;
+    </dd>
     <div class='test_options'>
-      <dt>Notifications:</dt>
+      <dt>&nbsp;</dt>
       <dd>
-        <select name="-o" onchange="toggleNotification(this);">
-          <option value="0" selected>None</option>
-          <option value="1">Notify using browser-popups only</option>
-          <option value="2">Notify using e-mail only</option>
-          <option value="3">Notify using browser-popups and e-mail</option>
-          <option value="4">Notify using agents only</option>
-          <option value="5">Notify using browser-popups and agents</option>
-          <option value="6">Notify using e-mail and agents</option>
-          <option value="7">Notify using browser popups, e-mail and agents</option>
-        </select>
-      </dd>
-      <div class='notification_options' style='display:none;'>
-        <dt>Interval: </dt>
-        <dd>
-          <select name="-M">
+          <select name="--frequency" disabled>
             <option value="1" selected>On preclear's end</option>
             <option value="2">On every cycles's end</option>
             <option value="3">On every cycles's and step's end</option>
             <option value="4">On every 25% of progress</option>
           </select>
         </dd>
-      </div>
     </div>
-    <?endif;?>
     <div class='clear_verify_options'>
       <dt>Read size: </dt>
       <dd>
