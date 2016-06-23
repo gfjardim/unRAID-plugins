@@ -4,20 +4,23 @@
 <!ENTITY name      "preclear.disk.beta">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2016.06.22">
+<!ENTITY version   "2016.06.23">
 <!ENTITY launch    "Settings/PreclearBeta">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
-
-<!ENTITY tmux     "2.1-x86_64-3">
-<!ENTITY libevent "2.0.22-x86_64-1">
-<!ENTITY ncurses  "5.9-x86_64-4">
+<!ENTITY tmux      "2.1-x86_64-3">
+<!ENTITY libevent  "2.0.22-x86_64-1">
+<!ENTITY ncurses   "5.9-x86_64-4">
+<!ENTITY utempter  "1.1.6-x86_64-2">
 ]>
 
 <PLUGIN name="&name;" author="&author;" launch="&launch;" version="&version;" pluginURL="&pluginURL;">
 
 <CHANGES>
 ##&name;
+
+###2016.06.23
+- Fix: install utempter
 
 ###2016.06.22
 - Add: Notification capability
@@ -150,6 +153,11 @@ The 'plugin' package MD5 hash.
 <MD5>c2d2b01f021dc2f4752c4fff02f65fd5</MD5>
 </FILE>
 
+<FILE Name="/boot/config/plugins/&name;/utempter-&utempter;.txz" Run="upgradepkg --install-new">
+<URL>&gitURL;/source/packages/utempter-&utempter;.txz</URL>
+<MD5>aed1f39d4a5acddb225b542145e0eeaf</MD5>
+</FILE>
+
 <!--
 The 'post-install' script.
 -->
@@ -186,6 +194,7 @@ find /boot/config/plugins/&name;/ -type f -iname "&name;*.md5" ! -iname "*&versi
 find /boot/config/plugins/&name;/ -type f -iname "tmux*.txz"     ! -iname "*&tmux;*" -delete
 find /boot/config/plugins/&name;/ -type f -iname "libevent*.txz" ! -iname "*&libevent;*" -delete
 find /boot/config/plugins/&name;/ -type f -iname "ncurses*.txz"  ! -iname "*&ncurses;*" -delete
+find /boot/config/plugins/&name;/ -type f -iname "utempter*.txz"  ! -iname "*&utempter;*" -delete
 
 echo ""
 echo "-----------------------------------------------------------"
@@ -209,7 +218,7 @@ rm -rf /boot/config/plugins/&name; \
        /usr/local/emhttp/plugins/&name; \
        /var/state/&name;
 
-find /var/log/packages -type f -iname "&name;-*" --delete
+find /var/log/packages -type f -iname "&name;-*" -delete
 
 exit 0
 </INLINE>
