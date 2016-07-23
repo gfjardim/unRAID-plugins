@@ -3,8 +3,8 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name      "preclear.disk.beta">
 <!ENTITY repo      "unRAID-plugins">
-<!ENTITY author    "gfjardim">
-<!ENTITY version   "2016.06.23">
+<!ENTITY author    "bradyjoh">
+<!ENTITY version   "2016.07.23">
 <!ENTITY launch    "Settings/PreclearBeta">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -18,6 +18,10 @@
 
 <CHANGES>
 ##&name;
+
+###2016.07.23
+- Add: More options for preclear cycles
+- Fix: Typo in Plugin description
 
 ###2016.06.23
 - Fix: install utempter
