@@ -201,7 +201,7 @@ $numdisks = count(get_unasigned_disks())-1;
     <div class='clear_options'>
       <dt>Cycles: </dt>
       <dd>
-        <select name="--cycles"><?for ($i=1; $i <= 5; $i++){echo "<option value='$i'>$i</option>";}?></select>
+        <select name="--cycles"><?for ($i=1; $i <= 40; $i++){echo "<option value='$i'>$i</option>";}?></select>
       </dd>
     </div>
     <dt>Notifications:</dt>
