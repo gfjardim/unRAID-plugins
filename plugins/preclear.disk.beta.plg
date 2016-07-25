@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk.beta">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "bradyjoh">
-<!ENTITY version   "2016.07.23">
+<!ENTITY version   "2016.07.25">
 <!ENTITY launch    "Settings/PreclearBeta">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
