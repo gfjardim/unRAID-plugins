@@ -44,9 +44,8 @@ $fast_postread  = $script_version ? (strpos(file_get_contents($script_file), "fa
 $notifications  = $script_version ? (strpos(file_get_contents($script_file), "notify_channels") ? TRUE : FALSE ) : FALSE;
 $noprompt       = $script_version ? (strpos(file_get_contents($script_file), "noprompt") ? TRUE : FALSE ) : FALSE;
 $Preclear       = new Preclear;
-$VERBOSE        = TRUE;
-$notifications = FALSE;
-$fast_postread = FALSE;
+// $VERBOSE        = TRUE;
+
 if (isset($_POST['display']))
 {
   $display = $_POST['display'];
