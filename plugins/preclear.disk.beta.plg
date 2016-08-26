@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk.beta">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2016.06.23">
+<!ENTITY version   "2016.08.26">
 <!ENTITY launch    "Settings/PreclearBeta">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -18,6 +18,9 @@
 
 <CHANGES>
 ##&name;
+
+###&version;
+- Remove this plugin
 
 ###2016.06.23
 - Fix: install utempter
@@ -125,85 +128,26 @@
 </CHANGES>
 
 <!--
-The 'plugin' package file.
--->
-<FILE Name="/boot/config/plugins/&name;/&name;-&version;.txz">
-<URL>&gitURL;/archive/&name;-&version;.txz</URL>
-</FILE>
-
-<!--
-The 'plugin' package MD5 hash.
--->
-<FILE Name="/boot/config/plugins/&name;/&name;-&version;.md5">
-<URL>&gitURL;/archive/&name;-&version;.md5</URL>
-</FILE>
-
-<FILE Name="/boot/config/plugins/&name;/tmux-&tmux;.txz" Run="upgradepkg --install-new">
-<URL>&gitURL;/source/packages/tmux-&tmux;.txz</URL>
-<MD5>8f4a1200f68308d026792bb730ee43d9</MD5>
-</FILE>
-
-<FILE Name="/boot/config/plugins/&name;/libevent-&libevent;.txz" Run="upgradepkg --install-new">
-<URL>&gitURL;/source/packages/libevent-&libevent;.txz</URL>
-<MD5>7a755ece3e378f244a3c327369e7f2ac</MD5>
-</FILE>
-
-<FILE Name="/boot/config/plugins/&name;/ncurses-&ncurses;.txz" Run="installpkg">
-<URL>&gitURL;/source/packages/ncurses-&ncurses;.txz</URL>
-<MD5>c2d2b01f021dc2f4752c4fff02f65fd5</MD5>
-</FILE>
-
-<FILE Name="/boot/config/plugins/&name;/utempter-&utempter;.txz" Run="upgradepkg --install-new">
-<URL>&gitURL;/source/packages/utempter-&utempter;.txz</URL>
-<MD5>aed1f39d4a5acddb225b542145e0eeaf</MD5>
-</FILE>
-
-<!--
 The 'post-install' script.
 -->
 <FILE Run="/bin/bash">
 <INLINE>
-# Verify and install plugin package
-sum1=$(/usr/bin/md5sum /boot/config/plugins/&name;/&name;-&version;.txz)
-sum2=$(/usr/bin/cat /boot/config/plugins/&name;/&name;-&version;.md5)
-if [ "${sum1:0:32}" != "${sum2:0:32}" ]; then
-  echo "Wrong 'plugin' package md5 hash."
-  rm /boot/config/plugins/&name;/&name;-&version;.txz
-  rm /boot/config/plugins/&name;/&name;-&version;.md5
-  exit 1
-else
-  upgradepkg --install-new /boot/config/plugins/&name;/&name;-&version;.txz
-fi
+# Remove plugin related files
+echo "sleep 10" &gt;/tmp/preclear.disk.remove
+echo "/usr/local/sbin/plugin remove &name;.plg" &gt;&gt; /tmp/preclear.disk.remove
+chmod +x /tmp/preclear.disk.remove
+/tmp/preclear.disk.remove &gt;/dev/null 2&gt;&amp;1 &amp;
 
-# Create a symlink to /root/mdcmd
-if [[ ! -e /root/mdcmd ]]; then
-  ln -sf /usr/local/sbin/mdcmd /root/mdcmd
-fi
-
-# Make executable
-chmod +x /usr/local/emhttp/plugins/&name;/script/preclear_disk.sh
-chmod -R +x /usr/local/emhttp/plugins/&name;/event/
-
-# Make dir
-mkdir -p /tmp/.preclear/
-
-# Cleaning old source files
-find /boot/config/plugins/&name;/ -type f -iname "&name;*.txz" ! -iname "*&version;*" -delete
-find /boot/config/plugins/&name;/ -type f -iname "&name;*.md5" ! -iname "*&version;*" -delete
-
-find /boot/config/plugins/&name;/ -type f -iname "tmux*.txz"     ! -iname "*&tmux;*" -delete
-find /boot/config/plugins/&name;/ -type f -iname "libevent*.txz" ! -iname "*&libevent;*" -delete
-find /boot/config/plugins/&name;/ -type f -iname "ncurses*.txz"  ! -iname "*&ncurses;*" -delete
-find /boot/config/plugins/&name;/ -type f -iname "utempter*.txz"  ! -iname "*&utempter;*" -delete
-
-echo ""
+echo " "
 echo "-----------------------------------------------------------"
-echo " &name; has been installed."
-echo " This plugin requires Dynamix webGui to operate"
+echo " &name; has been removed."
+echo " "
 echo " Copyright 2015-2016, gfjardim"
-echo " Version: &version;"
+echo " Version: &version; "
 echo "-----------------------------------------------------------"
-echo ""
+echo " "
+
+exit 0
 </INLINE>
 </FILE>
 
@@ -212,7 +156,6 @@ The 'remove' script.
 -->
 <FILE Run="/bin/bash" Method="remove">
 <INLINE>
-
 # Remove plugin related files
 rm -rf /boot/config/plugins/&name; \
        /usr/local/emhttp/plugins/&name; \
