@@ -1,0 +1,70 @@
+Menu="DiskUtilities"
+Title="Preclear Disk"
+Icon="preclear.disk.png"
+---
+<?
+$plugin = "preclear.disk";
+require_once("plugins/${plugin}/Preclear.php");
+$numdisks = count(get_unasigned_disks())-1;
+$Preclear = new Preclear;
+?>
+<?if (is_file("webGui/scripts/jquery.switchButton.js")): # Pre 6.1?>
+<script type="text/javascript" src="/webGui/scripts/jquery.switchButton.js"></script>
+<link type="text/css" rel="stylesheet" href="/webGui/styles/jquery-ui.min.css">
+<link type="text/css" rel="stylesheet" href="/webGui/styles/jquery.switchButton.css">
+<?else: # Post 6.1?>
+<script type="text/javascript" src="/webGui/javascript/jquery.switchbutton.js"></script>
+<link type="text/css" rel="stylesheet" href="/webGui/styles/jquery.ui.css">
+<link type="text/css" rel="stylesheet" href="/webGui/styles/jquery.switchbutton.css">
+<?endif;?>
+
+<link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/glyphicons.css">
+<link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/style-<?=$display['theme'];?>.css">
+<script type="text/javascript">
+  var authors = <?=json_encode($authors);?>;
+  var display = <?=json_encode($display);?>;
+  var scope   = "gfjardim";
+  var scripts = <?=json_encode($script_files);?>;
+  <?if (isset($_GET['disk']) && ! $Preclear->isRunning($_GET['disk']) ) echo "startDisk = '{$_GET[disk]}';";?>
+  $.getScript( "/plugins/<?=$plugin;?>/assets/javascript.js" );
+</script>
+<style>
+  table.preclear {padding:0px;margin:-21px 0px 22px 0px;border-collapse:collapse;white-space:nowrap;}
+  table.preclear thead tr>td{text-align:left;width:8%;padding-left:12px;}
+  table.preclear thead tr>td+td{text-align:left;width:auto;padding-left:12px;}
+  table.preclear tr>td{text-align:left;width:8%;padding-left:12px;padding-right:0;white-space:nowrap;}
+  table.preclear tr>td+td+td+td{text-align:left;width:auto;padding-left:30px;}
+  table.preclear tr>td+td+td+td+td{text-align:right;padding-left:0;padding-right:12px;width: 5em;}
+
+  button[type=button] {margin:0px 14px 0 14px;}
+  i.glyphicon{margin:0px 5px 0 5px;}
+  i.hdd{margin:0px; 0px;font-size: 1.1em}
+  i.partition{margin-left: 18px;}
+  .exec{cursor: pointer;}
+  i.glyphicon-append{margin:0px;font-size: 0.8em;position: relative; left:-0.3em;top:0.7em;}
+</style>
+<?=$Preclear->html();?>
+<table class='preclear custom_head'>
+  <thead>
+    <tr>
+      <td>Device</td>
+      <td>Identification</td>
+      <td>Temp</td>
+      <td>Size</td>
+      <td>Preclear Status</td>
+    </tr>
+  </thead>
+  <tbody id="preclear-table-body">
+    <tr><td colspan='12' style='text-align:center;font-weight:bold;'>
+      <center><i class='fa fa-spinner fa-spin'></i>&nbsp;<em>Please wait... retrieving information!</em></center>
+    </td></tr>
+    <?for ($i=0; $i < $numdisks; $i++) {$odd = ($odd == "even") ? "odd" : "even"; echo "<tr class='$odd'><td colspan='12'>&nbsp;</td></tr>";}?>
+  </tbody>
+</table>
+<script type="text/javascript">
+  <?if ($script_version):?>
+    $('.tabs').append('<span id=\"progress\" class=\"status\">Script: <span class=\"green\">Present, version <?=$script_version;?></span></span>');
+  <?else:?>
+     $('.tabs').append('<span id=\"progress\" class=\"status\">Script: <span class=\"red\">Not present</span></span>');
+  <?endif;?>
+</script>
