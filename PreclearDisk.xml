@@ -10,5 +10,5 @@
 A GUI front end for the very popular preclear disk script, which allows you to preclear your disks prior to adding them to unRaid without affecting the operation of unRaid itself.  NOTE:  This plugin requires you to separately install the preclear script.  See the support thread for details.
 </Description>
 <Support>http://lime-technology.com/forum/index.php?topic=39985.0</Support>
-<Icon>https://raw.githubusercontent.com/gfjardim/unRAID-plugins/master/source/preclear.disk/usr/local/emhttp/plugins/preclear.disk/images/preclear.disk.png</Icon>
+<Icon>https://raw.githubusercontent.com/gfjardim/unRAID-plugins/master/source/preclear.disk/images/preclear.disk.png</Icon>
 </Containers>
