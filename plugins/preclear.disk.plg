@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2016.08.26b">
+<!ENTITY version   "2016.08.28">
 <!ENTITY launch    "Settings/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,9 @@
 
 <CHANGES>
 ##&name;
+
+###2016.08.28
+- Fix: create temp folder on plugin installation
 
 ###2016.08.26
 - Fix: merge beta script
@@ -191,6 +194,9 @@ if [[ ! -e /root/mdcmd ]]; then
   ln -sf /usr/local/sbin/mdcmd /root/mdcmd
 fi
 
+# Creating some directories
+mkdir -p /tmp/.preclear/
+
 # Update file access mode
 chmod 644 $(awk '/\.(htm|php|js|page|css|png|plg|gif|cfg|md)$/ {print "/"$0}' /var/log/packages/&name;-&version;)
 
@@ -217,7 +223,8 @@ The 'remove' script.
 # Remove plugin related files
 rm -rf /boot/config/plugins/&name; \
        /usr/local/emhttp/plugins/&name; \
-       /var/state/&name;
+       /var/state/&name; \
+       /tmp/.preclear/
 find /var/log/packages -type f -iname "&name;-*" -delete
 exit 0
 </INLINE>
