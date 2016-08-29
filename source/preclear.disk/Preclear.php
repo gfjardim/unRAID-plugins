@@ -544,24 +544,24 @@ switch ($_POST['action']) {
       
       if (! $op )
       {
-        $cmd = "$script {$op}{$mail}{$notify}{$passes}{$read_sz}{$write_sz}{$pre_read}{$post_read}{$fast_read}{$noprompt} -s /dev/$device";
+        $cmd = "$script {$op}{$mail}{$notify}{$passes}{$read_sz}{$write_sz}{$pre_read}{$post_read}{$fast_read}{$noprompt} /dev/$device";
       }
 
       else if ( $op == "-V" )
       {
-        $cmd = "$script {$op}{$fast_read}{$mail}{$notify}{$read_sz}{$write_sz}{$noprompt} -s /dev/$device";
+        $cmd = "$script {$op}{$fast_read}{$mail}{$notify}{$read_sz}{$write_sz}{$noprompt} /dev/$device";
       }
 
       else
       {
-        $cmd = "$script {$op}{$noprompt} -s /dev/$device";
+        $cmd = "$script {$op}{$noprompt} /dev/$device";
         @unlink("/tmp/preclear_stat_{$device}");
       }
     }
 
     tmux_kill_window( $session );
     tmux_new_session( $session );
-    tmux_send_command($session, "$cmd 2>/tmp/preclear.error");
+    tmux_send_command($session, "$cmd");
 
     if ( $confirm && ! $noprompt )
     {

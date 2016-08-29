@@ -252,7 +252,15 @@ class Preclear
             </dd>
             <dt>Read size: </dt>
             <dd>
-              <select name="--read-size" ><option value="0">Default</option><?=$size2;?></select>
+              <select name="--read-size" >
+                <option value="33554432">32M</option>
+                <option value="67108864">64M</option>
+                <option value="134217728" selected>128M</option>
+                <option value="268435456">256M</option>
+                <option value="536870912">512M</option>
+                <option value="1073741824">1024M</option>
+                <option value="2147483648">2048M</option>
+              </select>
             </dd>
           </div>
           <div class="clear_options">

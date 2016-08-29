@@ -310,6 +310,7 @@ write_zeroes(){
   local time_start
   local output=$1
   local niceness=19
+  local display_pid=0
 
   time_start=$(timer)
 
@@ -367,15 +368,13 @@ write_zeroes(){
     fi
 
     echo "$disk_name|NN|Zeroing${cycle_disp}: ${percent_wrote}% @ $current_speed ($(timer $time_start))|$$" >$stat_file
-    
-    if [ -z "${time_display}" ]; then
-      time_display=$(timer)
-    else
-      if [ "$(( $time_current - $time_display ))" -gt "$refresh_period" ]; then
-        time_display=$(timer)
-        display_status "Zeroing in progress:|###(${percent_wrote}% Done)###" "** $status"
-      fi
+
+    # Display refresh
+    if [ ! -e "/proc/${display_pid}/exe" ]; then
+      display_status "Zeroing in progress:|###(${percent_wrote}% Done)###" "** $status" &
+      display_pid=$!
     fi
+
     if [ -f "$pause" ]; then
       display_status "Zeroing in progress:|###(${percent_wrote}% Done)### ***PAUSED***" "** PAUSED"
       echo "$disk_name|NN|Zeroing${cycle_disp}: PAUSED|$$" >$stat_file
@@ -458,7 +457,7 @@ read_entire_disk() {
   local percent_read
   local post_read_err read_chunk   read_limit read_speed  rsum      skip_b1         skip_b2 
   local skip_b3       skip_p1      skip_p2    skip_p3     skip_p4   skip_p5         time_start
-  local time_current  time_display read_type  read_type_s total_bytes
+  local time_current  read_type  read_type_s total_bytes
   local bytes_read=0
   local cycle=$cycle
   local cycles=$cycles
@@ -475,6 +474,7 @@ read_entire_disk() {
   local stat_file=${all_files[stat]}
   local verify_errors=${all_files[verify_errors]}
   local output=$3
+  local display_pid=0
 
   # Type of read: Pre-Read or Post-Read
   if [ "$read_type" == "preread" ]; then
@@ -497,6 +497,7 @@ read_entire_disk() {
     read_limit=$read_size
   else
     read_limit=33554432  # 32 MB
+    read_limit=134217728 # 128 MB
   fi
 
   if [ "$short_test" == "y" ]; then
@@ -519,8 +520,8 @@ read_entire_disk() {
   chunk=516096
 
   # Number of chunks to be read every loop
-  bcount=200
-  for i in $(seq 100 10000000); do
+  bcount=1
+  for i in $(seq $bcount 10000000); do
     if [ "$(( $chunk * $i ))" -le "$read_limit" ]; then
       bcount=$i
     else
@@ -533,9 +534,10 @@ read_entire_disk() {
   # Send initial notification
   if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 3 ] ; then
     report_out="$read_type_s Started on $disk_name.\\n Disk temperature: $(get_disk_temp $disk $smart_type)\\n"
-    send_mail "$read_type_s Started on $disk_name." "$read_type_s Started on $disk_name. Cycle $cycle of ${cycles}. " "$report_out"
+    send_mail "$read_type_s Started on $disk_name." "$read_type_s Started on $disk_name. Cycle $cycle of ${cycles}. " "$report_out" &
     next_notify=25
   fi
+  
 
   # Remove the count limit and signal if in the end of the disk
   while [ "$skip" -le "$total_chunks" ]; do
@@ -578,7 +580,7 @@ read_entire_disk() {
       kill -0 $skip_p4 2>/dev/null && wait $skip_p4
       kill -0 $skip_p5 2>/dev/null && wait $skip_p5
     fi
-    
+
     # Do the disk read
     if [ "$verify" == "verify" ]; then
       # first block must be treated differently
@@ -608,7 +610,7 @@ read_entire_disk() {
     if [ "$cycles" -gt 1 ]; then
       cycle_disp=" ($cycle of $cycles)"
     fi
-    echo "$disk_name|NN|${read_type_s}${cycle_disp}: ${percent_read}% @ $read_speed ($(timer $time_start))|$$" > $stat_file
+    echo "$disk_name|NN|${read_type_s}${cycle_disp}: ${percent_read}% @ ${average_speed} MB/s ($(timer $time_start))|$$" > $stat_file
 
     # Send mid notification
     if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -eq 4 ] && [ "$percent_read" -ge "$next_notify" ] && [ "$percent_read" -ne 100 ]; then
@@ -618,17 +620,14 @@ read_entire_disk() {
       report_out+="Disk temperature: ${disktemp}\\n"
       report_out+="Cycle's Elapsed Time: $(timer ${cycle_timer}).\\n"
       report_out+="Total Elapsed time: $(timer ${all_timer})."
-      send_mail "$read_type_s in Progress on ${disk_name}." "${read_type_s} in Progress on ${disk_name}: ${percent_read}% @ ${read_speed}. Temp: ${disktemp}. Cycle ${cycle} of ${cycles}." "${report_out}"
+      send_mail "$read_type_s in Progress on ${disk_name}." "${read_type_s} in Progress on ${disk_name}: ${percent_read}% @ ${read_speed}. Temp: ${disktemp}. Cycle ${cycle} of ${cycles}." "${report_out}" &
       let next_notify=($next_notify + 25)
     fi
 
-    if [ -z "${time_display}" ]; then
-      time_display=$(( $(timer) - $refresh_period ))
-    else
-      if [ "$(( $time_current - $time_display ))" -gt "$refresh_period" ]; then
-        time_display=$(timer)
-        display_status "$read_type|###(${percent_read}% Done)###" "** $status"
-      fi
+    # Display refresh
+    if [ ! -e "/proc/${display_pid}/exe" ]; then
+      display_status "$read_type|###(${percent_read}% Done)###" "** $status" &
+      display_pid=$!
     fi
 
     # Pause if requested
@@ -657,9 +656,8 @@ read_entire_disk() {
     report_out+="$read_type_s Elapsed Time: $(timer $time_start).\\n"
     report_out+="Cycle's Elapsed Time: $(timer $cycle_timer).\\n"
     report_out+="Total Elapsed time: $(timer $all_timer)."
-    send_mail "$read_type_s Finished on $disk_name." "$read_type_s Finished on $disk_name. Cycle ${cycle} of ${cycles}." "$report_out"
+    send_mail "$read_type_s Finished on $disk_name." "$read_type_s Finished on $disk_name. Cycle ${cycle} of ${cycles}." "$report_out" &
   fi
-
   eval "$output='$(timer $time_start) @ $average_speed MB/s'"
 }
 
@@ -1024,10 +1022,10 @@ while true ; do
     -b|--read-blocks)   is_numeric read_blocks    "$1" "$2"; shift 2;;
     -t|--test)          short_test=y;                        shift 1;;
     -d|--no-stress)     read_stress=n;                       shift 1;;
-    -l|--list)          list_device_names;                   exit 0 ;;
+    -l|--list)          list_device_names;                   exit 0;;
     -c|--cycles)        is_numeric cycles         "$1" "$2"; shift 2;;
     -u|--signature)     verify_disk_mbr=y;                   shift 1;;
-    -p|--verify)        verify_disk_mbr=y; verify_zeroed=y;  shift 1;;
+    -p|--verify)        verify_disk_mbr=y;  verify_zeroed=y; shift 1;;
     -j|--no-prompt)     no_prompt=y;                         shift 1;;
     -v|--version)       echo "$0 version: $version"; exit 0; shift 1;;
     -o|--preclear-only) write_disk_mbr=y;                    shift 1;;
