@@ -704,6 +704,8 @@ display_status(){
   eval "local -A prev=$(array_content display_step)"
   eval "local -A title=$(array_content display_title)"
 
+  echo "" > $out
+
   if [ "$skip_formatting" != "y" ]; then
     tput reset > $out
   fi
@@ -800,11 +802,11 @@ display_status(){
     tput cup $(( $init + $height - 1)) $wpos >> $out
     tail -n 1 "$smart_output" >> $out
     tput cup $(( $init + $height )) $width >> $out
-    echo "π" >> $out
+    # echo "π" >> $out
     tput cup $(( $init + $height + 2)) 0 >> $out
   else
     tput cup $(( $height + $hpos )) $width >> $out
-    echo "π" >> $out
+    # echo "π" >> $out
     tput cup $(( $height + $hpos + 2 )) 0 >> $out
   fi
   cat $out
@@ -1113,7 +1115,7 @@ append all_files 'smart_prefix'  "${all_files[dir]}/smart_"
 append all_files 'smart_final'   "${all_files[dir]}/smart_final"
 append all_files 'smart_out'     "${all_files[dir]}/smart_out"
 mkdir -p "${all_files[dir]}"
-trap "rm -rf ${all_files[dir]}" EXIT;
+# trap "rm -rf ${all_files[dir]}" EXIT;
 
 # Set terminal variables
 if [ "$format_html" == "y" ]; then
@@ -1397,8 +1399,9 @@ sed -i -e 's/####/#/g' $report
 
 # Save report to Flash disk
 mkdir -p /boot/preclear_reports/
-date_formated=$(date "+%Y.%m.%d-%H:%M:%S")
-todos < $report > /boot/preclear_reports/preclear_report_${disk_properties[serial]}_${date_formated}.txt
+date_formated=$(date "+%Y.%m.%d_%H.%M.%S")
+file_name=$(echo "preclear_report_${disk_properties[serial]}_${date_formated}.txt" | sed -e 's/[^A-Za-z0-9._-]/_/g')
+todos < $report > "/boot/preclear_reports/${file_name}"
 
 # Send end of the script notification
 if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 1 ]; then

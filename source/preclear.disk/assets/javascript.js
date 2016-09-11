@@ -1,5 +1,4 @@
-var plugin      = "preclear.disk";
-var PreclearURL = '/plugins/'+plugin+'/Preclear.php';
+var PreclearURL = '/plugins/'+plugin+'/Preclear.php'
 
 $(function()
   {

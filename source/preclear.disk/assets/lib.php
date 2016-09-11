@@ -4,10 +4,57 @@ class Preclear
   {
 
   public $plugin = "preclear.disk";
+  
+
+  public $authors = ["gfjardim" => "gfjardim", "joel" => "Joe L."];
+
+
+  public function Author($author)
+  {
+    return $this->authors[$author];
+  }
+
+
+  public function scriptCapabilities($file)
+  {
+    $o["version"]       = (is_file($file)) ? trim(shell_exec("$file -v 2>/dev/null|cut -d: -f2")) : NULL;
+    $o["file"] = $file;
+    $o["fast_postread"] = $o["version"] ? (strpos(file_get_contents($file), "fast_postread") ? TRUE : FALSE ) : FALSE;
+    $o["notifications"] = $o["version"] ? (strpos(file_get_contents($file), "notify_channels") ? TRUE : FALSE ) : FALSE;
+    $o["noprompt"]      = $o["version"] ? (strpos(file_get_contents($file), "noprompt") ? TRUE : FALSE ) : FALSE;
+    return $o;
+  }
+
+
+  public function scriptFiles()
+  {
+    $scripts = ["gfjardim" => "/usr/local/emhttp/plugins/".$this->plugin."/script/preclear_disk.sh",
+                "joel"     => "/boot/config/plugins/".$this->plugin."/preclear_disk.sh"];
+
+    foreach ($scripts as $author => $file)
+    {
+      if (! is_file($file))
+      {
+        unset($scripts[$author]);
+      }
+    }
+    return $scripts;
+  }
+
+
+  public function Script()
+  {
+    echo "var plugin = '".$this->plugin."';";
+    echo "var authors = ".json_encode($this->authors).";";
+    echo "var scope  = 'gfjardim';";
+    echo "var scripts = ".json_encode($this->scriptFiles()).";";
+    echo file_get_contents("plugins/".$this->plugin."/assets/javascript.js");
+  }
 
 
   public function Link($disk, $type)
   {
+    $disk = file_exists($disk) ? basename($disk) : $disk;
     $icon = "<a title='Preclear Disk' class='exec' href='/Settings/Preclear?disk={$disk}'><img src='/plugins/".$this->plugin."/icons/precleardisk.png'></a>";
     $text = "<a title='Preclear Disk' class='exec' onclick='startPreclear(\"{$disk}\")'>Start Preclear</a>";
     return ($type == "text") ? $text : $icon;
@@ -37,6 +84,7 @@ class Preclear
 
   public function isRunning($disk)
   {
+    $disk = file_exists($disk) ? basename($disk) : $disk;
     if ( $this->tmux_is_session("preclear_disk_{$disk}") )
     {
       return true;
@@ -149,6 +197,8 @@ class Preclear
       $x=pow(2,$i);
       $size2 .= "<option value='".($x*16*65536)."'>{$x}M</option>";
     }
+    $scripts = $this->scriptFiles();
+    $capabilities = array_key_exists("joel", $scripts) ? $this->scriptCapabilities($scripts["joel"]) : [];
     ?>
       <div id="preclear-dialog" style="display:none;" title=""></div>
       <div id="joel-start-defaults" style="display:none;">
@@ -170,7 +220,7 @@ class Preclear
               <select name="-c"><?=$cycles;?></select>
             </dd>
           </div>
-          <?if ($notifications):?>
+          <?if ( array_key_exists("notifications", $capabilities) && $capabilities["notifications"] ):?>
           <div class="clear_verify_options">
             <dt>Notifications:</dt>
             <dd style="font-weight: normal;">
@@ -207,7 +257,7 @@ class Preclear
               <input type="checkbox" name="-W" class="switch" >
             </dd>
           </div>
-          <?if ($fast_postread):?>
+          <?if ( array_key_exists("fast_postread", $capabilities) && $capabilities["fast_postread"] ):?>
           <div class='test_options'>
             <dt>Fast post-read verify: </dt>
             <dd>

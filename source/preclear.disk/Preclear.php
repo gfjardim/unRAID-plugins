@@ -1,50 +1,20 @@
 <?
 set_error_handler("log_error");
+$plugin = "preclear.disk";
+
+require_once( "webGui/include/Helpers.php" );
+require_once( "plugins/${plugin}/assets/lib.php" );
 
 #########################################################
 #############           VARIABLES          ##############
 #########################################################
 
-$plugin       = "preclear.disk";
 $state_file   = "/var/state/{$plugin}/state.ini";
 $log_file     = "/var/log/{$plugin}.log";
-$script_files = array( 
-                       "gfjardim" => "/usr/local/emhttp/plugins/${plugin}/script/preclear_disk.sh",
-                        "joel"     => "/boot/config/plugins/${plugin}/preclear_disk.sh",
-                      );
-
-$authors      = array( "gfjardim" => "gfjardim", "joel" => "Joe L.");
-
-
-
-$script_files = array_filter($script_files, function ($file) { return $file && is_file( $file ); });
-
-
-require_once( "webGui/include/Helpers.php" );
-require_once( "plugins/${plugin}/assets/lib.php" );
-
-# Search for scripts and remove those absent
-foreach ($script_files as $key => $script)
-{
-  if (is_file($script))
-  {
-    $script_file = $script;
-    $author      = $key;
-    @chmod($script_file, 0755);
-  }
-
-  else
-  {
-    unset($script_files[$key]);
-  }
-}
-
-$script_version = (is_file($script_file)) ? trim(shell_exec("$script_file -v 2>/dev/null|cut -d: -f2")) : NULL;
-$fast_postread  = $script_version ? (strpos(file_get_contents($script_file), "fast_postread") ? TRUE : FALSE ) : FALSE;
-$notifications  = $script_version ? (strpos(file_get_contents($script_file), "notify_channels") ? TRUE : FALSE ) : FALSE;
-$noprompt       = $script_version ? (strpos(file_get_contents($script_file), "noprompt") ? TRUE : FALSE ) : FALSE;
-$Preclear       = new Preclear;
+$Preclear     = new Preclear;
+$script_files = $Preclear->scriptFiles();
 // $VERBOSE        = TRUE;
+$TEST           = TRUE;
 
 if (isset($_POST['display']))
 {
@@ -451,12 +421,7 @@ switch ($_POST['action']) {
         $temp      = my_temp($disk['temperature']);
         $mounted   = array_reduce($disk['partitions'], function ($found, $partition) { return $found || is_mounted(realpath($partition)); }, false);
         
-        if (! is_file($script_file))
-        {
-          $status  = "Script not present";
-        }
-        
-        else if ($Preclear->isRunning($disk_name))
+        if ($Preclear->isRunning($disk_name))
         {
           $status  = $Preclear->Status($disk_name, $serial);
         }
@@ -485,12 +450,16 @@ switch ($_POST['action']) {
     echo json_encode(array("disks" => $disks_o, "info" => json_encode($disks)));
     break;
 
+
+
   case 'get_status':
     $disk_name = urldecode($_POST['device']);
     $serial    = urldecode($_POST['serial']);
     $status    = $Preclear->Status($disk_name, $serial);
     echo json_encode(array("status" => $status));
     break;
+
+
 
   case 'start_preclear':
     $device  = urldecode($_POST['device']);
@@ -510,15 +479,16 @@ switch ($_POST['action']) {
       $pre_read  = (isset($_POST['--skip-preread']) && $_POST['--skip-preread'] == "on") ? " --skip-preread" : "";
       $post_read = (isset($_POST['--skip-postread']) && $_POST['--skip-postread'] == "on") ? " --skip-postread" : "";
       $noprompt  = " --no-prompt";
+      $test      = isset($TEST) ? " --test" : "";
 
       if (!$op)
       {
-        $cmd = "$script {$op}${notify}${frequency}{$cycles}{$read_sz}{$pre_read}{$post_read}{$noprompt} /dev/$device";
+        $cmd = "$script {$op}${notify}${frequency}{$cycles}{$read_sz}{$pre_read}{$post_read}{$noprompt}{$test} /dev/$device";
       }
 
       else
       {
-        $cmd = "$script {$op}${notify}${frequency}{$read_sz} /dev/$device";
+        $cmd = "$script {$op}${notify}${frequency}{$read_sz}{$test} /dev/$device";
       }
       
     }
@@ -533,8 +503,11 @@ switch ($_POST['action']) {
       $pre_read  = (isset($_POST['-W']) && $_POST['-W'] == "on") ? " -W" : "";
       $post_read = (isset($_POST['-X']) && $_POST['-X'] == "on") ? " -X" : "";
       $fast_read = (isset($_POST['-f']) && $_POST['-f'] == "on") ? " -f" : "";
-      $noprompt  = $noprompt ? " -J" : "";
       $confirm   = (! $op || $op == " -z" || $op == " -V") ? TRUE : FALSE;
+      $test      = isset($TEST) ? " -s" : "";
+
+      $capable  = array_key_exists("joel", $script_files) ? $Preclear->scriptCapabilities($script_files["joel"]) : [];
+      $noprompt = (array_key_exists("noprompt", $capable) && $capable["noprompt"]) ? " -J" : "";
       
       if ( $post_read && $pre_read )
       {
@@ -544,12 +517,12 @@ switch ($_POST['action']) {
       
       if (! $op )
       {
-        $cmd = "$script {$op}{$mail}{$notify}{$passes}{$read_sz}{$write_sz}{$pre_read}{$post_read}{$fast_read}{$noprompt} /dev/$device";
+        $cmd = "$script {$op}{$mail}{$notify}{$passes}{$read_sz}{$write_sz}{$pre_read}{$post_read}{$fast_read}{$noprompt}{$test} /dev/$device";
       }
 
       else if ( $op == "-V" )
       {
-        $cmd = "$script {$op}{$fast_read}{$mail}{$notify}{$read_sz}{$write_sz}{$noprompt} /dev/$device";
+        $cmd = "$script {$op}{$fast_read}{$mail}{$notify}{$read_sz}{$write_sz}{$noprompt}{$test} /dev/$device";
       }
 
       else
