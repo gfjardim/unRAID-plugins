@@ -1436,6 +1436,5 @@ if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 1 ]; then
   report_out+="\\n\\nS.M.A.R.T. Report\\n"
   while read -r line; do report_out+="${line}\\n"; done < ${all_files[smart_out]}
   report_out+="\\n\\n"
-  report_out="$(cat $report)"
   send_mail "Preclear: PASS! Preclearing Disk ${disk_properties[name]} Finished!!!" "Preclear: PASS! Preclearing Disk ${disk_properties[name]} Finished!!! Cycle ${cycle} of ${cycles}" "${report_out}"
 fi

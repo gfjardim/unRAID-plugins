@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2016.09.10b">
+<!ENTITY version   "2016.09.11">
 <!ENTITY launch    "Settings/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -15,7 +15,7 @@
 <CHANGES>
 ##&name;
 
-###2016.09.10b
+###2016.09.11
 - Fix: better report formating
 
 ###016.09.10
