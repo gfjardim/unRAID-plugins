@@ -14,7 +14,7 @@ $log_file     = "/var/log/{$plugin}.log";
 $Preclear     = new Preclear;
 $script_files = $Preclear->scriptFiles();
 // $VERBOSE        = TRUE;
-$TEST           = TRUE;
+// $TEST           = TRUE;
 
 if (isset($_POST['display']))
 {

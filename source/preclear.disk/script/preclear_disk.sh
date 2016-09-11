@@ -13,7 +13,7 @@ if [ "$BV" -lt "040253" ]; then
 fi
 
 # Let's verify all dependencies
-for dep in cat awk basename blockdev comm date dd find fold getopt grep kill printf readlink seq sort strings sum tac todos tput udevadm xargs; do
+for dep in cat awk basename blockdev comm date dd find fold getopt grep kill printf readlink seq sort strings sum tac tmux todos tput udevadm xargs; do
   if ! type $dep >/dev/null 2>&1 ; then
     echo -e "The following dependency isn'y met: [$dep]\nPlease install it and try again."
     exit 1
@@ -1315,18 +1315,18 @@ for cycle in $(seq $cycles); do
   # Zero the disk
   display_status "Zeroing in progress ..." ''
   write_zeroes zeroing_average
-  sleep 10
+  # sleep 10
   append display_step "Zeroing the disk:|[${zeroing_average}] ***SUCCESS***"
-  sleep 10
+  # sleep 10
 
   # Write unRAID's preclear signature to the disk
   display_status "Writing unRAID's Preclear signature to the disk ..." ''
   echo "${disk_properties[name]}|NN|Writing unRAID's Preclear signature|$$" > ${all_files[stat]}
   write_signature 64
-  sleep 10
+  # sleep 10
   append display_step "Writing unRAID's Preclear signature:|***SUCCESS***"
   echo "${disk_properties[name]}|NN|Writing unRAID's Preclear signature finished|$$" > ${all_files[stat]}
-  sleep 10
+  # sleep 10
 
   # Verify unRAID's preclear signature in disk
   display_status "Verifying unRAID's signature on the MBR ..." ""
@@ -1387,15 +1387,35 @@ echo "${disk_properties[name]}|NN|Preclear Finished Successfully!|$$" > ${all_fi
 echo -e "\n--> ATTENTION: Please take a look into the SMART report above for drive health issues.\n"
 echo -e "--> RESULT: Preclear finished succesfully.\n\n"
 
-# Saving report
+# # Saving report
 report="${all_files[dir]}/report"
 display_status '' '' 'y'> $report
-echo -e "\n--> ATTENTION: Please take a look into the SMART report above for drive health issues.\n" >> $report
-echo -e "--> RESULT: Preclear finished succesfully.\n\n" >> $report
 
-# Clear report from formatting characters
-sed -i -r 's%(\x9B|\x1B\[)[0-?]*[@-~]%%g' $report
-sed -i -e 's/####/#/g' $report
+# echo -e "\n--> ATTENTION: Please take a look into the SMART report above for drive health issues.\n" >> $report
+# echo -e "--> RESULT: Preclear finished succesfully.\n\n" >> $report
+
+# # Clear report from formatting characters
+# sed -i -r 's%(\x9B|\x1B\[)[0-?]*[@-~]%%g' $report
+# sed -i -e 's/####/#/g' $report
+
+# # Format report
+# sed -i -e "s#\(Pre-read verification:\)|#\1                 #g" \
+#        -e "s#\(Zeroing the disk:\)|#\1                      #g" \
+#        -e "s#\(Writing unRAID's Preclear signature:\)|#\1                       #g" \
+#        -e "s#\(Verifying unRAID's Preclear signature:\)|#\1                     #g" \
+#        -e "s#\(Post-Read verification:\)|#\1                #g" \
+#        -e "s#\(Cycle elapsed time:.*\)| \(.*\)#\n\2#g" \
+#        -e "s#\*\{3\}##g" \
+#        -e "s#\(S.M.A.R.T. Status\)#\1\n#g" $report
+
+report_tmux="preclear_disk_report_${disk_properties[name]}"
+
+tmux new-session -d -x 140 -y 200 -s "${report_tmux}" >/dev/null 2>&1
+tmux send -t "${report_tmux}" "cat '$report'" ENTER 2>/dev/null
+tmux capture-pane -t "${report_tmux}" >/dev/null 2>&1
+tmux show-buffer >$report 2>&1
+tmux kill-session -t "${report_tmux}" >/dev/null 2>&1
+sed -i '/^$/{:a;N;s/\n$//;ta}' $report
 
 # Save report to Flash disk
 mkdir -p /boot/preclear_reports/
@@ -1416,5 +1436,6 @@ if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 1 ]; then
   report_out+="\\n\\nS.M.A.R.T. Report\\n"
   while read -r line; do report_out+="${line}\\n"; done < ${all_files[smart_out]}
   report_out+="\\n\\n"
+  report_out="$(cat $report)"
   send_mail "Preclear: PASS! Preclearing Disk ${disk_properties[name]} Finished!!!" "Preclear: PASS! Preclearing Disk ${disk_properties[name]} Finished!!! Cycle ${cycle} of ${cycles}" "${report_out}"
 fi
