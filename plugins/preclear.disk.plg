@@ -10,7 +10,7 @@
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
 ]>
 
-<PLUGIN name="&name;" author="&author;" launch="&launch;" version="&version;" pluginURL="&pluginURL;" min="6.2.0">
+<PLUGIN name="&name;" author="&author;" launch="&launch;" version="&version;" pluginURL="&pluginURL;" min="6.2">
 
 <CHANGES>
 ##&name;
