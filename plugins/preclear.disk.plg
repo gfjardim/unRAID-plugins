@@ -4,16 +4,23 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2016.09.11a">
+<!ENTITY version   "2016.09.23">
 <!ENTITY launch    "Settings/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
 ]>
 
-<PLUGIN name="&name;" author="&author;" launch="&launch;" version="&version;" pluginURL="&pluginURL;">
+<PLUGIN name="&name;" author="&author;" launch="&launch;" version="&version;" pluginURL="&pluginURL;" min="6.2.0">
 
 <CHANGES>
 ##&name;
+
+###2016.09.23
+- Add: show reports of listed disks;
+- Fix: page scrolling while updating;
+- Fix: make link point to Tools;
+- Fix: increase disk column width;
+- Fix: better script report.
 
 ###2016.09.11
 - Fix: better report formating
@@ -150,36 +157,25 @@ The 'plugin' package MD5 hash.
 <URL>&gitURL;/archive/&name;-&version;.md5</URL>
 </FILE>
 
-<!--
-The 'readvz' script.
--->
+<!--The 'readvz' script.-->
 <FILE Name="/boot/readvz" Mode="755">
-<URL>&gitURL;/source/packages/readvz</URL>
+  <URL>&gitURL;/source/packages/readvz</URL>
 </FILE>
 
-<!--
-tmux-1.8-x86_64-1.txz
--->
-<FILE Name="/boot/config/plugins/&name;/tmux-1.8-x86_64-1.txz" Run="upgradepkg --install-new">
-<URL>http://slackware.osuosl.org/slackware64-14.1/slackware64/ap/tmux-1.8-x86_64-1.txz</URL>
-<MD5>2a36cb120c8cdd584262442ed3f18f34</MD5>
+<!-- unRAID > 6.2.0 -->
+<FILE Name="/boot/config/plugins/&name;/libevent-2.0.22-x86_64-1.txz" Run="upgradepkg --install-new">
+  <URL>&gitURL;/source/packages/libevent-2.0.22-x86_64-1.txz</URL>
+  <MD5>7a755ece3e378f244a3c327369e7f2ac</MD5>
+</FILE>
+<FILE Name="/boot/config/plugins/&name;/tmux-2.2-x86_64-2.txz" Run="upgradepkg --install-new">
+  <URL>&gitURL;/source/packages/tmux-2.2-x86_64-2.txz</URL>
+  <MD5>a268019858c88d5f2f702d9fc182a37c</MD5>
+</FILE>
+<FILE Name="/boot/config/plugins/&name;/ncurses-5.9-x86_64-4.txz" Run="installpkg">
+  <URL>&gitURL;/source/packages/ncurses-5.9-x86_64-4.txz</URL>
+  <MD5>c2d2b01f021dc2f4752c4fff02f65fd5</MD5>
 </FILE>
 
-<!--
-libevent-2.0.21-x86_64-1.txz
--->
-<FILE Name="/boot/config/plugins/&name;/libevent-2.0.21-x86_64-1.txz" Run="upgradepkg --install-new">
-<URL>http://slackware.osuosl.org/slackware64-14.1/slackware64/l/libevent-2.0.21-x86_64-1.txz</URL>
-<MD5>48fe596d36a4585fc5b23ecfee09b0d3</MD5>
-</FILE>
-
-<!--
-ncurses-5.9-x86_64-2.txz
--->
-<FILE Name="/boot/config/plugins/&name;/ncurses-5.9-x86_64-2.txz" Run="upgradepkg --install-new">
-<URL>http://slackware.osuosl.org/slackware64-14.1/slackware64/l/ncurses-5.9-x86_64-2.txz</URL>
-<MD5>9134fa31097ee352a1f1662e3f6bcb3f</MD5>
-</FILE>
 
 <!--
 The 'post-install' script.
