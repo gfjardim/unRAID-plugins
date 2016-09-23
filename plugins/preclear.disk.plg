@@ -5,7 +5,7 @@
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
 <!ENTITY version   "2016.09.23">
-<!ENTITY launch    "Settings/Preclear">
+<!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
 ]>
