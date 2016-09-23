@@ -55,7 +55,7 @@ class Preclear
   public function Link($disk, $type)
   {
     $disk = file_exists($disk) ? basename($disk) : $disk;
-    $icon = "<a title='Preclear Disk' class='exec' href='/Settings/Preclear?disk={$disk}'><img src='/plugins/".$this->plugin."/icons/precleardisk.png'></a>";
+    $icon = "<a title='Preclear Disk' class='exec' href='/Tools/Preclear?disk={$disk}'><img src='/plugins/".$this->plugin."/icons/precleardisk.png'></a>";
     $text = "<a title='Preclear Disk' class='exec' onclick='startPreclear(\"{$disk}\")'>Start Preclear</a>";
     return ($type == "text") ? $text : $icon;
   }

@@ -13,8 +13,12 @@ function getPreclearContent()
   $.post(PreclearURL,{action:'get_content',display:display},function(data)
   {
     if ( $('#preclear-table-body').length )
-    {
+    { 
+      currentScroll  = $(window).scrollTop();
+      currentToggled = getToggledReports();
       $( '#preclear-table-body' ).html( data.disks );
+      toggleReports(currentToggled);
+      $(window).scrollTop(currentScroll);
     }
 
     window.disksInfo = JSON.parse(data.info);
@@ -256,3 +260,69 @@ function getDiskInfo(device, info){
     }
   }
 }
+
+
+function toggleReports(opened)
+{
+  $(".toggle-reports").each(function()
+  {
+    var elem = $(this);
+    var disk = elem.attr("hdd");
+    elem.disableSelection();
+
+    elem.click(function()
+    {
+      var elem = $(this);
+      var disk = elem.attr("hdd");
+      $(".toggle-"+disk).slideToggle(150, function()
+      {
+        if ( $("div.toggle-"+disk+":first").is(":visible") )
+        {
+          elem.find(".glyphicon-append").addClass("glyphicon-minus-sign").removeClass("glyphicon-plus-sign");
+        }
+        else
+        {
+          elem.find(".glyphicon-append").removeClass("glyphicon-minus-sign").addClass("glyphicon-plus-sign");
+        }
+      });
+    });
+
+    if (typeof(opened) !== 'undefined')
+    {
+      if ( $.inArray(disk, opened) > -1 )
+      {
+        $(".toggle-"+disk).css("display","block");
+        elem.find(".glyphicon-append").addClass("glyphicon-minus-sign").removeClass("glyphicon-plus-sign");
+      }
+    }      
+  });
+}
+
+
+function getToggledReports()
+{ 
+  var opened = [];
+  $(".toggle-reports").each(function(e)
+  {
+    var elem = $(this);
+    var disk = elem.attr("hdd");
+    if ( $("div.toggle-"+disk+":first").is(":visible") )
+    {
+      opened.push(disk);
+    }
+  });
+  return opened;
+}
+
+function rmReport(file, el)
+{
+  $.post(PreclearURL, {action:"remove_report", file:file}, function(data)
+  {
+    if (data)
+    {
+      $(el).parent().remove();
+    }
+
+  });
+}
+

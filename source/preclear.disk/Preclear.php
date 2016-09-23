@@ -302,7 +302,7 @@ function get_disk_info($device, $reload=FALSE)
   $disk = array();
   $attrs = benchmark("get_info", $device);
   $disk['serial_short'] = isset($attrs["ID_SCSI_SERIAL"]) ? $attrs["ID_SCSI_SERIAL"] : $attrs['ID_SERIAL_SHORT'];
-  $disk['serial']       = "{$attrs[ID_MODEL]}_{$disk[serial_short]}";
+  $disk['serial']       = trim("{$attrs[ID_MODEL]}_{$disk[serial_short]}");
   $disk['device']       = realpath($device);
   $disk['family']       = $attrs['FAMILY'];
   $disk['model']        = $attrs['MODEL'];
@@ -420,24 +420,59 @@ switch ($_POST['action']) {
         $serial    = $disk['serial'];
         $temp      = my_temp($disk['temperature']);
         $mounted   = array_reduce($disk['partitions'], function ($found, $partition) { return $found || is_mounted(realpath($partition)); }, false);
-        
+        $reports   = listDir("/boot/preclear_reports");
+        $reports   = array_filter(listDir("/boot/preclear_reports"), function ($report) use ($disk)
+                                  {
+                                    return preg_match("|".$disk["serial_short"]."|", $report) && ( preg_match("|_report_|", $report) || preg_match("|_rpt_|", $report) ); 
+                                  });
+
+        if (count($reports))
+        {
+          $title  = "<span title='Click to view reports.' class='exec toggle-reports' hdd='{$disk_name}'>
+                      <i class='glyphicon glyphicon-hdd hdd'></i>
+                      <i class='glyphicon glyphicon-plus-sign glyphicon-append'></i>
+                      ${disk['serial']}
+                    </span>";
+          
+          $report_files = "<div class='toggle-${disk_name}' style='display:none;'>";
+
+          foreach ($reports as $report)
+          {
+            $report_files .= "<div style='margin:4px 0px 4px 0px;'>
+                                <i class='glyphicon glyphicon-list-alt hdd'></i>
+                                <span style='margin:7px;'></span>
+                                <a href='${report}'>".pathinfo($report, PATHINFO_FILENAME)."</a>
+                                <a class='exec' title='Remove Report' style='color:#CC0000;font-weight:bold;' onclick='rmReport(\"{$report}\", this);'>
+                                  &nbsp;<i class='glyphicon glyphicon-remove hdd'></i>
+                                </a>
+                              </div>";  
+          }
+          
+          $report_files .= "</div>";
+        }
+        else
+        {
+          $report_files="";
+          $title  = "<span class='toggle-reports' hdd='{$disk_name}'><i class='glyphicon glyphicon-hdd hdd'></i><span style='margin:8px;'></span>{$serial}";
+        }
+
         if ($Preclear->isRunning($disk_name))
         {
           $status  = $Preclear->Status($disk_name, $serial);
         }
-        
         else
         {
           $status  = $mounted ? "Disk mounted" : $Preclear->Link($disk_name, "text");
         }
-
+        
         $disks_o .= "<tr class='$odd'>
                       <td><img src='/webGui/images/$disk_icon'><a href='/Settings/New?name=$disk_name'> $disk_name</a></td>
-                      <td><span class='toggle-hdd' hdd='{$disk_name}'><i class='glyphicon glyphicon-hdd hdd'></i><span style='margin:4px;'></span>{$serial}</td>
+                      <td>${title}${report_files}</td>
                       <td>{$temp}</td>
                       <td><span>${disk['size']}</span></td>
                       <td>{$status}</td>
                     </tr>";
+        $disks_o .= $report_files;
         $odd = ($odd == "odd") ? "even" : "odd";
       }
     }
@@ -584,6 +619,15 @@ switch ($_POST['action']) {
     }
     echo json_encode(array("content" => $output));
     break;
+
+
+  case 'remove_report':
+    $file = $_POST['file'];
+    if (! is_bool( strpos($file, "/boot/preclear_reports")))
+    {
+      unlink($file);
+      echo "true";
+    }
 }
 
 

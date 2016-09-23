@@ -330,9 +330,9 @@ write_zeroes(){
   blockdev --rereadpt $disk
 
   if [ "$short_test" == "y" ]; then
-    nice -n $niceness dd if=/dev/zero bs=2048k     seek=1 conv=fdatasync of=$disk count=512 2> $dd_output &
+    nice -n $niceness dd if=/dev/zero of=$disk bs=2048k     seek=1 conv=fdatasync,noerror iflag=fullblock count=512 2> $dd_output &
   else
-    nice -n $niceness dd if=/dev/zero bs=$write_bs seek=1 conv=fdatasync of=$disk           2> $dd_output &
+    nice -n $niceness dd if=/dev/zero of=$disk bs=$write_bs seek=1 conv=fdatasync,noerror iflag=fullblock           2> $dd_output &
   fi
   dd_pid=$!
 
@@ -1105,7 +1105,7 @@ if [ "$disable_smart" != "y" ]; then
 fi
 
 # Used files
-append all_files 'dir'           "/tmp/.preclear/${disk_properties[name]}"
+append all_files 'dir'           "/boot/.preclear/${disk_properties[name]}"
 append all_files 'dd_out'        "${all_files[dir]}/dd_output"
 append all_files 'pause'         "${all_files[dir]}/pause"
 append all_files 'verify_errors' "${all_files[dir]}/verify_errors"
@@ -1115,7 +1115,7 @@ append all_files 'smart_prefix'  "${all_files[dir]}/smart_"
 append all_files 'smart_final'   "${all_files[dir]}/smart_final"
 append all_files 'smart_out'     "${all_files[dir]}/smart_out"
 mkdir -p "${all_files[dir]}"
-# trap "rm -rf ${all_files[dir]}" EXIT;
+trap "rm -rf ${all_files[dir]}" EXIT;
 
 # Set terminal variables
 if [ "$format_html" == "y" ]; then
@@ -1160,7 +1160,7 @@ all_timer=$(timer)
 if [ -f "${all_files[pid]}" ]; then
   pid=$(cat ${all_files[pid]})
   if [ -e "/proc/${pid}" ]; then
-    echo "A instance of Preclear for disk '$theDisk' is already running."
+    echo "An instance of Preclear for disk '$theDisk' is already running."
     trap '' EXIT
     exit 1
   else
@@ -1384,12 +1384,14 @@ for cycle in $(seq $cycles); do
 done
 
 echo "${disk_properties[name]}|NN|Preclear Finished Successfully!|$$" > ${all_files[stat]};
-echo -e "\n--> ATTENTION: Please take a look into the SMART report above for drive health issues.\n"
+
+if [ "$disable_smart" != "y" ]; then
+  echo -e "\n--> ATTENTION: Please take a look into the SMART report above for drive health issues.\n"
+fi
 echo -e "--> RESULT: Preclear finished succesfully.\n\n"
 
 # # Saving report
 report="${all_files[dir]}/report"
-display_status '' '' 'y'> $report
 
 # echo -e "\n--> ATTENTION: Please take a look into the SMART report above for drive health issues.\n" >> $report
 # echo -e "--> RESULT: Preclear finished succesfully.\n\n" >> $report
@@ -1408,13 +1410,25 @@ display_status '' '' 'y'> $report
 #        -e "s#\*\{3\}##g" \
 #        -e "s#\(S.M.A.R.T. Status\)#\1\n#g" $report
 
-report_tmux="preclear_disk_report_${disk_properties[name]}"
+tmux_window="preclear_disk_${disk_properties[name]}"
+if [ "$(tmux ls 2>/dev/null | grep -c "${tmux_window}")" -gt 0 ]; then
+  tmux capture-pane -t "${tmux_window}" && tmux show-buffer >$report 2>&1
+else
+  display_status '' '' >$report
+  if [ "$disable_smart" != "y" ]; then
+    echo -e "\n--> ATTENTION: Please take a look into the SMART report above for drive health issues.\n" >>$report
+  fi
+  echo -e "--> RESULT: Preclear finished succesfully.\n\n" >>$report
+  report_tmux="preclear_disk_report_${disk_properties[name]}"
 
-tmux new-session -d -x 140 -y 200 -s "${report_tmux}" >/dev/null 2>&1
-tmux send -t "${report_tmux}" "cat '$report'" ENTER 2>/dev/null
-tmux capture-pane -t "${report_tmux}" >/dev/null 2>&1
-tmux show-buffer >$report 2>&1
-tmux kill-session -t "${report_tmux}" >/dev/null 2>&1
+  tmux new-session -d -x 140 -y 200 -s "${report_tmux}"
+  tmux send -t "${report_tmux}" "cat '$report'" ENTER
+
+  tmux capture-pane -t "${report_tmux}" && tmux show-buffer >$report 2>&1
+  tmux kill-session -t "${report_tmux}" >/dev/null 2>&1
+fi
+
+# Remove empy lines
 sed -i '/^$/{:a;N;s/\n$//;ta}' $report
 
 # Save report to Flash disk
