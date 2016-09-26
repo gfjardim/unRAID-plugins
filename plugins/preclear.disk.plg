@@ -4,13 +4,14 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2016.09.25">
+<!ENTITY version   "2016.09.26">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
-<!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
+<!ENTITY beta      "-beta">
+<!ENTITY pluginURL "&gitURL;/plugins/&name;&beta;.plg">
 ]>
 
-<PLUGIN name="&name;" author="&author;" launch="&launch;" version="&version;" pluginURL="&pluginURL;" min="6.2">
+<PLUGIN name="&name;" author="&author;" launch="&launch;" version="&version;" pluginURL="&pluginURL;">
 
 <CHANGES>
 ##&name;
@@ -171,33 +172,28 @@ The 'plugin' package MD5 hash.
 </FILE>
 
 <!--
-unRAID > 6.2.0
--->
-<FILE Name="/boot/config/plugins/&name;/libevent-2.0.22-x86_64-1.txz" Run="upgradepkg --install-new">
-  <URL>&gitURL;/source/packages/libevent-2.0.22-x86_64-1.txz</URL>
-  <MD5>7a755ece3e378f244a3c327369e7f2ac</MD5>
-</FILE>
-
-<FILE Name="/boot/config/plugins/&name;/tmux-2.2-x86_64-2.txz" Run="upgradepkg --install-new">
-  <URL>&gitURL;/source/packages/tmux-2.2-x86_64-2.txz</URL>
-  <MD5>a268019858c88d5f2f702d9fc182a37c</MD5>
-</FILE>
-
-<FILE Name="/boot/config/plugins/&name;/utempter-1.1.6-x86_64-2.txz" Run="upgradepkg --install-new">
-  <URL>&gitURL;/source/packages/utempter-1.1.6-x86_64-2.txz</URL>
-  <MD5>aed1f39d4a5acddb225b542145e0eeaf</MD5>
-</FILE>
-
-<FILE Name="/boot/config/plugins/&name;/ncurses-5.9-x86_64-4.txz" Run="installpkg">
-  <URL>&gitURL;/source/packages/ncurses-5.9-x86_64-4.txz</URL>
-  <MD5>c2d2b01f021dc2f4752c4fff02f65fd5</MD5>
-</FILE>
-
-<!--
 The 'post-install' script.
 -->
 <FILE Run="/bin/bash">
 <INLINE>
+download_install() {
+  local dest="/boot/config/plugins/&name;/${1}"
+  local src="&gitURL;/source/packages/${1}"
+  local md5=$2
+  if [ ! -f "${dest}" ]; then
+    curl --location --silent --fail "${src}" --output "${dest}"
+  fi
+  file_md5=$(/usr/bin/md5sum ${dest})
+  if [ "${file_md5:0:32}" != "${md5:0:32}" ]; then
+    echo "Wrong '${1}' package md5 hash."
+    rm "${dest}"
+    exit 1
+  else
+    /sbin/installpkg "$dest"
+  fi
+}
+
+
 # Verify and install plugin package
 sum1=$(/usr/bin/md5sum /boot/config/plugins/&name;/&name;-&version;.txz)
 sum2=$(/usr/bin/cat /boot/config/plugins/&name;/&name;-&version;.md5)
@@ -210,13 +206,27 @@ else
   upgradepkg --install-new /boot/config/plugins/&name;/&name;-&version;.txz
 fi
 
+gcc_version=$(cat /proc/version|grep -Po 'gcc version \K[\d.]*')
+if [ "$gcc_version" == "5.3.0" ]; then
+  download_install libevent-2.0.22-x86_64-1.txz 7a755ece3e378f244a3c327369e7f2ac
+  download_install tmux-2.2-x86_64-2.txz a268019858c88d5f2f702d9fc182a37c
+  download_install ncurses-5.9-x86_64-4.txz c2d2b01f021dc2f4752c4fff02f65fd5
+  download_install utempter-1.1.6-x86_64-2.txz aed1f39d4a5acddb225b542145e0eeaf
+
+else
+  download_install libevent-2.0.22-x86_64-1_slack14.1.txz bc5d1dff8d2f3758b0feddf00d2c6229
+  download_install tmux-1.8-x86_64-1.txz 2a36cb120c8cdd584262442ed3f18f34
+  download_install ncurses-5.9-x86_64-2.txz 9134fa31097ee352a1f1662e3f6bcb3f
+  download_install utempter-1.1.5-x86_64-1.txz dbbe884ebb29b830e4032cc41c3f679a
+fi
+
 # Create a symlink to /root/mdcmd
 if [[ ! -e /root/mdcmd ]]; then
   ln -sf /usr/local/sbin/mdcmd /root/mdcmd
 fi
 
 # Creating some directories
-mkdir -p /tmp/.preclear/ /usr/local/bin/
+mkdir -p /boot/.preclear/ /usr/local/bin/
 
 # Update file access mode
 chmod 644 $(awk '/\.(htm|php|js|page|css|png|plg|gif|cfg|md)$/ {print "/"$0}' /var/log/packages/&name;-&version;)
@@ -231,7 +241,7 @@ echo ""
 echo "-----------------------------------------------------------"
 echo " &name; has been installed."
 echo " This plugin requires Dynamix webGui to operate"
-echo " Copyright 2015, gfjardim"
+echo " Copyright 2015-2016, gfjardim"
 echo " Version: &version;"
 echo "-----------------------------------------------------------"
 echo ""
@@ -247,7 +257,7 @@ The 'remove' script.
 rm -rf /boot/config/plugins/&name; \
        /usr/local/emhttp/plugins/&name; \
        /var/state/&name; \
-       /tmp/.preclear/
+       /boot/.preclear/
 find /var/log/packages -type f -iname "&name;-*" -delete
 exit 0
 </INLINE>
