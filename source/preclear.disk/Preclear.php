@@ -610,14 +610,26 @@ switch ($_POST['action']) {
 
   case 'get_preclear':
     $device  = urldecode($_POST['device']);
-    $content = tmux_get_session("preclear_disk_".$device);
+    $session = "preclear_disk_{$device}";
+    $content = tmux_get_session($session);
     if (preg_match("%π%", $content)) {
       $output .= "<pre>".preg_replace("#\n{5,}#", "<br>", $content)."</pre>";
     } else {
       $output .= "<pre>".preg_replace("#\n{5,}#", "<br>", $content)."</pre>";
       $output .= "";
     }
+    if ( strpos(tmux_get_session($session), "Answer Yes to continue") )
+    {
+      $output .= "<br><center><button onclick='hit_yes(\"{$device}\")'>Answer Yes</button></center>";
+    }
     echo json_encode(array("content" => $output));
+    break;
+
+
+  case 'hit_yes':
+    $device  = urldecode($_POST['device']);
+    $session = "preclear_disk_{$device}";
+    tmux_send_command($session, "Yes");
     break;
 
 
@@ -645,15 +657,21 @@ switch ($_GET['action']) {
       var timers = {};
       var URL = "/plugins/<?=$plugin;?>/Preclear.php";
       var device = "<?=$device;?>";
-      function get_preclear() {
+      function get_preclear()
+      {
         clearTimeout(timers.preclear);
         $.post(URL,{action:"get_preclear",device:device},function(data) {
-          if (data.content) {
+          if (data.content)
+          {
             $("#data_content").html(data.content);
           }
         },"json").always(function() {
           timers.preclear=setTimeout('get_preclear()',1000);
         });
+      }
+      function hit_yes(device)
+      {
+        $.post(URL,{action:"hit_yes",device:device});
       }
       $(function() {
         document.title='Preclear for disk /dev/<?=$device;?> ';
