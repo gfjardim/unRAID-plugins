@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2016.09.26">
+<!ENTITY version   "2016.09.26a">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY beta      "-beta">
@@ -15,6 +15,9 @@
 
 <CHANGES>
 ##&name;
+
+###2016.09.26a
+- Fix: prepare better Unassigned Devices integration
 
 ###2016.09.25
 - Fix: utempter depencency not installed

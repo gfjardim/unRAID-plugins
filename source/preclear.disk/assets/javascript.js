@@ -2,14 +2,21 @@ var PreclearURL = '/plugins/'+plugin+'/Preclear.php'
 
 $(function()
   {
-    var refresh = 10000;
     getPreclearContent();
+    if ( $('#usb_devices_list').length )
+    {
+      $('#usb_devices_list').change(function(e)
+      {
+        getPreclearContent();
+      });
+    }
   }
 );
 
 
 function getPreclearContent()
 {
+  clearTimeout(timers.preclear);
   $.post(PreclearURL,{action:'get_content',display:display},function(data)
   {
     if ( $('#preclear-table-body').length )
@@ -19,6 +26,13 @@ function getPreclearContent()
       $( '#preclear-table-body' ).html( data.disks );
       toggleReports(currentToggled);
       $(window).scrollTop(currentScroll);
+    }
+    else
+    {
+      $.each(data.status, function(i,v)
+      {
+        $("#preclear_"+i).html("<i class='glyphicon glyphicon-dashboard hdd'></i><span style='margin:6px;'></span>"+v);
+      });
     }
 
     window.disksInfo = JSON.parse(data.info);
@@ -30,7 +44,7 @@ function getPreclearContent()
     }
   },'json').always(function()
   {
-    setTimeout('getPreclearContent()', 10000);
+    timers.preclear = setTimeout('getPreclearContent()', 10000);
   });
 }
 
@@ -99,7 +113,7 @@ function startPreclear(device)
     buttons: {
       "Start": function(e)
       {
-        $('button:eq(0)',$('#dialog_id').dialog.buttons).button('disable');
+        // $('button:eq(0)',$('#dialog_id').dialog.buttons).button('disable');
         $(e.target).attr('disabled', true);
         var opts       = new Object();
         opts["action"] = "start_preclear";

@@ -408,6 +408,7 @@ switch ($_POST['action']) {
   case 'get_content':
     debug("Starting get_content: ".(time() - $start_time),'DEBUG');
     $disks = benchmark("get_all_disks_info");
+    $all_status = array();
 
     if ( count($disks) )
     {
@@ -459,6 +460,7 @@ switch ($_POST['action']) {
         if ($Preclear->isRunning($disk_name))
         {
           $status  = $Preclear->Status($disk_name, $serial);
+          $all_status[$disk_name] = $status;
         }
         else
         {
@@ -482,7 +484,7 @@ switch ($_POST['action']) {
       $disks_o .= "<tr><td colspan='12' style='text-align:center;font-weight:bold;'>No unassigned disks available.</td></tr>";
     }
     debug("get_content Finished: ".(time() - $start_time),'DEBUG');
-    echo json_encode(array("disks" => $disks_o, "info" => json_encode($disks)));
+    echo json_encode(array("disks" => $disks_o, "info" => json_encode($disks), "status" => $all_status));
     break;
 
 
@@ -573,7 +575,7 @@ switch ($_POST['action']) {
 
     if ( $confirm && ! $noprompt )
     {
-      foreach( range(0, 30) as $x )
+      foreach( range(0, 3) as $x )
       {
         if ( strpos(tmux_get_session($session), "Answer Yes to continue") )
         {
@@ -588,6 +590,7 @@ switch ($_POST['action']) {
         }
       }
     }
+
     break;
 
 
