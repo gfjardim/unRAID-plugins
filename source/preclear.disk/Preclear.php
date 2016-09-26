@@ -421,8 +421,8 @@ switch ($_POST['action']) {
         $serial    = $disk['serial'];
         $temp      = my_temp($disk['temperature']);
         $mounted   = array_reduce($disk['partitions'], function ($found, $partition) { return $found || is_mounted(realpath($partition)); }, false);
-        $reports   = listDir("/boot/preclear_reports");
-        $reports   = array_filter(listDir("/boot/preclear_reports"), function ($report) use ($disk)
+        $reports   = is_dir("/boot/preclear_reports") ? listDir("/boot/preclear_reports") : array();
+        $reports   = array_filter($reports, function ($report) use ($disk)
                                   {
                                     return preg_match("|".$disk["serial_short"]."|", $report) && ( preg_match("|_report_|", $report) || preg_match("|_rpt_|", $report) ); 
                                   });

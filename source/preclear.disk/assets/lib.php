@@ -175,7 +175,6 @@ class Preclear
 
   public function html()
   {
-    global $notifications, $fast_postread;
     for ($i=1; $i <= 20; $i++)
     {
       $cycles .= "<option value='$i'>$i</option>";
