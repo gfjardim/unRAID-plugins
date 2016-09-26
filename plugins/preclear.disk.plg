@@ -221,7 +221,7 @@ mkdir -p /tmp/.preclear/ /usr/local/bin/
 # Update file access mode
 chmod 644 $(awk '/\.(htm|php|js|page|css|png|plg|gif|cfg|md)$/ {print "/"$0}' /var/log/packages/&name;-&version;)
 chmod -R 755 /usr/local/emhttp/plugins/&name;/script/
-ln -sf /usr/local/bin/preclear /usr/local/emhttp/plugins/&name;/script/preclear.sh
+ln -sf /usr/local/emhttp/plugins/&name;/script/preclear.sh /usr/local/bin/preclear
 
 # Cleaning old source files
 find /boot/config/plugins/&name;/ -type f -iname "&name;*.txz" ! -iname "*&version;*" -delete
