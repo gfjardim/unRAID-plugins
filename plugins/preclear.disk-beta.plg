@@ -1,0 +1,266 @@
+<?xml version='1.0' standalone='yes'?>
+
+<!DOCTYPE PLUGIN [
+<!ENTITY name      "preclear.disk">
+<!ENTITY repo      "unRAID-plugins">
+<!ENTITY author    "gfjardim">
+<!ENTITY version   "2016.09.25">
+<!ENTITY launch    "Tools/Preclear">
+<!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
+<!ENTITY beta      "-beta">
+<!ENTITY pluginURL "&gitURL;/plugins/&name;&beta;.plg">
+]>
+
+<PLUGIN name="&name;" author="&author;" launch="&launch;" version="&version;" pluginURL="&pluginURL;">
+
+<CHANGES>
+##&name;
+
+###2016.09.25
+- Fix: utempter depencency not installed
+- Add: "Answer Yes" button on Joe L. script if needed.
+- Add: preclear command to show status on shell
+
+###2016.09.23a
+- Fix: script error appearing if SMART is not available
+
+###2016.09.23
+- Add: show reports of listed disks;
+- Fix: page scrolling while updating;
+- Fix: make link point to Tools;
+- Fix: increase disk column width;
+- Fix: better script report.
+
+###2016.09.11
+- Fix: better report formating
+
+###016.09.10
+- Fix: preclear report not being created due to filename invalid characters.
+
+###2016.08.29
+- Fix: slow read with custom settings
+
+###2016.08.28
+- Fix: create temp folder on plugin installation
+
+###2016.08.26
+- Fix: merge beta script
+- Fix: high memory consumption
+
+###2016.06.23
+- Fix: install utempter
+
+###2016.06.22
+- Add: Notification capability
+- Fix: Move Preclear icon to Tools
+- Fix: Fix unknown terminal "screen" error
+- Fix: Preclear script not reading the end of the disk
+- Update: tmux (2.1), libevent (2.0.22) and ncurses (5.9-4)
+
+###2016.03.24a
+- Fix: better smartctl device testing
+
+###2016.03.24
+- Fix: displaying negative numbers
+
+###2016.03.22
+- Fix: Better S.M.A.R.T. report
+- Add: Save a report in /boot/preclear_reports
+
+###2016.03.21
+- Add: pause any preclear operations while array start/stop
+- Add: Initial SMART reporting
+
+###2016.03.20
+- Fix: disk detected as part of the array if cache slot was empty
+
+###2016.03.11b
+- Add: New Preclear script
+- Forked: to beta
+
+###2015.11.18
+- Add: logging capabilities
+- Fix: php error if disk.cfg file doesn't exist
+
+###2015.09.28a
+- Fix: DVD/BluRay drives being included
+- Fix: some minor bugs
+
+###2015.09.18
+- Fix: Areca disks not appearing correctly.
+
+###2015.09.17b
+- Fix: black CSS conformity
+
+###2015.09.17
+- Release: maintenance release.
+
+###2015.09.08
+- Add: ncurses package, avoiding the use of the xterm hack.
+
+###2015.09.07d
+- Improvement: better integration with Unassigned Devices.
+- Fix: unRAID 6.1.1 doesn't have a 'screen' terminal descriptor; xterm used instead.
+
+###2015.08.12
+- Fix: 6.1-rc3 compatibility
+
+###2015.07.23
+- Fix: better unRAID 6.1 compatibility
+- Fix: clearer notification system
+
+###2015.07.21
+- Fix: unRAID 6.1-rc1 compatibility
+
+###2015.06.16
+- Fix: duplicate hdd entry due to udev's duplicate links
+
+###2015.06.15
+- Fix: minor bugfixes
+
+###2015.06.13
+- Fix: remove ^n markup from preclear status
+- Fix: show a wait message while preclear is starting
+- Fix: add MD5 verification to downloaded files
+- Fix: remove the Start Preclear link if an tmux session is already open
+
+###2015.05.20b
+- Minor bugfixes
+
+###2015.05.20a
+- Add support to bjp999 version
+
+###2015.05.20
+- Remove preclear script from package. It must be manually added to /boot/config/plugins/preclear.disk/ directory.
+
+###2015.05.18b
+- Fix: empty cacheId variable crashing the code
+
+###2015.05.18a
+- Fix: plugin not appearing under Settings/Utilities
+
+###2015.05.18
+- Add: fast preclear option (bjp999 mod)
+
+###2015.05.17a
+- Improve: detection of SCSI disks
+
+###2015.05.16a
+- Add: other preclear operations
+
+###2015.05.16
+- Initial release.
+</CHANGES>
+
+<!--
+The 'plugin' package file.
+-->
+<FILE Name="/boot/config/plugins/&name;/&name;-&version;.txz">
+<URL>&gitURL;/archive/&name;-&version;.txz</URL>
+</FILE>
+
+<!--
+The 'plugin' package MD5 hash.
+-->
+<FILE Name="/boot/config/plugins/&name;/&name;-&version;.md5">
+<URL>&gitURL;/archive/&name;-&version;.md5</URL>
+</FILE>
+
+<!--The 'readvz' script.-->
+<FILE Name="/boot/readvz" Mode="755">
+  <URL>&gitURL;/source/packages/readvz</URL>
+</FILE>
+
+<!--
+The 'post-install' script.
+-->
+<FILE Run="/bin/bash">
+<INLINE>
+download_install() {
+  local dest="/boot/config/plugins/&name;/${1}"
+  local src="&gitURL;/source/packages/${1}"
+  local md5=$2
+  if [ ! -f "${dest}" ]; then
+    curl --location --silent --fail "${src}" --output "${dest}"
+  fi
+  file_md5=$(/usr/bin/md5sum ${dest})
+  if [ "${file_md5:0:32}" != "${md5:0:32}" ]; then
+    echo "Wrong '${1}' package md5 hash."
+    rm "${dest}"
+    exit 1
+  else
+    /sbin/installpkg "$dest"
+  fi
+}
+
+
+# Verify and install plugin package
+sum1=$(/usr/bin/md5sum /boot/config/plugins/&name;/&name;-&version;.txz)
+sum2=$(/usr/bin/cat /boot/config/plugins/&name;/&name;-&version;.md5)
+if [ "${sum1:0:32}" != "${sum2:0:32}" ]; then
+  echo "Wrong 'plugin' package md5 hash."
+  rm /boot/config/plugins/&name;/&name;-&version;.txz
+  rm /boot/config/plugins/&name;/&name;-&version;.md5
+  exit 1
+else
+  upgradepkg --install-new /boot/config/plugins/&name;/&name;-&version;.txz
+fi
+
+gcc_version=$(cat /proc/version|grep -Po 'gcc version \K[\d.]*')
+if [ "$gcc_version" == "5.3.0" ]; then
+  download_install libevent-2.0.22-x86_64-1.txz 7a755ece3e378f244a3c327369e7f2ac
+  download_install tmux-2.2-x86_64-2.txz a268019858c88d5f2f702d9fc182a37c
+  download_install ncurses-5.9-x86_64-4.txz c2d2b01f021dc2f4752c4fff02f65fd5
+  download_install utempter-1.1.6-x86_64-2.txz aed1f39d4a5acddb225b542145e0eeaf
+
+else
+  download_install libevent-2.0.22-x86_64-1_slack14.1.txz bc5d1dff8d2f3758b0feddf00d2c6229
+  download_install tmux-1.8-x86_64-1.txz 2a36cb120c8cdd584262442ed3f18f34
+  download_install ncurses-5.9-x86_64-2.txz 9134fa31097ee352a1f1662e3f6bcb3f
+  download_install utempter-1.1.5-x86_64-1.txz dbbe884ebb29b830e4032cc41c3f679a
+fi
+
+# Create a symlink to /root/mdcmd
+if [[ ! -e /root/mdcmd ]]; then
+  ln -sf /usr/local/sbin/mdcmd /root/mdcmd
+fi
+
+# Creating some directories
+mkdir -p /tmp/.preclear/ /usr/local/bin/
+
+# Update file access mode
+chmod 644 $(awk '/\.(htm|php|js|page|css|png|plg|gif|cfg|md)$/ {print "/"$0}' /var/log/packages/&name;-&version;)
+chmod -R 755 /usr/local/emhttp/plugins/&name;/script/
+ln -sf /usr/local/emhttp/plugins/&name;/script/preclear.sh /usr/local/bin/preclear
+
+# Cleaning old source files
+find /boot/config/plugins/&name;/ -type f -iname "&name;*.txz" ! -iname "*&version;*" -delete
+find /boot/config/plugins/&name;/ -type f -iname "&name;*.md5" ! -iname "*&version;*" -delete
+
+echo ""
+echo "-----------------------------------------------------------"
+echo " &name; has been installed."
+echo " This plugin requires Dynamix webGui to operate"
+echo " Copyright 2015, gfjardim"
+echo " Version: &version;"
+echo "-----------------------------------------------------------"
+echo ""
+</INLINE>
+</FILE>
+
+<!--
+The 'remove' script.
+-->
+<FILE Run="/bin/bash" Method="remove">
+<INLINE>
+# Remove plugin related files
+rm -rf /boot/config/plugins/&name; \
+       /usr/local/emhttp/plugins/&name; \
+       /var/state/&name; \
+       /tmp/.preclear/
+find /var/log/packages -type f -iname "&name;-*" -delete
+exit 0
+</INLINE>
+</FILE>
+
+</PLUGIN>
