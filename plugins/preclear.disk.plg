@@ -4,17 +4,19 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2016.09.26b">
+<!ENTITY version   "2016.09.27">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
-<!ENTITY beta      "-beta">
-<!ENTITY pluginURL "&gitURL;/plugins/&name;&beta;.plg">
+<!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
 ]>
 
 <PLUGIN name="&name;" author="&author;" launch="&launch;" version="&version;" pluginURL="&pluginURL;">
 
 <CHANGES>
 ##&name;
+
+###2016.09.27
+- Fix: better PHP exception handling.
 
 ###2016.09.26b
 - Fix: not loading information if /boot/preclear_reports directory doesn't exist

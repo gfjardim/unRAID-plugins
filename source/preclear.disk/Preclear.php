@@ -1,5 +1,6 @@
 <?
 set_error_handler("log_error");
+set_exception_handler( "log_exception" );
 $plugin = "preclear.disk";
 
 require_once( "webGui/include/Helpers.php" );
@@ -30,7 +31,8 @@ if (! is_dir(dirname($state_file)) )
 #############        MISC FUNCTIONS        ##############
 #########################################################
 
-function log_error($errno, $errstr, $errfile, $errline) {
+function log_error($errno, $errstr, $errfile, $errline)
+{
   switch($errno){
     case E_ERROR:               $error = "Error";                          break;
     case E_WARNING:             $error = "Warning";                        break;
@@ -50,6 +52,10 @@ function log_error($errno, $errstr, $errfile, $errline) {
   debug("PHP {$error}: $errstr in {$errfile} on line {$errline}");
 }
 
+function log_exception( Exception $e )
+{
+  debug("PHP Exception: {$e->getMessage()} in {$e->getFile()} on line {$e->getLine()}");
+}
 
 function debug($msg, $type = "NOTICE")
 {
@@ -421,7 +427,7 @@ switch ($_POST['action']) {
         $serial    = $disk['serial'];
         $temp      = my_temp($disk['temperature']);
         $mounted   = array_reduce($disk['partitions'], function ($found, $partition) { return $found || is_mounted(realpath($partition)); }, false);
-        $reports   = is_dir("/boot/preclear_reports") ? listDir("/boot/preclear_reports") : array();
+        $reports   = is_dir("/boot/preclear_reports") ? listDir("/boot/preclear_reports") : [];
         $reports   = array_filter($reports, function ($report) use ($disk)
                                   {
                                     return preg_match("|".$disk["serial_short"]."|", $report) && ( preg_match("|_report_|", $report) || preg_match("|_rpt_|", $report) ); 

@@ -334,6 +334,11 @@ function rmReport(file, el)
   {
     if (data)
     {
+      var remain = $(el).closest("div").siblings().length;
+      if ( remain == "0")
+      {
+        $(el).closest("td").find(".glyphicon-minus-sign, .glyphicon-plus-sign").css("opacity", "0.0");
+      }
       $(el).parent().remove();
     }
 
