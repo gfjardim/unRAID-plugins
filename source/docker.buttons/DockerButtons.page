@@ -1,0 +1,174 @@
+Menu="Buttons:1"
+Link="nav-user"
+---
+<?
+require_once '/usr/local/emhttp/plugins/dynamix.docker.manager/include/DockerClient.php';
+$DockerClient    = new DockerClient();
+$DockerTemplates = new DockerTemplates();
+
+$info = $DockerTemplates->getAllInfo();
+
+$buttonUpdatable  = [];
+$buttonStartable  = [];
+$buttonStoppable  = [];
+$buttonOrphaned   = [];
+$buttonForceAll   = [];
+
+foreach ($DockerClient->getDockerContainers() as $container) {
+  $name    = $container["Name"];
+  $updated = ($info[$name]['updated'] == "false") ? false : true;
+
+  if ($container['Running'])
+  {
+    $buttonStoppable[] = $name;
+  }
+  else
+  {
+    $buttonStartable[] = $name;
+  }
+
+  if ($updated === false)
+  {
+    $buttonUpdatable[] = $name;
+  }
+  $buttonForceAll[] = $name;
+}
+
+foreach ($DockerClient->getDockerImages() as $image)
+{
+  if (! count($image['usedBy']) ) {
+    $buttonOrphaned[] = $image['Id'];
+  }
+}
+
+?>
+<script type="text/javascript">
+  var buttonStartable = <?=json_encode($buttonStartable);?>;
+  var buttonStoppable = <?=json_encode($buttonStoppable);?>;
+  var buttonUpdatable = <?=json_encode($buttonUpdatable);?>;
+  var buttonOrphaned  = <?=json_encode($buttonOrphaned);?>;
+  var buttonForceAll  = <?=json_encode($buttonForceAll);?>;
+  var buttonOutput    = "";
+
+  $(function()
+  {
+    var target1 = $("input[value='Check for Updates']");
+    var target2 = $("div[id='apps_icons'] > div[class~='Panel']:last").next();
+    if (target1.length)
+    {
+      target = target1;
+    }
+    else
+    {
+      target    = target2;
+      dashboard = true;
+    }
+
+    if (target.length)
+    {
+      disable = Object.keys(buttonStartable).length ? "" : "disabled";
+      buttonOutput += "<button onclick='dockerButtonStart(this);' "+disable+">Start All Containers</button>";
+
+      disable = Object.keys(buttonStoppable).length ? "" : "disabled";
+      buttonOutput += "<button onclick='dockerButtonStop(this);' "+disable+">Stop All Containers</button>";
+
+      disable = Object.keys(buttonUpdatable).length ? "" : "disabled";
+      buttonOutput += "<button onclick='dockerButtonUpdate(this,false);' "+disable+">Install Available Updates</button>";
+
+      disable = Object.keys(buttonOrphaned).length ? "" : "disabled";
+      buttonOutput += "<button class='advanced' style='display:none;' onclick='dockerButtonUpdate(this,true);' "+disable+">Force Update All Containers</button>";
+      buttonOutput += "<button class='advanced' style='display:none;' onclick='dockerButtonOrphan(this);' "+disable+">Remove Orphaned Images</button>";
+
+      if (typeof(dashboard) !== 'undefined')
+      {
+        buttonOutput = "<div>"+buttonOutput+"</div>";
+      }
+      
+      target.after(buttonOutput);
+    }
+  });
+
+function dockerButtonsAlert(title,desc,imageUrl,imageSize, outsideClick, showCancel, showConfirm, alertType) {
+    if (typeof(imageUrl)     === "undefined") imageUrl     = "/plugins/docker.buttons/images/loading.gif";
+    if (typeof(outsideClick) === "undefined") outsideClick = false;
+    if (typeof(showCancel)   === "undefined") showCancel   = false;
+    if (typeof(showConfirm)  === "undefined") showConfirm  = false;
+    if (typeof(showConfirm)  === "undefined") showConfirm  = false;
+    if (typeof(imageSize)    === "undefined") imageSize    = "80x80";
+    swal({
+      title: title,
+      text: desc,
+      imageUrl: imageUrl,
+      imageSize: imageSize,
+      allowOutsideClick: outsideClick,
+      showConfirmButton: showConfirm,
+      showCancelButton: showCancel,
+      type: alertType,
+      html: true
+    });
+  }
+
+  function dockerButtonUpdate(el,force)
+  {
+    $(el).attr("disabled", true);
+    Updates = (force) ? buttonForceAll : buttonUpdatable;
+    dockerButtonsAlert("Updating Containers","Please wait while updating Docker containers...");
+    $.get("/plugins/dynamix.docker.manager/include/CreateDocker.php",{updateContainer: true, "ct[]": Updates}).always(function(){location.reload();});
+  }
+
+  function dockerButtonStart(el)
+  {
+    $(el).attr("disabled", true);
+    dockerButtonsAlert("Starting Containers","Please wait while starting Docker containers...");
+    var elnum = Object.keys( buttonStartable ).length;
+    $.each(buttonStartable, function (i,v)
+    {
+      $.get(eventURL, {action: "start", container: v}, function(data)
+      {
+        elnum -= 1;
+        if (! elnum)
+        {
+          swal.close();
+          location.reload();
+        }
+      });
+    });
+  }
+
+
+  function dockerButtonStop(el)
+  {
+    $(el).attr("disabled", true);
+    var elnum = Object.keys( buttonStoppable ).length;
+    dockerButtonsAlert("Stopping Containers","Please wait while stopping Docker containers...");
+    $.each(buttonStoppable, function (i,v)
+    {
+      $.get(eventURL, {action: "stop", container: v}, function(data)
+      {
+        elnum -= 1;
+        if (! elnum)
+        {
+          location.reload();
+        }
+      });
+    });
+  }
+
+  function dockerButtonOrphan(el)
+  {
+    $(el).attr("disabled", true);
+    var elnum = Object.keys( buttonOrphaned ).length;
+    $.each(buttonOrphaned, function (i,v)
+    {
+      $.get(eventURL, {action: "remove_image", image: v}, function(data)
+      {
+        elnum -= 1;
+        if (! elnum)
+        {
+          location.reload();
+        }
+      });
+    });
+  }
+
+</script>

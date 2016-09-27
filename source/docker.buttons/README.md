@@ -1,0 +1,1 @@
+This is a simple plugin that adds some buttons on Docker and Dashboard pages, allowing containers to be started/stopped/updated in batch.
