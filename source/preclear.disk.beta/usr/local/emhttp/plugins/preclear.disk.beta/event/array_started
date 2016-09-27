@@ -1,5 +1,0 @@
-#!/bin/bash
-for disk in $(find /tmp/.preclear/ -mindepth 1 -maxdepth 1 -type d |xargs basename); do
-  echo "Pausing preclear of disk '$disk'"|logger -t preclear.disk
-  touch "/tmp/.preclear/${disk}/pause"
-done
