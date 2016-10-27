@@ -570,11 +570,9 @@ read_entire_disk() {
     # Ensure bytes_read is a number
     if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
       bytes_read=$bytes_dd
-    fi
-
-    if [ ! -z "${bytes_read##*[!0-9]*}" ]; then
       let percent_read=($bytes_read*100/$total_bytes)
     fi
+    
     time_current=$(timer)
 
     current_speed=$(awk -F',' 'END{print $NF}' $dd_output|xargs)

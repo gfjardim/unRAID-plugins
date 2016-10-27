@@ -1016,7 +1016,7 @@ analyze_smart() {
 read_entire_disk( ) {
   # Get the disk geometry (cylinders, heads, sectors)
   fgeometry=`fdisk -l $1 2>/dev/null`
-  units=`echo "$fgeometry" | grep Units | awk '{ print $9 }'`
+  units=`echo "$fgeometry" | grep Units | awk '{ print $8 }'`
   tu=$units
   while [ "$units" -lt 1000000 ]
   do
@@ -1206,7 +1206,7 @@ read_entire_disk( ) {
     if [ "$2" = "preread" -o "$fast_postread" = "n" ]
     then
       # Now, also read the blocks linearly, from start to end, $bcount cylinders at a time.
-      read_speed=`dd if=$1 bs=$units of=/dev/null count=$bcount skip=$skip conv=noerror 2>&1|  sed -n 3p | awk '{ print $8,$9 }'`
+      read_speed=`dd if=$1 bs=$units of=/dev/null count=$bcount skip=$skip conv=noerror 2>&1|awk -F',' 'END{print $NF}'`
       echo $read_speed >/tmp/read_speed$disk_basename
       if [ "$2" = "postread" -a "$skip_postread_verify" = "no" ]
       then
@@ -1413,7 +1413,7 @@ fi
 #----------------------------------------------------------------------------------
 # first verify the device is not busy
 #----------------------------------------------------------------------------------
-sfdisk -R $theDisk
+blockdev --rereadpt $theDisk
 ret=$?
 if [ $ret != 0 ]
 then
@@ -1915,7 +1915,7 @@ do
   # Get total bytes so we can calculate percentage done. (if Pre read wasn't run)
   #----------------------------------------------------------------------------------
   fgeometry=`fdisk -l $1`
-  units=`echo "$fgeometry" | grep Units | awk '{ print $9 }'`
+  units=`echo "$fgeometry" | grep Units | awk '{ print $8 }'`
   if [ $short_test -eq 0 ]
       then
       total_bytes=`echo "$fgeometry" | grep "Disk $1" | awk '{ print $5 }'`
@@ -2059,7 +2059,7 @@ do
   display_progress 5
 
   # let the kernel know we changed the partitioning
-  sfdisk -R $theDisk
+  blockdev --rereadpt $theDisk
 
   step8="Step 8 of 10 - Notifying kernel we changed the partitioning   ${bold}DONE${norm}"
   step9="${bold}Step 9 of 10 - Creating the /dev/disk/by* entries${norm}"
