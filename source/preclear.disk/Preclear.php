@@ -52,7 +52,7 @@ function log_error($errno, $errstr, $errfile, $errline)
   debug("PHP {$error}: $errstr in {$errfile} on line {$errline}");
 }
 
-function log_exception( Exception $e )
+function log_exception( $e )
 {
   debug("PHP Exception: {$e->getMessage()} in {$e->getFile()} on line {$e->getLine()}");
 }
@@ -175,17 +175,17 @@ function save_ini_file($file, $array)
   {
     if(is_array($val))
     {
-      $res[] = PHP_EOL."[$key]";
+      $res[] = PHP_EOL."[".addslashes($key)."]";
 
       foreach($val as $skey => $sval)
       {
-        $res[] = "$skey = ".(is_numeric($sval) ? $sval : '"'.$sval.'"');
+        $res[] = "$skey = ".(is_numeric($sval) ? $sval : '"'.addslashes($sval).'"');
       }
     }
 
     else
     {
-      $res[] = "$key = ".(is_numeric($val) ? $val : '"'.$val.'"');
+      $res[] = "$key = ".(is_numeric($val) ? $val : '"'.addslashes($val).'"');
     }
   }
   file_put_contents($file, implode(PHP_EOL, $res));
@@ -265,7 +265,7 @@ function get_info($device) {
 
   $parse_smart = function($smart, $property) 
   {
-    $value = trim(split(":", array_values(preg_grep("#$property#", $smart))[0])[1]);
+    $value = trim(explode(":", array_values(preg_grep("#$property#", $smart))[0])[1]);
     return ($value) ? $value : "n/a";
   };
 
@@ -518,7 +518,6 @@ switch ($_POST['action']) {
       $notify    = (isset($_POST['--notify']) && $_POST['--notify'] > 0) ? " --notify ".urldecode($_POST['--notify']) : "";
       $frequency = (isset($_POST['--frequency']) && $_POST['--frequency'] > 0 && intval($_POST['--notify']) > 0) ? " --frequency ".urldecode($_POST['--frequency']) : "";
       $cycles    = (isset($_POST['--cycles'])) ? " --cycles ".urldecode($_POST['--cycles']) : "";
-      $read_sz   = (isset($_POST['--read-size']) && $_POST['--read-size'] != 0) ? " --read-size ".urldecode($_POST['--read-size']) : "";
       $pre_read  = (isset($_POST['--skip-preread']) && $_POST['--skip-preread'] == "on") ? " --skip-preread" : "";
       $post_read = (isset($_POST['--skip-postread']) && $_POST['--skip-postread'] == "on") ? " --skip-postread" : "";
       $noprompt  = " --no-prompt";
@@ -526,12 +525,12 @@ switch ($_POST['action']) {
 
       if (!$op)
       {
-        $cmd = "$script {$op}${notify}${frequency}{$cycles}{$read_sz}{$pre_read}{$post_read}{$noprompt}{$test} /dev/$device";
+        $cmd = "$script {$op}${notify}${frequency}{$cycles}{$pre_read}{$post_read}{$noprompt}{$test} /dev/$device";
       }
 
       else
       {
-        $cmd = "$script {$op}${notify}${frequency}{$read_sz}{$test} /dev/$device";
+        $cmd = "$script {$op}${notify}${frequency}{$test} /dev/$device";
       }
       
     }
@@ -657,11 +656,16 @@ switch ($_GET['action']) {
   case 'show_preclear':
     $device = urldecode($_GET['device']);
     ?>
+    <html>
+    <body>
+    <div id="data_content"></div>
+
     <?if (is_file("webGui/scripts/dynamix.js")):?>
     <script type='text/javascript' src='/webGui/scripts/dynamix.js'></script>
     <?else:?>
     <script type='text/javascript' src='/webGui/javascript/dynamix.js'></script>
     <?endif;?>
+    <script src="/plugins/<?=$plugin;?>/assets/clipboard.min.js"></script>
     <script>
       var timers = {};
       var URL = "/plugins/<?=$plugin;?>/Preclear.php";
@@ -686,8 +690,11 @@ switch ($_GET['action']) {
         document.title='Preclear for disk /dev/<?=$device;?> ';
         get_preclear();
       });
+      new Clipboard('.btn');
     </script>
-    <div id="data_content"></div>
+    <div style="text-align: center;"><button class="btn" data-clipboard-target="#data_content">Copy to clipboard</button></div>
+    </body>
+    </html>
     <?
     break;
 }

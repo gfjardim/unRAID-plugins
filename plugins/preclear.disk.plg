@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2016.09.27">
+<!ENTITY version   "2016.10.26">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,14 @@
 
 <CHANGES>
 ##&name;
+
+###2016.10.26
+- Add: Copy to Clipboard button on Preview window
+- Fix: unescaped quotes breaking read of "state.ini" file
+- Fix: remove PHP "split" function due deprecation
+- Fix: script - better SMART detection
+- Fix: script - greatly improve speed and memory footprint in read operations
+- Fix: script - faster display refresh
 
 ###2016.09.27
 - Fix: better PHP exception handling.

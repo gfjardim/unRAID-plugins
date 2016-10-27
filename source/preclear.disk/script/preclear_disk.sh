@@ -3,7 +3,7 @@ LC_CTYPE=C
 export LC_CTYPE
 
 # Version
-version="0.7-beta"
+version="0.8-beta"
 
 # Let's make sure some features are supported by BASH
 BV=$(echo $BASH_VERSION|tr '.' "\n"|grep -Po "^\d+"|xargs printf "%.2d\n"|tr -d '\040\011\012\015')
@@ -309,7 +309,6 @@ write_zeroes(){
   local write_bs=""
   local time_start
   local output=$1
-  local niceness=19
   local display_pid=0
 
   time_start=$(timer)
@@ -330,9 +329,9 @@ write_zeroes(){
   blockdev --rereadpt $disk
 
   if [ "$short_test" == "y" ]; then
-    nice -n $niceness dd if=/dev/zero of=$disk bs=2048k     seek=1 conv=fdatasync,noerror iflag=fullblock count=512 2> $dd_output &
+    dd if=/dev/zero of=$disk bs=2048k     seek=1 conv=fdatasync,noerror iflag=fullblock count=512 2> $dd_output &
   else
-    nice -n $niceness dd if=/dev/zero of=$disk bs=$write_bs seek=1 conv=fdatasync,noerror iflag=fullblock           2> $dd_output &
+    dd if=/dev/zero of=$disk bs=$write_bs seek=1 conv=fdatasync,noerror iflag=fullblock           2> $dd_output &
   fi
   dd_pid=$!
 
@@ -341,7 +340,7 @@ write_zeroes(){
 
   # Send initial notification
   if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 3 ] ; then
-    report_out="Zeroing Started on $disk_name.\\n Disk temperature: $(get_disk_temp $disk $smart_type)\\n"
+    report_out="Zeroing Started on $disk_name.\\n Disk temperature: $(get_disk_temp $disk "$smart_type")\\n"
     send_mail "Zeroing Started on $disk_name." "Zeroing Started on $disk_name. Cycle $cycle of ${cycles}. " "$report_out"
     next_notify=25
   fi
@@ -388,7 +387,7 @@ write_zeroes(){
 
     # Send mid notification
     if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -eq 4 ] && [ "$percent_wrote" -ge "$next_notify" ] && [ "$percent_wrote" -ne 100 ]; then
-      disktemp="$(get_disk_temp $disk $smart_type)"
+      disktemp="$(get_disk_temp $disk "$smart_type")"
       report_out="Zeroing in progress on $disk_name: ${percent_wrote}% complete.\\n"
       report_out+="Wrote $(format_number ${bytes_wrote}) of ${tb_formatted} @ ${current_speed} \\n"
       report_out+="Disk temperature: ${disktemp}\\n"
@@ -403,7 +402,7 @@ write_zeroes(){
   if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 3 ] ; then
     report_out="Zeroing finished on $disk_name.\\n"
     report_out+="Wrote $(format_number ${bytes_wrote}) of ${tb_formatted} @ ${current_speed} \\n"
-    report_out+="Disk temperature: $(get_disk_temp $disk $smart_type).\\n"
+    report_out+="Disk temperature: $(get_disk_temp $disk "$smart_type").\\n"
     report_out+="Zeroing Elapsed Time: $(timer $time_start).\\n"
     report_out+="Cycle's Elapsed Time: $(timer $cycle_timer).\\n"
     report_out+="Total Elapsed time: $(timer $all_timer)."
@@ -448,33 +447,26 @@ is_numeric() {
 }
 
 read_entire_disk() { 
-  local actual_bytes
-  local bcount
-  local bytes_read
-  local chunk
-  local dd_cmd
-  local next_chunk_read
-  local percent_read
-  local post_read_err read_chunk   read_limit read_speed  rsum      skip_b1         skip_b2 
-  local skip_b3       skip_p1      skip_p2    skip_p3     skip_p4   skip_p5         time_start
-  local time_current  read_type  read_type_s total_bytes
+  local average_speed bytes_dd current_speed count disktemp dd_cmd  report_out status tb_formatted
+  local skip_b1 skip_b2 skip_b3 skip_p1 skip_p2 skip_p3 skip_p4 skip_p5 time_start time_current read_type_s total_bytes
   local bytes_read=0
+  local cmp_output=${all_files[cmp_out]}
   local cycle=$cycle
   local cycles=$cycles
+  local display_pid=0
   local dd_output=${all_files[dd_out]}
   local disk=${disk_properties[device]}
   local disk_name=${disk_properties[name]}
   local disk_blocks=${disk_properties[blocks_512]}
+  local output=$3
   local pause=${all_files[pause]}
-  local short_test=$short_test
-  local read_size=$read_size
-  local skip=0
-  local verify=$1
+  local percent_read=0
+  local read_stress=$read_stress
   local read_type=$2
+  local short_test=$short_test
   local stat_file=${all_files[stat]}
   local verify_errors=${all_files[verify_errors]}
-  local output=$3
-  local display_pid=0
+  local verify=$1
 
   # Type of read: Pre-Read or Post-Read
   if [ "$read_type" == "preread" ]; then
@@ -492,85 +484,73 @@ read_entire_disk() {
   # start time
   time_start=$(timer)
 
-  # Read memory limit in bytes
-  if [ -n "$read_size" ]; then
-    read_limit=$read_size
-  else
-    read_limit=33554432  # 32 MB
-    read_limit=134217728 # 128 MB
-  fi
-
   if [ "$short_test" == "y" ]; then
-    actual_bytes=${disk_properties[size]}
-    total_bytes=1074511872 #Debug case..  Set total size to ~1GB disk to speed up test
-    if [ "$actual_bytes" -lt "$total_bytes" ]; then
-      let total_bytes=( $actual_bytes / 10 )
-    fi
+    total_bytes=1073741824 # 2097152 * 512
+    count="count=512"
   else
     total_bytes=${disk_properties[size]}
-    total_bytes=$(( $disk_blocks * 512))
+    count=""
   fi
+
   tb_formatted=$(format_number $total_bytes)
-
-  # Record chunk that will be read every loop
-  # BYTES        CHUNK
-  # 103219200 -> 516096
-  # 154828800 -> 774144 
-  # 309657600 -> 1548288
-  chunk=516096
-
-  # Number of chunks to be read every loop
-  bcount=1
-  for i in $(seq $bcount 10000000); do
-    if [ "$(( $chunk * $i ))" -le "$read_limit" ]; then
-      bcount=$i
-    else
-      break
-    fi
-  done
-
-  total_chunks=$(( $total_bytes / $chunk ))
 
   # Send initial notification
   if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 3 ] ; then
-    report_out="$read_type_s Started on $disk_name.\\n Disk temperature: $(get_disk_temp $disk $smart_type)\\n"
+    report_out="$read_type_s Started on $disk_name.\\n Disk temperature: $(get_disk_temp $disk "$smart_type")\\n"
     send_mail "$read_type_s Started on $disk_name." "$read_type_s Started on $disk_name. Cycle $cycle of ${cycles}. " "$report_out" &
     next_notify=25
   fi
-  
 
-  # Remove the count limit and signal if in the end of the disk
-  while [ "$skip" -le "$total_chunks" ]; do
-    if [ "$skip" -eq "$total_chunks" ]; then
-      end_of_disk=y
-      dd_count=""
-    else
-      dd_count="count=$bcount"
+  # Start the disk read
+  if [ "$verify" == "verify" ]; then
+
+    # Verify the beginning of the disk skipping the MBR
+    dd_cmd="dd if=$disk bs=512 count=4096 skip=1 conv=noerror iflag=fullblock"
+    $dd_cmd 2>$dd_output | cmp - /dev/zero &>$cmp_output
+
+    # Fail if not zeroed
+    if grep -q "differ" "$cmp_output"; then
+      return 1
     fi
+    
+    # Verify the rest of the disk
+    dd_cmd="dd if=$disk bs=2097152 $count skip=1 conv=noerror iflag=fullblock"
+    { $dd_cmd 2>$dd_output | cmp - /dev/zero &>$cmp_output; } &
+    dd_pid=$(ps --ppid $! | awk '/dd/{print $1}')
 
-    # Stress the disk if requested
+  else
+    dd if=$disk of=/dev/null bs=2097152 $count conv=noerror iflag=fullblock > $dd_output 2>&1 &
+    dd_pid=$!
+  fi
+
+  # if we are interrupted, kill the background reading of the disk.
+  trap 'kill -9 $dd_pid 2>/dev/null;exit' 2
+
+  while kill -0 $dd_pid >/dev/null 2>&1; do
+
+    # Stress the disk header
     if [ "$read_stress" == "y" ]; then
-      # read a random block.
-      skip_b1=$(( 0+(`head -c4 /dev/urandom| od -An -tu4`)%($total_chunks) ))
-      dd if=$disk of=/dev/null count=1 bs=$chunk skip=$skip_b1 >/dev/null 2>&1 &
+      # read a random block
+      skip_b1=$(( 0+(`head -c4 /dev/urandom| od -An -tu4`)%($disk_blocks) ))
+      dd if=$disk of=/dev/null count=1 bs=512 skip=$skip_b1 iflag=direct >/dev/null 2>&1 &
       skip_p1=$!
 
-      # read the first block here, bypassing the buffer cache by use of iflag=direct
-      dd if=$disk of=/dev/null count=1 bs=$chunk iflag=direct >/dev/null 2>&1 &
+      # read the first block
+      dd if=$disk of=/dev/null count=1 bs=512 iflag=direct >/dev/null 2>&1 &
       skip_p2=$!
 
-      # read a random block.
-      skip_b2=$(( 0+(`head -c4 /dev/urandom| od -An -tu4`)%($total_chunks) ))
-      dd if=$disk of=/dev/null count=1 bs=$chunk skip=$skip_b2 >/dev/null 2>&1 &
+      # read a random block
+      skip_b2=$(( 0+(`head -c4 /dev/urandom| od -An -tu4`)%($disk_blocks) ))
+      dd if=$disk of=/dev/null count=1 bs=512 skip=$skip_b2 iflag=direct >/dev/null 2>&1 &
       skip_p3=$!
 
-      # read the last block here, bypassing the buffer cache by use of iflag=direct
-      dd if=$disk of=/dev/null count=1 bs=$chunk skip=$last_block iflag=direct >/dev/null 2>&1 &
+      # read the last block
+      dd if=$disk of=/dev/null count=1 bs=512 skip=$(($disk_blocks -1)) iflag=direct >/dev/null 2>&1 &
       skip_p4=$!
 
-      # read a random block.
-      skip_b3=$(( 0+(`head -c4 /dev/urandom| od -An -tu4`)%($total_chunks) ))
-      dd if=$disk of=/dev/null count=1 bs=$chunk skip=$skip_b3 >/dev/null 2>&1 &
+      # read a random block
+      skip_b3=$(( 0+(`head -c4 /dev/urandom| od -An -tu4`)%($disk_blocks) ))
+      dd if=$disk of=/dev/null count=1 bs=512 skip=$skip_b3 iflag=direct >/dev/null 2>&1 &
       skip_p5=$!
 
       # make sure the background random blocks are read before continuing
@@ -581,32 +561,26 @@ read_entire_disk() {
       kill -0 $skip_p5 2>/dev/null && wait $skip_p5
     fi
 
-    # Do the disk read
-    if [ "$verify" == "verify" ]; then
-      # first block must be treated differently
-      if [ "$skip" -eq "0" ]; then
-        dd_cmd="dd if=$disk bs=512 count=8192 skip=1 conv=noerror iflag=fullblock"
-      else 
-        dd_cmd="dd if=$disk bs=$chunk count=$bcount skip=$skip conv=noerror iflag=fullblock"
-      fi
-      rsum=$($dd_cmd 2>$dd_output|sum|awk '{print $1}')
-      if [ "$rsum" != "00000" ]; then
-        echo " > Command '$dd_cmd' returned $rsum instead of 00000" >$verify_errors
-        return 1
-      fi
-    else
-      dd if=$disk of=/dev/null bs=$chunk $dd_count skip=$skip >$dd_output 2>&1
-    fi
-    
+    # Refresh dd status
+    sleep 3 && kill -USR1 $dd_pid 2>/dev/null && sleep 2
+
     # Calculate the current status
+    bytes_dd=$(awk 'END{print $1}' $dd_output|xargs)
+    
+    # Ensure bytes_read is a number
+    if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
+      bytes_read=$bytes_dd
+    fi
+
+    if [ ! -z "${bytes_read##*[!0-9]*}" ]; then
+      let percent_read=($bytes_read*100/$total_bytes)
+    fi
     time_current=$(timer)
-    readed_bytes=$(awk 'END{print $1}' $dd_output|xargs)
-    bytes_read=$(( $bytes_read + $readed_bytes ))
-    percent_read=$(( $bytes_read*100/$total_bytes ))
-    read_speed=$(awk -F',' 'END{print $NF}' $dd_output|xargs)
+
+    current_speed=$(awk -F',' 'END{print $NF}' $dd_output|xargs)
     average_speed=$(($bytes_read / ($time_current - $time_start) / 1000000 ))
 
-    status="Time elapsed: $(timer $time_start) | Current speed: $read_speed | Average speed: $average_speed MB/s"
+    status="Time elapsed: $(timer $time_start) | Current speed: $current_speed | Average speed: $average_speed MB/s"
     if [ "$cycles" -gt 1 ]; then
       cycle_disp=" ($cycle of $cycles)"
     fi
@@ -614,13 +588,13 @@ read_entire_disk() {
 
     # Send mid notification
     if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -eq 4 ] && [ "$percent_read" -ge "$next_notify" ] && [ "$percent_read" -ne 100 ]; then
-      disktemp="$(get_disk_temp $disk $smart_type)"
+      disktemp="$(get_disk_temp $disk "$smart_type")"
       report_out="${read_type_s} in progress on $disk_name: ${percent_read}% complete.\\n"
-      report_out+="Read $(format_number ${bytes_read}) of ${tb_formatted} @ ${read_speed} \\n"
+      report_out+="Read $(format_number ${bytes_read}) of ${tb_formatted} @ ${current_speed} \\n"
       report_out+="Disk temperature: ${disktemp}\\n"
       report_out+="Cycle's Elapsed Time: $(timer ${cycle_timer}).\\n"
       report_out+="Total Elapsed time: $(timer ${all_timer})."
-      send_mail "$read_type_s in Progress on ${disk_name}." "${read_type_s} in Progress on ${disk_name}: ${percent_read}% @ ${read_speed}. Temp: ${disktemp}. Cycle ${cycle} of ${cycles}." "${report_out}" &
+      send_mail "$read_type_s in Progress on ${disk_name}." "${read_type_s} in Progress on ${disk_name}: ${percent_read}% @ ${current_speed}. Temp: ${disktemp}. Cycle ${cycle} of ${cycles}." "${report_out}" &
       let next_notify=($next_notify + 25)
     fi
 
@@ -630,56 +604,55 @@ read_entire_disk() {
       display_pid=$!
     fi
 
-    # Pause if requested
     if [ -f "$pause" ]; then
       display_status "$read_type|###(${percent_read}% Done)### ***PAUSED***" "** PAUSED"
       echo "$disk_name|NN|${read_type_s}${cycle_disp}: PAUSED|$$" > $stat_file
-      while [[ -f "$pause" ]]; do
+
+      # Pause dd
+      kill -TSTP $dd_pid
+      while [[ -f $pause ]]; do
         sleep 1
       done
-    fi
-
-    # Update the skip count
-    let skip=($skip + $bcount)
-
-    # Break if it's the end of the disk
-    if [ "$end_of_disk" == "y" ]; then
-      break
+      # Restore dd
+      kill -CONT $dd_pid
     fi
   done
+
+  # Fail if not zeroed
+  if [ "$verify" == "verify" ]; then
+    if grep -q "differ" "$cmp_output"; then
+      return 1
+    fi
+  fi
 
   # Send final notification
   if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 3 ] ; then
     report_out="$read_type_s finished on $disk_name.\\n"
     report_out+="Read $(format_number $bytes_read) of $tb_formatted @ $average_speed MB/s\\n"
-    report_out+="Disk temperature: $(get_disk_temp $disk $smart_type).\\n"
+    report_out+="Disk temperature: $(get_disk_temp $disk "$smart_type").\\n"
     report_out+="$read_type_s Elapsed Time: $(timer $time_start).\\n"
     report_out+="Cycle's Elapsed Time: $(timer $cycle_timer).\\n"
     report_out+="Total Elapsed time: $(timer $all_timer)."
     send_mail "$read_type_s Finished on $disk_name." "$read_type_s Finished on $disk_name. Cycle ${cycle} of ${cycles}." "$report_out" &
   fi
+
   eval "$output='$(timer $time_start) @ $average_speed MB/s'"
+  return
 }
 
 draw_canvas(){
-  local start=$1 height=$2 width=$3 brick=$canvas_brick c
-
-  eval "local x=\${canvas_${start}+x}"
-  if [ -z $x ]; then
-    eval "declare -g canvas_${start}";
-    let iniline=($height + $start)
-    for line in $(seq $start $iniline ); do
-      c+=$(tput cup $line 0 && echo $brick)
-      c+=$(tput cup $line $width && echo $brick)
-    done
-    for col in $(seq $width); do
-      c+=$(tput cup $start $col && echo $brick)
-      c+=$(tput cup $iniline $col && echo $brick)
-      c+=$(tput cup $(( $iniline - 2 )) $col && echo $brick)
-    done
-    eval "canvas_${start}=\$c"
-  fi
-  eval "echo -e \$canvas_${start}"
+  local start=$1 height=$2 width=$3 brick="${canvas[brick]}" c
+  let iniline=($height + $start)
+  for line in $(seq $start $iniline ); do
+    c+=$(tput cup $line 0 && echo $brick)
+    c+=$(tput cup $line $width && echo $brick)
+  done
+  for col in $(seq $width); do
+    c+=$(tput cup $start $col && echo $brick)
+    c+=$(tput cup $iniline $col && echo $brick)
+    c+=$(tput cup $(( $iniline - 2 )) $col && echo $brick)
+  done
+  echo $c
 }
 
 display_status(){
@@ -689,9 +662,8 @@ display_status(){
   local current=$1
   local status=$2
   local stat=""
-  local width=$canvas_width
-  local height=$canvas_height
-  local brick=$canvas_brick
+  local width="${canvas[width]}"
+  local height="${canvas[height]}"
   local all_timer=$all_timer
   local cycle_timer=$cycle_timer
   local smart_output="${all_files[smart_out]}"
@@ -710,7 +682,10 @@ display_status(){
     tput reset > $out
   fi
 
-  echo "$(draw_canvas $hpos $height $width)" >> $out
+  if [ -z "${canvas[info]}" ]; then
+    append canvas "info" "$(draw_canvas $hpos $height $width)"
+  fi
+  echo "${canvas[info]}" >> $out
 
   for (( i = 0; i <= ${#title[@]}; i++ )); do
     line=${title[$i]}
@@ -786,8 +761,12 @@ display_status(){
   if [ -f "$smart_output" ]; then
     echo -e "\n\n\n\n" >> $out
     init=$(($hpos+$height+3))
-    echo "$(draw_canvas $init $height $width)" >> $out
-    line="S.M.A.R.T. Status"
+    if [ -z "${canvas[smart]}" ]; then
+      append canvas "smart" "$(draw_canvas $init $height $width)"
+    fi
+    echo "${canvas[smart]}" >> $out
+
+    line="S.M.A.R.T. Status $type"
     line_num=$(echo "$line"|tr -d "${bold}"|tr -d "${norm}"|tr -d "${ul}"|tr -d "${noul}"|wc -m)
     let l=($init + 2)
     tput cup $(($l)) $(( $width/2 - $line_num/2 )) >> $out
@@ -817,14 +796,14 @@ ask_preclear(){
   local wpos=4
   local hpos=0
   local max=""
-  local width=$canvas_width
-  local height=$canvas_height
+  local width="${canvas[width]}"
+  local height="${canvas[height]}"
   eval "local -A title=$(array_content display_title)"
   eval "local -A disk_info=$(array_content disk_properties)"
 
   tput reset
 
-  draw_canvas $hpos $canvas_height $canvas_width
+  draw_canvas $hpos $height $width
 
   for (( i = 0; i <= ${#title[@]}; i++ )); do
     line=${title[$i]}
@@ -895,7 +874,7 @@ save_smart_info() {
         echo $line >> $smart_file
       fi
     fi
-  done < <(smartctl --attributes -d $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" | \
+  done < <(smartctl --all $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" | \
            grep -v "ATTRIBUTE_NAME" | grep -v "^$" | awk '{ print $1 "|" $2 "|" $10}')
 }
 
@@ -935,7 +914,7 @@ output_smart() {
   nfinal="${final}_$(( $RANDOM * 19318203981230 + 40 ))"
   cp -f "$final" "$nfinal"
   sed -i " 1 s/$/|STATUS/" $nfinal
-  status=$(smartctl --attributes -d $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" |\
+  status=$(smartctl --attributes $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" |\
            grep -v "ATTRIBUTE_NAME" | grep -v "^$" | awk '{print $1 "-" $2 "|" $9 }')
   while read line; do
     attr=$(echo $line | cut -d'|' -f1)
@@ -959,7 +938,7 @@ output_smart() {
     sed -i "/^$attr/ s/$/|${msg}/" $nfinal
   done < <(cat $nfinal | tail -n +2)
   cat $nfinal | column -t -s '|' -o '    '> $output
-  smartctl --health -d $type $device | sed -n '/SMART DATA SECTION/,/^$/p'| tail -n +2 | head -n 1 >> $output
+  smartctl --health $type $device | sed -n '/SMART DATA SECTION/,/^$/p'| tail -n +2 | head -n 1 >> $output
 }
 
 get_disk_temp() {
@@ -967,7 +946,7 @@ get_disk_temp() {
   local type=$2
   local valid_temp=" 190 194 "
   local temp=0
-  if [ -z "$type" ]; then
+  if [ "$disable_smart" == "y" ]; then
     echo "n/a"
     return 0
   fi
@@ -975,10 +954,10 @@ get_disk_temp() {
   while read line; do
     attr=$(echo $line | cut -d'|' -f1)
     if [[ $valid_temp =~ [[:space:]]$attr[[:space:]] ]]; then
-      echo "$(echo $line | cut -d'|' -f3)oC"
+      echo "$(echo $line | cut -d'|' -f3) C"
       return 0
     fi
-  done < <(smartctl --attributes -d $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" | \
+  done < <(smartctl --attributes $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" | \
            grep -v "ATTRIBUTE_NAME" | grep -v "^$" | awk '{ print $1 "|" $2 "|" $10}')
   echo "n/a"
 }
@@ -995,9 +974,9 @@ cycles=1
 append display_step ""
 verify_mbr_only=n
 refresh_period=30
-canvas_width=123
-canvas_height=20
-canvas_brick=#
+append canvas 'width'  '123'
+append canvas 'height' '20'
+append canvas 'brick'  '#'
 smart_type=auto
 notify_channel=0
 notify_freq=0
@@ -1042,7 +1021,9 @@ if [ ! -b "$1" ]; then
   echo "Disk not set, please verify the command arguments."
   exit 1
 fi
+
 theDisk=$(echo $1|xargs)
+
 # diff /tmp/.init <(set -o >/dev/null; set)
 # exit 0
 ######################################################
@@ -1079,9 +1060,12 @@ fi
 
 # Test suitable device type for SMART, and disable it if not found.
 disable_smart=y
-for type in scsi ata auto sat,auto sat,12 usbsunplus usbcypress usbjmicron usbjmicron,x test "sat -T permissive" usbjmicron,p sat,16; do
-  smartInfo=$(smartctl --attributes -d $type "$theDisk" 2>/dev/null| grep "Reallocated_Sector_Ct")
-  if [ "$smartInfo"  ]; then
+for type in "" scsi ata auto sat,auto sat,12 usbsunplus usbcypress usbjmicron usbjmicron,x test "sat -T permissive" usbjmicron,p sat,16; do
+  if [ -n "$type" ]; then
+    type="-d $type"
+  fi
+  smartInfo=$(smartctl --all $type "$theDisk" 2>/dev/null)
+  if [[ $smartInfo == *"Reallocated_Sector_Ct"* ]]; then
     disable_smart=n
     smart_type=$type
     break
@@ -1101,12 +1085,13 @@ if [ "$disable_smart" != "y" ]; then
       append disk_properties 'firmware' "$(echo "${BASH_REMATCH[1]}"|xargs)"
     fi
   done < <(echo -n "$smartInfo")
-  append disk_properties 'temp' $(get_disk_temp $theDisk $smart_type)
+  append disk_properties 'temp' "$(get_disk_temp $theDisk "$smart_type")"
 fi
 
 # Used files
 append all_files 'dir'           "/boot/.preclear/${disk_properties[name]}"
 append all_files 'dd_out'        "${all_files[dir]}/dd_output"
+append all_files 'cmp_out'       "${all_files[dir]}/cmp_out"
 append all_files 'pause'         "${all_files[dir]}/pause"
 append all_files 'verify_errors' "${all_files[dir]}/verify_errors"
 append all_files 'pid'           "${all_files[dir]}/pid"
@@ -1170,9 +1155,9 @@ else
   echo "$$" > ${all_files[pid]}
 fi
 
-# [ "$disable_smart" != "y" ] && save_smart_info $theDisk $smart_type "cycle_initial_start"
+# [ "$disable_smart" != "y" ] && save_smart_info $theDisk "$smart_type" "cycle_initial_start"
 # [ "$disable_smart" != "y" ] && compare_smart "cycle_initial_start"
-# [ "$disable_smart" != "y" ] && output_smart $theDisk $smart_type
+# [ "$disable_smart" != "y" ] && output_smart $theDisk "$smart_type"
 # cat "${all_files[smart_out]}"
 # exit 0
 
@@ -1268,11 +1253,11 @@ all_timer=$(timer)
 append display_title "${ul}unRAID Server Pre-Clear of disk${noul} ${bold}$theDisk${norm}"
 
 # Export initial SMART status
-[ "$disable_smart" != "y" ] && save_smart_info $theDisk $smart_type "cycle_initial_start"
+[ "$disable_smart" != "y" ] && save_smart_info $theDisk "$smart_type" "cycle_initial_start"
 
 # Add current SMART status to display_smart
 [ "$disable_smart" != "y" ] && compare_smart "cycle_initial_start"
-[ "$disable_smart" != "y" ] && output_smart $theDisk $smart_type
+[ "$disable_smart" != "y" ] && output_smart $theDisk "$smart_type"
 
 for cycle in $(seq $cycles); do
   # Set a cycle timer
@@ -1294,7 +1279,7 @@ for cycle in $(seq $cycles); do
   fi
 
   # Export initial SMART status
-  [ "$disable_smart" != "y" ] && save_smart_info $theDisk $smart_type "cycle_${cycle}_start"
+  [ "$disable_smart" != "y" ] && save_smart_info $theDisk "$smart_type" "cycle_${cycle}_start"
 
   # Do a preread if not skipped
   if [ "$skip_preread" != "y" ]; then
@@ -1361,11 +1346,11 @@ for cycle in $(seq $cycles); do
     fi
   fi
   # Export final SMART status for cycle
-  [ "$disable_smart" != "y" ] && save_smart_info $theDisk $smart_type "cycle_${cycle}_end"
+  [ "$disable_smart" != "y" ] && save_smart_info $theDisk "$smart_type" "cycle_${cycle}_end"
   # Compare start/end values
   [ "$disable_smart" != "y" ] && compare_smart "cycle_${cycle}_start" "cycle_${cycle}_end" "CYCLE $cycle"
   # Add current SMART status to display_smart
-  [ "$disable_smart" != "y" ] && output_smart $theDisk $smart_type
+  [ "$disable_smart" != "y" ] && output_smart $theDisk "$smart_type"
   display_status '' ''
 
   # Send end of the cycle notification
@@ -1377,7 +1362,7 @@ for cycle in $(seq $cycles); do
     [ "$skip_postread" != "y" ] && report_out+="Last Cycle's Post-Read Time: ${postread_average}.\\n"
     report_out+="Last Cycle's Elapsed TIme: $(timer cycle_timer)\\n"
     report_out+="Disk Start Temperature: ${disk_properties[temp]}\n"
-    report_out+="Disk Current Temperature: $(get_disk_temp $theDisk $smart_type)\\n"
+    report_out+="Disk Current Temperature: $(get_disk_temp $theDisk "$smart_type")\\n"
     [ "$cycles" -gt 1 ] && report_out+="\\nStarting a new cycle.\\n"
     send_mail "Disk ${disk_properties[name]} PASSED cycle ${cycle}!" "Preclear: Disk ${disk_properties[name]} PASSED cycle ${cycle}!" "$report_out"
   fi
@@ -1392,23 +1377,6 @@ echo -e "--> RESULT: Preclear finished succesfully.\n\n"
 
 # # Saving report
 report="${all_files[dir]}/report"
-
-# echo -e "\n--> ATTENTION: Please take a look into the SMART report above for drive health issues.\n" >> $report
-# echo -e "--> RESULT: Preclear finished succesfully.\n\n" >> $report
-
-# # Clear report from formatting characters
-# sed -i -r 's%(\x9B|\x1B\[)[0-?]*[@-~]%%g' $report
-# sed -i -e 's/####/#/g' $report
-
-# # Format report
-# sed -i -e "s#\(Pre-read verification:\)|#\1                 #g" \
-#        -e "s#\(Zeroing the disk:\)|#\1                      #g" \
-#        -e "s#\(Writing unRAID's Preclear signature:\)|#\1                       #g" \
-#        -e "s#\(Verifying unRAID's Preclear signature:\)|#\1                     #g" \
-#        -e "s#\(Post-Read verification:\)|#\1                #g" \
-#        -e "s#\(Cycle elapsed time:.*\)| \(.*\)#\n\2#g" \
-#        -e "s#\*\{3\}##g" \
-#        -e "s#\(S.M.A.R.T. Status\)#\1\n#g" $report
 
 tmux_window="preclear_disk_${disk_properties[name]}"
 if [ "$(tmux ls 2>/dev/null | grep -c "${tmux_window}")" -gt 0 ]; then
@@ -1446,7 +1414,7 @@ if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 1 ]; then
   [ "$skip_postread" != "y" ] && report_out+="Last Cycle's Post-Read Time: ${postread_average}.\\n"
   report_out+="Last Cycle's Elapsed TIme: $(timer cycle_timer)\\n"
   report_out+="Disk Start Temperature: ${disk_properties[temp]}\n"
-  report_out+="Disk Current Temperature: $(get_disk_temp $theDisk $smart_type)\\n"
+  report_out+="Disk Current Temperature: $(get_disk_temp $theDisk "$smart_type")\\n"
   if [ "$disable_smart" != "y" ]; then
     report_out+="\\n\\nS.M.A.R.T. Report\\n"
     while read -r line; do report_out+="${line}\\n"; done < ${all_files[smart_out]}

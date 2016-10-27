@@ -101,9 +101,9 @@ class Preclear
     $status  = "";
     $file    = "/tmp/preclear_stat_{$disk}";
     $session = $this->tmux_is_session("preclear_disk_{$disk}");
-    $rm      = "<a class='exec' title='%s' style='color:#CC0000;font-weight:bold;' onclick='stopPreclear(\"{$serial}\",\"{$disk}\",\"%s\");'>";
+    $rm      = "<a class='exec' style='color:#CC0000;font-weight:bold;margin-left:5px;' title='%s' onclick='stopPreclear(\"{$serial}\",\"{$disk}\",\"%s\");'>";
     $rm     .= "<i class='glyphicon glyphicon-remove hdd'></i></a>";
-    $preview = "<a class='exec' onclick='openPreclear(\"{$disk}\");' title='Preview'><i class='glyphicon glyphicon-eye-open'></i></a>";
+    $preview = "<a class='exec' style='margin-left:5px;' onclick='openPreclear(\"{$disk}\");' title='Preview'><i class='glyphicon glyphicon-eye-open hdd'></i></a>";
     
     if (is_file($file))
     {
@@ -129,14 +129,14 @@ class Preclear
 
             else
             {
-              $status .= "<span'>{$stat[2]}</span>";
+              $status .= "<span>{$stat[2]}</span>";
             }
           }
           break;
 
         default:
           $running = false;
-          $status .= "<span >{$stat[2]}</span>";
+          $status .= "<span>{$stat[2]}</span>";
           break;
       }
 
@@ -230,9 +230,9 @@ class Preclear
             <dt>&nbsp;</dt>
             <dd>
               <select name="-M" disabled>
-                <option value="1" selected>On preclear's end</option>
-                <option value="2">On every cycles's end</option>
-                <option value="3">On every cycles's and step's end</option>
+                <option value="1" selected>On preclear end</option>
+                <option value="2">On every cycle end</option>
+                <option value="3">On every cycle and step end</option>
                 <option value="4">On every 25% of progress</option>
               </select>
               </dd>
@@ -293,13 +293,13 @@ class Preclear
             <dt>&nbsp;</dt>
             <dd>
               <select name="--frequency" disabled>
-                <option value="1" selected>On preclear's end</option>
-                <option value="2">On every cycles's end</option>
-                <option value="3">On every cycles's and step's end</option>
+                <option value="1" selected>On preclear end</option>
+                <option value="2">On every cycle end</option>
+                <option value="3">On every cycle and step end</option>
                 <option value="4">On every 25% of progress</option>
               </select>
             </dd>
-            <dt>Read size: </dt>
+<!--             <dt>Read size: </dt>
             <dd>
               <select name="--read-size" >
                 <option value="33554432">32M</option>
@@ -310,7 +310,7 @@ class Preclear
                 <option value="1073741824">1024M</option>
                 <option value="2147483648">2048M</option>
               </select>
-            </dd>
+            </dd> -->
           </div>
           <div class="clear_options">
             <dt>Skip Pre-Read: </dt>

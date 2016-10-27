@@ -141,7 +141,6 @@ function startPreclear(device)
           opts["--notify"]       += getVal(this, "preclear_notify2") == "on" ? 2 : 0;
           opts["--notify"]       += getVal(this, "preclear_notify3") == "on" ? 4 : 0;
           opts["--frequency"]     = getVal(this, "--frequency");
-          opts["--read-size"]     = getVal(this, "--read-size");
           opts["--skip-preread"]  = getVal(this, "--skip-preread");
           opts["--skip-postread"] = getVal(this, "--skip-postread");        
         }
