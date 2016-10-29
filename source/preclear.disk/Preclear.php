@@ -204,15 +204,19 @@ function get_unasigned_disks()
   $unraid_serials = array_merge($disks_serial,$cache_serial,$flash_serial);
   $unraid_disks   = array();
 
-  foreach( $unraid_serials as $serial )
+  if (is_file("/var/local/emhttp/disks.ini"))
   {
-    $unraid_disks = array_merge($unraid_disks, preg_grep("#-".preg_quote($serial, "#")."#", $disks_id));
+    $disksIni    = parse_ini_file("/var/local/emhttp/disks.ini", true);
+    $unraid_real = array_filter(array_map(function($disk){return $disk['device'] ? "/dev/${disk['device']}" : null;}, $disksIni));
   }
-
-  $unraid_real = array_map(function($p)
+  else
+  {
+    foreach( $unraid_serials as $serial )
     {
-      return realpath($p);
-    }, $unraid_disks);
+      $unraid_disks = array_merge($unraid_disks, preg_grep("#-".preg_quote($serial, "#")."#", $disks_id));
+    }
+    $unraid_real = array_map(function($p){return realpath($p);}, $unraid_disks);
+  }
 
   $unassigned  = array_flip(array_diff(array_combine($disks_id, $disks_real), $unraid_real));
   natsort($unassigned);
@@ -410,7 +414,10 @@ function benchmark()
 
 
 $start_time = time();
-switch ($_POST['action']) {
+switch ($_POST['action'])
+{
+
+
   case 'get_content':
     debug("Starting get_content: ".(time() - $start_time),'DEBUG');
     $disks = benchmark("get_all_disks_info");
@@ -474,7 +481,7 @@ switch ($_POST['action']) {
         }
         
         $disks_o .= "<tr class='$odd'>
-                      <td><img src='/webGui/images/$disk_icon'><a href='/Settings/New?name=$disk_name'> $disk_name</a></td>
+                      <td><img src='/webGui/images/${disk_icon}'><a href='/Tools/New?name=$disk_name'> $disk_name</a></td>
                       <td>${title}${report_files}</td>
                       <td>{$temp}</td>
                       <td><span>${disk['size']}</span></td>
@@ -520,8 +527,8 @@ switch ($_POST['action']) {
       $cycles    = (isset($_POST['--cycles'])) ? " --cycles ".urldecode($_POST['--cycles']) : "";
       $pre_read  = (isset($_POST['--skip-preread']) && $_POST['--skip-preread'] == "on") ? " --skip-preread" : "";
       $post_read = (isset($_POST['--skip-postread']) && $_POST['--skip-postread'] == "on") ? " --skip-postread" : "";
+      $test      = (isset($_POST['--test']) && $_POST['--test'] == "on") ? " --test" : "";
       $noprompt  = " --no-prompt";
-      $test      = isset($TEST) ? " --test" : "";
 
       if (!$op)
       {
@@ -648,6 +655,8 @@ switch ($_POST['action']) {
       unlink($file);
       echo "true";
     }
+    break;
+
 }
 
 

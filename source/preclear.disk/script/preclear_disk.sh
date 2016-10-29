@@ -398,6 +398,11 @@ write_zeroes(){
     fi
   done
 
+  # Wait last display refresh
+  while kill -0 $display_pid &>/dev/null; do
+    sleep 1
+  done
+
   # Send final notification
   if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 3 ] ; then
     report_out="Zeroing finished on $disk_name.\\n"
@@ -572,7 +577,7 @@ read_entire_disk() {
       bytes_read=$bytes_dd
       let percent_read=($bytes_read*100/$total_bytes)
     fi
-    
+
     time_current=$(timer)
 
     current_speed=$(awk -F',' 'END{print $NF}' $dd_output|xargs)
@@ -614,6 +619,11 @@ read_entire_disk() {
       # Restore dd
       kill -CONT $dd_pid
     fi
+  done
+
+  # Wait last display refresh
+  while kill -0 $display_pid &>/dev/null; do
+    sleep 1
   done
 
   # Fail if not zeroed
@@ -1021,6 +1031,9 @@ if [ ! -b "$1" ]; then
 fi
 
 theDisk=$(echo $1|xargs)
+
+# redirect errors to log
+exec 2> >(read err; echo "preclear_disk_$(basename $theDisk): ${err}" >> /var/log/preclear.disk.log)
 
 # diff /tmp/.init <(set -o >/dev/null; set)
 # exit 0

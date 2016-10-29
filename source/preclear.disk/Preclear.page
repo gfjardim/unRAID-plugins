@@ -7,6 +7,7 @@ $plugin = "preclear.disk";
 require_once("plugins/${plugin}/Preclear.php");
 $numdisks = count(get_unasigned_disks())-1;
 $Preclear = new Preclear;
+$zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAME'])), $plugin, date('Ymd-Hi') );
 ?>
 <?if (is_file("webGui/scripts/jquery.switchButton.js")): # Pre 6.1?>
 <script type="text/javascript" src="/webGui/scripts/jquery.switchButton.js"></script>
@@ -24,6 +25,22 @@ $Preclear = new Preclear;
   var display = <?=json_encode($display);?>;
   <?if (isset($_GET['disk']) && ! $Preclear->isRunning($_GET['disk']) ) echo "startDisk = '{$_GET[disk]}';";?>
   <?=$Preclear->Script();?>
+  function cleanUp() {
+    if (document.hasFocus()) {
+      $('input[value="Downloading..."]').val('Download').prop('disabled',false);
+      $.post('/webGui/include/Download.php',{cmd:'delete',file:'<?=$zipFile;?>'});
+    } else {
+      setTimeout(cleanUp,4000);
+    }
+  }
+
+  function getlog() {
+    $('input[value="Download"]').val('Downloading...').prop('disabled',true);
+    $.post('/webGui/include/Download.php',{cmd:'save',source:'/var/log/<?=$plugin;?>.log',file:'<?=$zipFile;?>'},function(zip) {
+      location = zip;
+      setTimeout(cleanUp,4000);
+    });
+  }
 </script>
 <style>
   table.preclear {padding:0px;margin:-21px 0px 22px 0px;border-collapse:collapse;white-space:nowrap;}
@@ -60,3 +77,7 @@ $Preclear = new Preclear;
     <?for ($i=0; $i < $numdisks; $i++) {$odd = ($odd == "even") ? "odd" : "even"; echo "<tr class='$odd'><td colspan='12'>&nbsp;</td></tr>";}?>
   </tbody>
 </table>
+<blockquote class='inline_help'>
+  <input type="button" value="Download Log" onclick="getlog()">
+  <p>Click on the <strong>'Download Log'</strong> button to download a compressed log of Preclear Disk plugin.</p>
+</blockquote>

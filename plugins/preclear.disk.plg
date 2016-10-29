@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2016.10.26">
+<!ENTITY version   "2016.10.29">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,13 @@
 
 <CHANGES>
 ##&name;
+
+###2016.10.29
+- Fix: small bug in script display
+- Fix: Array disks connected to Areca cards showing up
+- Fix: Detect if script author is Joe L. or bjp999
+- Add: script write errors to log file
+- Add: Download log file from the webui
 
 ###2016.10.26
 - Add: Copy to Clipboard button on Preview window

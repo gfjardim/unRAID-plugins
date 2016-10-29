@@ -142,7 +142,8 @@ function startPreclear(device)
           opts["--notify"]       += getVal(this, "preclear_notify3") == "on" ? 4 : 0;
           opts["--frequency"]     = getVal(this, "--frequency");
           opts["--skip-preread"]  = getVal(this, "--skip-preread");
-          opts["--skip-postread"] = getVal(this, "--skip-postread");        
+          opts["--skip-postread"] = getVal(this, "--skip-postread");      
+          opts["--test"]          = getVal(this, "--test");      
         }
 
         $.post(PreclearURL, opts, function(data)

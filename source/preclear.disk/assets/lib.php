@@ -6,12 +6,31 @@ class Preclear
   public $plugin = "preclear.disk";
   
 
-  public $authors = ["gfjardim" => "gfjardim", "joel" => "Joe L."];
+  public function Authors()
+  {
+    $authors      = ["gfjardim" => "gfjardim", "joel" => "Joe L."];
+    $scripts      = $this->scriptFiles();
+
+    foreach ($authors as $key => $name) {
+      $capabilities = array_key_exists($key, $scripts) ? $this->scriptCapabilities($scripts[$key]) : [];
+
+      if ( array_key_exists("version", $capabilities) && $capabilities["version"] )
+      {
+        if ( $capabilities["fast_postread"] )
+        {
+          $name = "bjp999";      
+        }
+        $authors[$key] = "$name - ${capabilities['version']}";      
+      }
+
+    }
+    return $authors;
+  }
 
 
   public function Author($author)
   {
-    return $this->authors[$author];
+    return $this->Authors()[$author];
   }
 
 
@@ -45,9 +64,10 @@ class Preclear
   public function Script()
   {
     echo "var plugin = '".$this->plugin."';";
-    echo "var authors = ".json_encode($this->authors).";";
+    echo "var authors = ".json_encode($this->Authors()).";";
     echo "var scope  = 'gfjardim';";
-    echo "var scripts = ".json_encode($this->scriptFiles()).";";
+    echo "var scripts = ".json_encode($this->scriptFiles()).";";\
+    printf("var zip = '%s-%s-%s.zip';", str_replace(' ','_',strtolower($var['NAME'])), $this->plugin, date('Ymd-Hi') );
     echo file_get_contents("plugins/".$this->plugin."/assets/javascript.js");
   }
 
@@ -299,18 +319,6 @@ class Preclear
                 <option value="4">On every 25% of progress</option>
               </select>
             </dd>
-<!--             <dt>Read size: </dt>
-            <dd>
-              <select name="--read-size" >
-                <option value="33554432">32M</option>
-                <option value="67108864">64M</option>
-                <option value="134217728" selected>128M</option>
-                <option value="268435456">256M</option>
-                <option value="536870912">512M</option>
-                <option value="1073741824">1024M</option>
-                <option value="2147483648">2048M</option>
-              </select>
-            </dd> -->
           </div>
           <div class="clear_options">
             <dt>Skip Pre-Read: </dt>
@@ -320,6 +328,12 @@ class Preclear
             <dt>Skip Post-Read: </dt>
             <dd>
               <input type="checkbox" name="--skip-postread" class="switch" >
+            </dd>
+          </div>
+          <div class='inline_help'>
+            <dt>Enable Testing (just for debugging):</dt>
+            <dd>
+              <input type="checkbox" name="--test" class="switch" >
             </dd>
           </div>
         </dl>
