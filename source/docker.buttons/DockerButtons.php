@@ -1,5 +1,6 @@
 <?
-require_once '/usr/local/emhttp/plugins/dynamix.docker.manager/include/DockerClient.php';
+$docroot = $docroot ?: @$_SERVER['DOCUMENT_ROOT'] ?: '/usr/local/emhttp';
+require_once "$docroot/plugins/dynamix.docker.manager/include/DockerClient.php";
 $DockerClient    = new DockerClient();
 $DockerTemplates = new DockerTemplates();
 
@@ -7,56 +8,8 @@ $_REQUEST  = array_merge($_GET, $_POST);
 $action    = array_key_exists('action', $_REQUEST) ? $_REQUEST['action'] : '';
 $container = array_key_exists('container', $_REQUEST) ? $_REQUEST['container'] : '';
 $image     = array_key_exists('image', $_REQUEST) ? $_REQUEST['image'] : '';
+$plugin    = array_key_exists('plugin', $_REQUEST) ? $_REQUEST['plugin'] : '';
 $Info      = $DockerTemplates->getAllInfo();
-
-function pullImage($image) {
-  global $DockerClient, $DockerTemplates;
-  $alltotals      = [];
-  $curtotals      = [];
-  $lastPercentage = 0;
-  $fsLayers       = [];
-
-  $DockerClient->pullImage($image, function ($line) use (&$alltotals, &$lastPercentage, &$curtotals, &$fsLayers) {
-    $_echo   = function($m){print_r($m); flush(); ob_flush();};
-    $content = json_decode($line, true);
-    $id      = (isset($content['id'])) ? trim($content['id']) : '';
-    $status  = (isset($content['status'])) ? trim($content['status']) : '';
-
-    if (!empty($id)) {
-
-      if (!empty($content['progressDetail']) && !empty($content['progressDetail']['total'])) {
-        $alltotals[$id] = $content['progressDetail']['total'];
-      }
-
-      if ($status == 'Pulling fs layer')
-      {
-        $fsLayers[$id] = "";
-      }
-      else if ($status == 'Downloading')
-      {
-        $current = $content['progressDetail']['current'];
-        $curtotals[$id] = $current;
-      }
-      else if ($status == "Download complete")
-      {
-        $curtotals[$id] = $alltotals[$id];
-      }
-    }
-
-    if ( count($alltotals) && ! array_diff_key($fsLayers, $alltotals))
-    {
-      $sumCurrent = array_sum($curtotals);
-      $sumTotal   = array_sum($alltotals);
-      $curPercentage = round(($sumCurrent / $sumTotal) * 100);
-      if ($curPercentage != $lastPercentage) {
-        $lastPercentage = $curPercentage;
-        $_echo(json_encode(["current"=>$sumCurrent,"total"=>$sumTotal,"percentage"=>$curPercentage])."\n");
-      }
-    }
-    if (empty($status)) return;
-  });
-  return true;
-}
 
 switch ($action) {
   case 'get_content':
@@ -64,6 +17,7 @@ switch ($action) {
     $Output['Startable'] = [];
     $Output['Stoppable'] = [];
     $Output['Updatable'] = [];
+    $Output['Unnamed']   = [];
     $Output['Orphaned']  = [];
     $Output['ForceAll']  = [];
 
@@ -83,6 +37,11 @@ switch ($action) {
       if ($updated === false)
       {
         $Output['Updatable'][] = $name;
+      }
+
+      if (preg_match("/[a-z]*?_[a-z]*$/i", $name))
+      {
+        $Output['Unnamed'][] = $name;
       }
       $Output['ForceAll'][] = $name;
     }
@@ -114,6 +73,15 @@ switch ($action) {
     }
     break;
 
+  case 'remove_container':
+    if (is_array($container))
+    {
+      foreach ($container as $remove) {
+         $DockerClient->removeContainer($remove);
+      }
+    }
+    break;
+
   case 'remove_image':
     if (is_array($image))
     {
@@ -123,31 +91,30 @@ switch ($action) {
     }
     break;
 
-  case 'update':
-    // Set header
-    header('Content-type: application/octet-stream');
-    // Turn off output buffering
-    ini_set('output_buffering', 'off');
-    // Turn off PHP output compression
-    ini_set('zlib.output_compression', false);
-    // Implicitly flush the buffer(s)
-    ini_set('implicit_flush', true);
-    ob_implicit_flush(true);
-    // Clear, and turn off output buffering
-    while (ob_get_level() > 0) {
-        // Get the curent level
-        $level = ob_get_level();
-        // End the buffering
-        ob_end_clean();
-        // If the current level has not changed, abort
-        if (ob_get_level() == $level) break;
+  case 'plugin_update':
+    if (is_array($plugin))
+    {
+      readfile('logging.htm');
+      $write_log = function($string) {
+        if (empty($string))
+        {
+          return;
+        }
+        $string = str_replace("\n", "<br>", $string);
+        $string = str_replace('"', "\\\"", trim($string));
+        echo "<script>addLog(\"{$string}\");</script>";
+        @flush();
+      };
+      foreach ($plugin as $file) {
+        $command = escapeshellcmd("/usr/local/emhttp/plugins/dynamix.plugin.manager/scripts/plugin");
+        $command = "${command} update ".escapeshellarg($file);
+        $proc = popen($command, 'r');
+        while (!feof($proc)) {
+          $write_log(fgets($proc));
+        }
+        $write_log("\n\n");
+      }
     }
-
-    $containers = $DockerClient->getDockerContainers();
-    foreach ($container as $update) {
-      $key = array_search($update, array_column($containers, 'Name'));
-      $image = $containers[$key]["Image"];
-    }
-    pullImage("sparklyballs/beardrage:latest");
+    break;
 }
 ?>

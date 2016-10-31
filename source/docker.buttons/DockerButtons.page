@@ -2,23 +2,29 @@ Menu="Buttons:1"
 Cond="(pgrep('docker')!==false)"
 Link="nav-user"
 ---
+<?
+$plugin = "docker.buttons";
+?>
 <style type="text/css">
   .dupdate{color: #0088CC;}
 </style>
+<script type="text/javascript" src="/plugins/<?=$plugin;?>/assets/arrive.min.js"></script>
 <script type="text/javascript">
   var DockerButtons = new Object;
   DockerButtons['Startable'] = [];
   DockerButtons['Stoppable'] = [];
   DockerButtons['Updatable'] = [];
   DockerButtons['Orphaned']  = [];
+  DockerButtons['Unnamed']   = [];
   DockerButtons['ForceAll']  = [];
+  var PluginsUpdatable = [];
   var buttonOutput = "";
-  var DBUrl        = "/plugins/docker.buttons/DockerButtons.php";
-  new Image().src  = "/plugins/docker.buttons/images/loading.gif";
+  var DBUrl        = "/plugins/<?=$plugin;?>/DockerButtons.php";
+  new Image().src  = "/plugins/<?=$plugin;?>/images/loading.gif";
 
   $(function()
   {
-    var target1 = $("input[value='Check for Updates']");
+    var target1 = $("#docker_containers").siblings("input[value='Check for Updates']");
     var target2 = $("div[id='apps_icons'] > div[class~='Panel']:last").next();
     if (target1.length)
     {
@@ -44,15 +50,22 @@ Link="nav-user"
         disable = Object.keys(DockerButtons.Updatable).length ? "dupdate" : "disabled";
         buttonOutput += "<button onclick='dockerButtonUpdate(this,false);' "+disable+"><i class='fa fa-cloud-download "+disable+"'>&nbsp;&nbsp;</i>Install Available Updates</button>";
 
-        advanced = $.cookie("docker_listview_mode") == "advanced" ? "inline-block" : "none";
-        buttonOutput += "<button class='advanced' style='display:"+advanced+";' onclick='dockerButtonUpdate(this,true);'>";
-        buttonOutput += "<i class='fa fa-cloud-download dupdate'>&nbsp;&nbsp;</i>Force Update All Containers</button>";
-        
-        disable = Object.keys(DockerButtons.Orphaned).length ? "stopped" : "disabled";
-        buttonOutput += "<button class='advanced' style='display:"+advanced+";' onclick='dockerButtonOrphan(this);' "+disable+">";
-        buttonOutput += "<i class='fa fa-remove "+disable+"'>&nbsp;&nbsp;</i>Remove Orphaned Images</button>";
+        if (typeof(dashboard) === 'undefined')
+        {
+          advanced = $.cookie("docker_listview_mode") == "advanced" ? "inline-block" : "none";
+          
+          disable = Object.keys(DockerButtons.Unnamed).length ? "stopped" : "disabled";
+          buttonOutput += "<button class='advanced' style='display:"+advanced+";' onclick='dockerButtonUnnamed(this);' "+disable+">";
+          buttonOutput += "<i class='fa fa-remove "+disable+"'>&nbsp;&nbsp;</i>Remove Unnamed Containers</button>";
 
-        if (typeof(dashboard) !== 'undefined')
+          buttonOutput += "<button class='advanced' style='display:"+advanced+";' onclick='dockerButtonUpdate(this,true);'>";
+          buttonOutput += "<i class='fa fa-cloud-download dupdate'>&nbsp;&nbsp;</i>Force Update All Containers</button>";
+          
+          disable = Object.keys(DockerButtons.Orphaned).length ? "stopped" : "disabled";
+          buttonOutput += "<button class='advanced' style='display:"+advanced+";' onclick='dockerButtonOrphan(this);' "+disable+">";
+          buttonOutput += "<i class='fa fa-remove "+disable+"'>&nbsp;&nbsp;</i>Remove Orphaned Images</button>";
+        }
+        else
         {
           buttonOutput = "<div>"+buttonOutput+"</div>";
         }
@@ -60,12 +73,36 @@ Link="nav-user"
         target.after(buttonOutput);
       },"json");
     }
+
+    // Plugins
+    var plugin_table = $("#plugin_table");
+    if (plugin_table.length)
+    {
+      buttonOutput  = "<span class='status vhshift'><button id='UpdateAllPlugins' style='margin-left:7px;' onclick='pluginsUpdate();' disabled>";
+      buttonOutput += "<i class='fa fa-cloud-download' disabled>&nbsp;&nbsp;</i>Update All Plugins</button></span>";
+      $(".tabs").append(buttonOutput);
+
+      plugin_table.arrive("tr", function() {
+        if ( $(this).find("span.red-text").length )
+        {
+          regex = /=([\w|.]*plg)/g;
+          var plg = regex.exec( $(this).find("td input[type='button']").attr('onclick') );
+          if (plg.length)
+          {
+            PluginsUpdatable.push(plg[1]);
+            $("#UpdateAllPlugins").attr("disabled",false).find("i").addClass("dupdate");   
+          }
+        }
+      });
+    };
+
   });
+
 
 
   function dockerButtonsAlert(title,desc,imageUrl,imageSize, outsideClick, showCancel, showConfirm, alertType)
   {
-    if (typeof(imageUrl)     === "undefined") imageUrl     = "/plugins/docker.buttons/images/loading.gif";
+    if (typeof(imageUrl)     === "undefined") imageUrl     = "/plugins/<?=$plugin;?>/images/loading.gif";
     if (typeof(outsideClick) === "undefined") outsideClick = false;
     if (typeof(showCancel)   === "undefined") showCancel   = false;
     if (typeof(showConfirm)  === "undefined") showConfirm  = false;
@@ -155,7 +192,6 @@ Link="nav-user"
     {
       swal.close();
       location.reload();
-
     });
   }
 
@@ -164,6 +200,17 @@ Link="nav-user"
     $(el).attr("disabled", true);
     dockerButtonsAlert("Stopping Containers","Please wait while stopping Docker containers...");
     $.post(DBUrl, {action:"stop", "container[]":DockerButtons.Stoppable}, function()
+    {
+      swal.close();
+      location.reload();
+    });
+  }
+
+  function dockerButtonUnnamed(el)
+  {
+    $(el).attr("disabled", true);
+    dockerButtonsAlert("Removing Unnamed Containers","Please wait while removing Docker unnamed containers...");
+    $.post(DBUrl, {action:"remove_container", "container[]":DockerButtons.Unnamed}, function()
     {
       swal.close();
       location.reload();
@@ -179,6 +226,17 @@ Link="nav-user"
       swal.close();
       location.reload();
     });
+  }
+
+  function pluginsUpdate(el)
+  {
+    $(el).attr("disabled", true);
+    var url = DBUrl + "?action=plugin_update";
+    $.each(PluginsUpdatable, function(i,v)
+    {
+      url = url + "&plugin[]=" + v;
+    });
+    openBox(url,"Update Plugins",600,900,true);
   }
 
 </script>
