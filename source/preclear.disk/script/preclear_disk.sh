@@ -33,6 +33,10 @@ trim() {
   echo -n "$var"
 }
 
+debug() {
+  cat <<< "preclear_disk_$(basename $theDisk): $@" >> /var/log/preclear.disk.log
+}
+
 list_unraid_disks(){
   local _result=$1
   i=0
@@ -295,6 +299,7 @@ write_zeroes(){
   local cycle=$cycle
   local cycles=$cycles
   local current_speed
+  local dd_flags="conv=fdatasync,noerror oflag=direct"
   local dd_pid
   local dd_output=${all_files[dd_out]}
   local disk=${disk_properties[device]}
@@ -310,30 +315,38 @@ write_zeroes(){
   local time_start
   local output=$1
   local display_pid=0
+  local write_bs=2097152
 
   time_start=$(timer)
 
   if [ "$short_test" == "y" ]; then
-    total_bytes=1073741824 # 2048k * 512
+    total_bytes=$(($write_bs * 2048))
   else
     total_bytes=${disk_properties[size]}
   fi
   tb_formatted=$(format_number $total_bytes)
-  
-  if [ "$write_bs" = "" ]; then
-    write_bs="2048k"
-  fi
 
   # Empty the MBR partition table
   dd if=/dev/zero bs=512 count=100 of=$disk >/dev/null 2>&1
   blockdev --rereadpt $disk
 
   if [ "$short_test" == "y" ]; then
-    dd if=/dev/zero of=$disk bs=2048k     seek=1 conv=fdatasync,noerror iflag=fullblock count=512 2> $dd_output &
+    dd_cmd="dd if=/dev/zero of=$disk bs=$write_bs seek=1 count=$(($total_bytes / $write_bs)) $dd_flags"
   else
-    dd if=/dev/zero of=$disk bs=$write_bs seek=1 conv=fdatasync,noerror iflag=fullblock           2> $dd_output &
+    dd_cmd="dd if=/dev/zero of=$disk bs=$write_bs seek=1 $dd_flags"
   fi
+  debug "Zeroing: $dd_cmd"
+  $dd_cmd 2> $dd_output &
   dd_pid=$!
+  debug "Zeroing: dd pid [$dd_pid]"
+
+  sleep 1
+
+  # return 1 if dd failed
+  if ! ps -p $dd_pid &>/dev/null; then
+    debug "Zeroing: dd command failed -> $(cat $dd_output)"
+    return 1
+  fi
 
   # if we are interrupted, kill the background zeroing of the disk.
   trap 'kill -9 $dd_pid 2>/dev/null;exit' 2
@@ -459,6 +472,7 @@ read_entire_disk() {
   local cycle=$cycle
   local cycles=$cycles
   local display_pid=0
+  local dd_flags="iflag=direct"
   local dd_output=${all_files[dd_out]}
   local disk=${disk_properties[device]}
   local disk_name=${disk_properties[name]}
@@ -472,6 +486,7 @@ read_entire_disk() {
   local stat_file=${all_files[stat]}
   local verify_errors=${all_files[verify_errors]}
   local verify=$1
+  local read_bs=2097152
 
   # Type of read: Pre-Read or Post-Read
   if [ "$read_type" == "preread" ]; then
@@ -490,8 +505,8 @@ read_entire_disk() {
   time_start=$(timer)
 
   if [ "$short_test" == "y" ]; then
-    total_bytes=1073741824 # 2097152 * 512
-    count="count=512"
+    total_bytes=$(($read_bs * 2048))
+    count="count=$(($total_bytes / $read_bs))"
   else
     total_bytes=${disk_properties[size]}
     count=""
@@ -510,22 +525,52 @@ read_entire_disk() {
   if [ "$verify" == "verify" ]; then
 
     # Verify the beginning of the disk skipping the MBR
-    dd_cmd="dd if=$disk bs=512 count=4096 skip=1 conv=noerror iflag=fullblock"
-    $dd_cmd 2>$dd_output | cmp - /dev/zero &>$cmp_output
+    dd_cmd="dd if=$disk bs=512 count=4096 skip=1 $dd_flags"
+    debug "${read_type_s}: $dd_cmd"
+    $dd_cmd 2>$dd_output | cmp - /dev/zero &>$cmp_output 
+    debug "${read_type_s}: dd pid [$!]"
 
-    # Fail if not zeroed
-    if grep -q "differ" "$cmp_output"; then
+    # Fail if not zeroed or error
+    if grep -q "differ" "$cmp_output" &>/dev/null; then
+      debug "${read_type_s}: fail - disk not zeroed"
       return 1
     fi
     
     # Verify the rest of the disk
-    dd_cmd="dd if=$disk bs=2097152 $count skip=1 conv=noerror iflag=fullblock"
-    { $dd_cmd 2>$dd_output | cmp - /dev/zero &>$cmp_output; } &
-    dd_pid=$(ps --ppid $! | awk '/dd/{print $1}')
+    dd_cmd="dd if=$disk bs=$read_bs $count skip=1 $dd_flags 2>$dd_output | cmp - /dev/zero &>$cmp_output"
+    debug "${read_type_s}: $dd_cmd "
+    { dd if=$disk bs=$read_bs $count skip=1 $dd_flags 2>$dd_output | cmp - /dev/zero &>$cmp_output ; } &
+    block_pid=$!
+
+    # get pid of dd
+    for i in $(seq 5); do
+      dd_pid=$(ps --ppid $block_pid | awk '/dd/{print $1}')
+      if [ -n "$dd_pid" ]; then
+        debug "${read_type_s}: dd pid [$dd_pid]"
+        break;
+      else
+        sleep 1
+      fi
+    done
+
+    if [ -z "$dd_pid" ]; then
+      debug "${read_type_s}: dd command failed -> $(cat $dd_output)"
+      return 1
+    fi
 
   else
-    dd if=$disk of=/dev/null bs=2097152 $count conv=noerror iflag=fullblock > $dd_output 2>&1 &
+    dd_cmd="dd if=$disk of=/dev/null bs=2097152 $count $dd_flags"
+    debug "${read_type_s}: $dd_cmd"
+    $dd_cmd > $dd_output 2>&1 &
     dd_pid=$!
+  fi
+
+  sleep 1
+
+  # return 1 if dd failed
+  if ! ps -p $dd_pid &>/dev/null; then
+    debug "${read_type_s}: dd command failed -> $(cat $dd_output)"
+    return 1
   fi
 
   # if we are interrupted, kill the background reading of the disk.
@@ -626,11 +671,10 @@ read_entire_disk() {
     sleep 1
   done
 
-  # Fail if not zeroed
-  if [ "$verify" == "verify" ]; then
-    if grep -q "differ" "$cmp_output"; then
-      return 1
-    fi
+  # Fail if not zeroed or error
+  if grep -q "differ" "$cmp_output" &>/dev/null; then
+    debug "${read_type_s}: fail - disk not zeroed"
+    return 1
   fi
 
   # Send final notification
@@ -645,7 +689,7 @@ read_entire_disk() {
   fi
 
   eval "$output='$(timer $time_start) @ $average_speed MB/s'"
-  return
+  return 0
 }
 
 draw_canvas(){
@@ -977,6 +1021,7 @@ get_disk_temp() {
 ######################################################
 
 #Defaut values
+command=$(echo "$0 $@")
 read_stress=y
 cycles=1
 append display_step ""
@@ -1034,6 +1079,8 @@ theDisk=$(echo $1|xargs)
 
 # redirect errors to log
 exec 2> >(read err; echo "preclear_disk_$(basename $theDisk): ${err}" >> /var/log/preclear.disk.log)
+
+debug "Command: $command"
 
 # diff /tmp/.init <(set -o >/dev/null; set)
 # exit 0
@@ -1100,7 +1147,7 @@ if [ "$disable_smart" != "y" ]; then
 fi
 
 # Used files
-append all_files 'dir'           "/boot/.preclear/${disk_properties[name]}"
+append all_files 'dir'           "/tmp/.preclear/${disk_properties[name]}"
 append all_files 'dd_out'        "${all_files[dir]}/dd_output"
 append all_files 'cmp_out'       "${all_files[dir]}/cmp_out"
 append all_files 'pause'         "${all_files[dir]}/pause"
@@ -1110,6 +1157,7 @@ append all_files 'stat'          "/tmp/preclear_stat_${disk_properties[name]}"
 append all_files 'smart_prefix'  "${all_files[dir]}/smart_"
 append all_files 'smart_final'   "${all_files[dir]}/smart_final"
 append all_files 'smart_out'     "${all_files[dir]}/smart_out"
+
 mkdir -p "${all_files[dir]}"
 trap "rm -rf ${all_files[dir]}" EXIT;
 
