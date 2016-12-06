@@ -233,7 +233,7 @@ else
 fi
 
 gcc_version=$(cat /proc/version|grep -Po 'gcc version \K[\d.]*')
-if [ "$gcc_version" == "5.3.0" ]; then
+if [ "$gcc_version" = "5.3.0" -o "$gcc_version" = "5.4.0" ]; then
   download_install libevent-2.0.22-x86_64-1.txz 7a755ece3e378f244a3c327369e7f2ac
   download_install tmux-2.2-x86_64-2.txz a268019858c88d5f2f702d9fc182a37c
   download_install ncurses-5.9-x86_64-4.txz c2d2b01f021dc2f4752c4fff02f65fd5
