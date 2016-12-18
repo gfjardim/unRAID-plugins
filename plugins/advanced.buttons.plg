@@ -22,7 +22,7 @@
 ###2016.10.31
 - Fix: advanced buttons showing on Dashboard
 - Add: remove Unnamed containers
-- Add: Update All Plugins 
+- Add: Update All Plugins
 
 ###2016.09.28
 - Initial release.
@@ -62,6 +62,12 @@ chmod -R +x /usr/local/emhttp/plugins/&name;/script/
 # Cleaning old source files
 find /boot/config/plugins/&name;/ -type f -iname "&name;*.txz" ! -iname "*&version;*" -delete
 find /boot/config/plugins/&name;/ -type f -iname "&name;*.md5" ! -iname "*&version;*" -delete
+
+# Remove Docker Buttons plugin
+if [ -f "/boot/config/plugins/docker.buttons.plg" ]; then
+  /usr/local/sbin/plugin remove docker.buttons.plg
+  rm -rf /usr/local/emhttp/plugins/docker.buttons
+fi
 
 echo ""
 echo "-----------------------------------------------------------"
