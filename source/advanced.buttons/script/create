@@ -1,0 +1,291 @@
+#!/usr/bin/php
+<?PHP
+$plugin = "docker.buttons";
+require_once("/usr/local/emhttp/plugins/${plugin}/assets/common.php");
+require_once("${docroot}/webGui/include/Helpers.php");
+$display = @parse_ini_file("/boot/config/plugins/dynamix/dynamix.cfg", true)["display"] ?: [];
+
+$DockerClient    = new DockerClient();
+$DockerTemplates = new DockerTemplates();
+$DockerUpdate    = new DockerUpdate();
+$RestoreConfig   = json_decode(@file_get_contents($Files['ConfigFile']) ?: "[]", true);
+$OutputTitle     = "${argv[1]}";
+$arguments       = array_slice($argv, 2);
+$StatusFile      = $Files["DockerStat"];
+
+function evalCreateDocker($functionName)
+{
+  $CreateDocker = file("/usr/local/emhttp/plugins/dynamix.docker.manager/include/CreateDocker.php", FILE_IGNORE_NEW_LINES);
+  $initOffset   = array_keys(preg_grep("/^function\s+${functionName}\s?\(/i", $CreateDocker))[0];
+  $endOffset    = array_keys(preg_grep('/^\}/i', array_slice($CreateDocker, $initOffset) ))[0];
+  $CreateDocker = array_slice($CreateDocker, $initOffset, $endOffset + 1 );
+  eval(implode("\n", $CreateDocker));
+}
+
+
+function download_url($url, $path = "", $bg = false) {
+  exec("curl --max-time 30 --silent --insecure --location --fail ".($path ? " -o ".escapeshellarg($path) : "")." $url ".($bg ? ">/dev/null 2>&1 &" : "2>/dev/null"), $out, $exit_code);
+  return ($exit_code === 0) ? implode("\n", $out) : false;
+}
+
+
+function getV1Size($strRepo, $digest, $Token)
+{
+  $sizeBlobURL = sprintf("https://registry-1.docker.io/v2/%s/blobs/%s", $strRepo, $digest);
+  $sizeBlobURL = sprintf("--head -H %s %s", $Token, escapeshellarg($sizeBlobURL));
+  if (preg_match("/Content-Length: (\d+)/", download_url($sizeBlobURL), $matches))
+  {
+    return $matches[1];
+  }
+  else
+  {
+    return 0;
+  }
+
+}
+
+function pullImage($image) {
+  global $StatusFile, $DockerClient, $DockerTemplates, $DockerUpdate;
+  $alltotals      = [];
+  $curtotals      = [];
+  $extracttotals  = [];
+  $extracting     = false;
+  $lastPercentage = 0;
+  $fsLayers       = [];
+  $manifestLayers = [];
+  $imageDigest    = "";
+  $lastStatus     = "";
+
+  $image = DockerUtil::ensureImageTag($image);
+  list($strRepo, $strTag) = explode(':', DockerUtil::ensureImageTag($image));
+  $strAuthURL = sprintf("https://auth.docker.io/token?service=registry.docker.io&scope=repository:%s:pull", $strRepo);
+  $arrAuth    = json_decode(download_url(escapeshellarg($strAuthURL)), true);
+  if (! array_key_exists("token", $arrAuth))
+  {
+    return false;
+  }
+
+  $Token = escapeshellarg("Authorization: Bearer ${arrAuth['token']}");
+
+  $strManifestURL = sprintf("https://registry-1.docker.io/v2/%s/manifests/%s", $strRepo, $strTag);
+  $strManifestURL = sprintf("-H 'Accept: application/vnd.docker.distribution.manifest.v2+json' -H %s %s", $Token, escapeshellarg($strManifestURL));
+  $Manifest       = json_decode(download_url($strManifestURL),true);
+
+  if (! array_key_exists("schemaVersion", $Manifest))
+  {
+    return false;
+  }
+
+  $manifestVersion = $Manifest["schemaVersion"];
+  if ($manifestVersion == "1")
+  {
+    $Manifest["fsLayers"] = array_map("unserialize", array_unique(array_map("serialize", $Manifest["fsLayers"])));
+    foreach ($Manifest["fsLayers"] as $blob) {
+      $layerId = substr($blob["blobSum"], 7, 12);
+      $manifestLayers[$layerId]["digest"] = $blob["blobSum"];
+      // $manifestLayers[$layerId]["size"]   = getV1Size($strRepo, $manifestLayers[$layerId]["digest"], $Token);
+    }
+  }
+  else
+  {
+    foreach ($Manifest["layers"] as $layer) {
+      $layerId = substr($layer["digest"], 7, 12);
+      $manifestLayers[$layerId]["digest"] = $layer["digest"];
+      $manifestLayers[$layerId]["size"]   = $layer["size"];
+    }
+  }
+
+  $pullCallback = function ($line) use ($image, &$imageDigest, &$alltotals, &$lastStatus, &$lastPercentage, &$extracting, 
+                                        &$curtotals, &$extracttotals, &$strRepo, &$manifestLayers, &$Token, &$Name) 
+  {
+    global $StatusFile, $title, $message;
+    $_echo   = function($m){print_r($m); flush(); ob_flush();};
+    $content = json_decode($line, true);
+    $id      = (isset($content['id'])) ? trim($content['id']) : '';
+    $status  = (isset($content['status'])) ? trim($content['status']) : '';
+
+    if (empty($status)) return;
+
+    if (!empty($id))
+    {
+      switch ($status)
+      {
+        case 'Pulling fs layer':
+          $manifestLayers[$id]["size"] = $manifestLayers[$id]["size"] ?: getV1Size($strRepo, $manifestLayers[$id]["digest"], $Token);
+          $alltotals[$id] = $manifestLayers[$id]["size"];
+          break;
+
+        case 'Downloading':
+          $current = $content['progressDetail']['current'];
+          $curtotals[$id] = $current;
+          break;
+
+        case 'Download complete':
+          $curtotals[$id] = $alltotals[$id];
+          break;
+
+        case 'Extracting':
+          $current = $content['progressDetail']['current'];
+          $extracttotals[$id] = $current;
+          break;
+
+        case 'Pull complete':
+          $extracttotals[$id] = $alltotals[$id];
+          break;
+
+        default:
+          // echo $manifestLayers[$id]["digest"];
+          return;
+      }
+    }
+    else
+    {
+      if (strpos($status, 'Digest: ') === 0) {
+        $imageDigest = substr($status, 8);
+      }
+    }
+
+    if ( count($alltotals) )
+    {
+      $sumCurrent     = array_sum($curtotals);
+      $sumTotal       = array_sum($alltotals);
+      $curPercentage  = round(($sumCurrent / $sumTotal) * 100);
+      $lastPercentage = $curPercentage;
+      if ( ( $status == "Extracting" && $lastStatus == "Extracting" && $curPercentage == 100 ) || $extracting )
+      {  
+        $extracting = true;
+        $sumExtract = array_sum($extracttotals);
+        $ExtractPercentage  = round(($sumExtract / $sumTotal) * 100);
+        $stat = sprintf("Extracting '%s' (%s%% of %s).", $image, $ExtractPercentage, my_scale($sumTotal, $unit)." $unit");
+      }
+      else
+      {
+        $stat = sprintf("Downloading '%s' (%s%% of %s).", $image, $curPercentage, my_scale($sumTotal, $unit)." $unit");
+      }
+      saveStatus($StatusFile, $title, $message, $stat);
+    }
+
+  $lastStatus = $status;
+  };
+ 
+  $DockerClient->pullImage($image, $pullCallback);
+  if ($lastPercentage)
+  {
+    $stat = sprintf("Downloaded '%s': %s.", $image, my_scale(array_sum($alltotals), $unit)." $unit");
+    saveStatus($StatusFile, $title, $message, $stat);
+    sleep(2);
+  }
+
+  return $imageDigest ?: true;
+}
+
+evalCreateDocker("xml_encode");
+evalCreateDocker("xml_decode");
+evalCreateDocker("xmlToVar");
+evalCreateDocker("xmlToCommand");
+@touch($Files['DockerStat']);
+
+foreach ($arguments as $key => $Name) {
+
+  $title = "${OutputTitle} Docker Containers";
+  $message = sprintf("%s '%s' (%s of %s)", $OutputTitle, $Name, ($key + 1), count($arguments));
+
+  saveStatus($StatusFile, $title, $message, "Starting...");
+
+  $template = $DockerTemplates->getUserTemplate(urldecode($Name));
+
+  if (! $template)
+  {
+    saveStatus($StatusFile, "Template not found, aborting...");
+    sleep(3);
+    unlink($Files['DockerStat']);
+    continue;
+  }
+
+  list($Cmd, $Name, $Repository) = xmlToCommand($template);
+
+  $Image = DockerUtil::ensureImageTag($Repository);
+  
+  saveStatus($StatusFile, $title, $message, "Pulling '$Image'...");
+
+  $Cmd = str_replace("/plugins/dynamix.docker.manager/scripts/docker", "/usr/bin/docker", $Cmd);
+
+  $oldImageID = $DockerClient->getImageID($Repository);
+
+  // Pull image
+  $pull = pullImage($Image);
+  if ($pull === false)
+  {
+    saveStatus($StatusFile, $title, $message, "Error pulling '${Image}'");
+    sleep(3);
+    unlink($Files['DockerStat']);
+    continue;
+  }
+  else if ($pull !== true)
+  {
+    // updating image info
+    $DockerTemplates->removeImageInfo($Image);
+    $DockerUpdate->setUpdateStatus($Image, $pull);
+  }
+
+  $oldContainerDetails = $DockerClient->getContainerDetails($Name);
+
+  // Restore Container Config
+  $ContainerConfig = array_values( array_filter($RestoreConfig, function($ct) use ($Name){ return $ct["name"] == $Name; }) );
+  if ($OutputTitle == "Restoring" && $ContainerConfig)
+  {
+    $ContainerConfig = $ContainerConfig[0];
+    $autoStartFile = $dockerManPaths['autostart-file'];
+    $allAutoStart  = @file($autoStartFile, FILE_IGNORE_NEW_LINES);
+    if ( $ContainerConfig["autostart"] && !in_array($Name, $allAutoStart) )
+    {
+      $allAutoStart[] = $Name;
+      file_put_contents($autoStartFile, implode(PHP_EOL, $allAutoStart).(count($allAutoStart)? PHP_EOL : ""));
+    }
+    $oldContainerDetails['State']['Running'] = $ContainerConfig["status"];
+  }
+
+  // determine if the container is still running
+  if (( isset($oldContainerDetails['State']['Running']) && $oldContainerDetails['State']['Running'] ) || empty($oldContainerDetails) )
+  {
+    // since container was already running, put it back it to a running state after update
+    $Cmd = str_replace('docker create ', 'docker run -d ', $Cmd);
+
+    // attempt graceful stop of container first
+    $DockerClient->stopContainer($Name);
+  }
+
+  // force kill container if still running after 10 seconds
+  $DockerClient->removeContainer($Name);
+
+  $descriptorspec = [
+    0 => ["pipe", "r"],
+    1 => ["pipe", "w"],
+    2 => ["pipe", "w"]
+  ];
+
+  $msg = "";
+  $proc = proc_open($Cmd." 2>&1", $descriptorspec, $pipes, '/', []);
+  while ($out = fgets( $pipes[1] )) {
+    $msg .= preg_replace("%[\t\n\x0B\f\r]+%", '', $out )."<br>";
+  }
+  $retval = proc_close($proc);
+
+  saveStatus($StatusFile, $title, $message, $retval ?  "The command failed. Error: $msg" : "The command finished successfully!");
+
+  // Clean info
+  $DockerClient->flushCaches();
+  $DockerTemplates->removeContainerInfo($Name);
+
+  $newImageID = $DockerClient->getImageID($Repository);
+
+  if ($oldImageID && $oldImageID != $newImageID)
+  {
+    // remove old orphan image since it's no longer used by this container
+    $DockerClient->removeImage($oldImageID);
+  }
+
+  sleep(3);
+}
+saveStatus($StatusFile, $title, "Docker Containers ${OutputTitle} finished successfully!", "", 0, "reload");
+?>

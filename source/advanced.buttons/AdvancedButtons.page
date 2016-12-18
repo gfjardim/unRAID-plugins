@@ -1,0 +1,534 @@
+Menu="Buttons:1"
+Cond="(pgrep('docker')!==false)"
+Link="nav-user"
+---
+<?
+$plugin = "advanced.buttons";
+?>
+<style type="text/css">
+  .dupdate{color: #0088CC;}
+
+  .pluginShadowBox
+  {
+    font-family:bitstream;
+    font-size:10px;
+    color:#505050;
+    margin:8px 8px;
+    padding:0;
+    height: 600px;
+    overflow-y: scroll;
+  }
+</style>
+<script type="text/javascript" src="/plugins/<?=$plugin;?>/assets/arrive.min.js"></script>
+<script type="text/javascript">
+  var AdvancedButtons        = new Object;
+  AdvancedButtons.Startable  = [];
+  AdvancedButtons.Stoppable  = [];
+  AdvancedButtons.Updatable  = [];
+  AdvancedButtons.Orphaned   = [];
+  AdvancedButtons.Unnamed    = [];
+  AdvancedButtons.ForceAll   = [];
+  AdvancedButtons.Saved      = [];
+  AdvancedButtons.Title      = [];
+  AdvancedButtons.Content    = [];
+  AdvancedButtons.Plugin     = [];
+  AdvancedButtons.Docker     = [];
+  AdvancedButtons.PluginsAll = [];
+  AdvancedButtons.PluginsUp  = [];
+  AdvancedButtons.PluginUpdating = null;
+  AdvancedButtons.Target     = null;
+  AdvancedButtons.Url        = "/plugins/<?=$plugin;?>/AdvancedButtons.php";
+  var buttonOutput  = "";
+
+
+  $(function()
+  {
+    getABDockerStatus("Docker");
+    getABPluginStatus("Plugin");
+
+    var target1 = $("#docker_containers").siblings("input[value='Check for Updates']");
+    var target2 = $("div[id='apps_icons'] > div[class~='Panel']:last").next();
+    if (target1.length)
+    {
+      AdvancedButtons.Target = target1;
+    }
+    else
+    {
+      AdvancedButtons.Target = target2;
+      dashboard = true;
+    }
+
+    if (AdvancedButtons.Target.length)
+    {
+      $.post(AdvancedButtons.Url,{action:'get_content'}, function(data)
+      {
+        $.each(data, function( k, v )
+        {
+          AdvancedButtons[k] = v;
+        });
+
+        disable = (Object.keys(AdvancedButtons.Startable).length && ! AdvancedButtons.DockerRunning) ? "started" : "disabled";
+        buttonOutput += "<button class='AdvancedButtons' onclick='dockerButtonCommand(\"start\");' "+disable+">";
+        buttonOutput += "<i class='fa fa-play "+disable+"'>&nbsp;&nbsp;</i>Start All Containers</button>";
+
+        disable = (Object.keys(AdvancedButtons.Stoppable).length && ! AdvancedButtons.DockerRunning) ? "stopped" : "disabled";
+        buttonOutput += "<button class='AdvancedButtons' onclick='dockerButtonCommand(\"stop\");' "+disable+">";
+        buttonOutput += "<i class='fa fa-square "+disable+"'>&nbsp;&nbsp;</i>Stop All Containers</button>";
+
+        disable = (Object.keys(AdvancedButtons.Updatable).length && ! AdvancedButtons.DockerRunning) ? "dupdate" : "disabled";
+        buttonOutput += "<button class='AdvancedButtons' onclick='dockerButtonCommand(\"update\");' "+disable+">";
+        buttonOutput += "<i class='fa fa-cloud-download "+disable+"'>&nbsp;&nbsp;</i>Install All Updates</button>";
+
+        if (typeof(dashboard) === 'undefined')
+        {
+          advanced = $.cookie("docker_listview_mode") == "advanced" ? "inline-block" : "none";
+
+          diff = $(AdvancedButtons.Saved).not(AdvancedButtons.ForceAll).get();
+          disable = (Object.keys(AdvancedButtons.Saved).length && ! AdvancedButtons.DockerRunning && diff.length) ? "started" : "disabled";
+          buttonOutput += "<button class='AdvancedButtons RestoreContainerState advanced' style='display:"+advanced+";' onclick='dockerButtonCommand(\"restore_containers\");' "+disable+">";
+          buttonOutput += "<i class='fa fa-undo  "+disable+"'>&nbsp;&nbsp;</i>Restore Previous Containers</button>";
+
+          disable = (Object.keys(AdvancedButtons.ForceAll).length && ! AdvancedButtons.DockerRunning) ? "started" : "disabled";
+          buttonOutput += "<button class='AdvancedButtons SaveContainerState advanced' style='display:"+advanced+";' onclick='dockerButtonSave(this);' "+disable+">";
+          buttonOutput += "<i class='fa fa-floppy-o "+disable+"'>&nbsp;&nbsp;</i>Save Current Containers</button>";
+
+          disable = (Object.keys(AdvancedButtons.Unnamed).length && ! AdvancedButtons.DockerRunning) ? "stopped" : "disabled";
+          buttonOutput += "<button class='AdvancedButtons advanced' style='display:"+advanced+";' onclick='dockerButtonUnnamed(this);' "+disable+">";
+          buttonOutput += "<i class='fa fa-remove "+disable+"'>&nbsp;&nbsp;</i>Remove Unnamed Containers</button>";
+
+          disable = (! AdvancedButtons.DockerRunning) ? "dupdate" : "disabled";
+          buttonOutput += "<button class='AdvancedButtons advanced' style='display:"+advanced+";' onclick='dockerButtonCommand(\"update_all_containers\");' "+disable+">";
+          buttonOutput += "<i class='fa fa-cloud-download "+disable+"'>&nbsp;&nbsp;</i>Force All Updates</button>";
+          
+          disable = (Object.keys(AdvancedButtons.Orphaned).length && ! AdvancedButtons.DockerRunning) ? "stopped" : "disabled";
+          buttonOutput += "<button class='AdvancedButtons advanced' style='display:"+advanced+";' onclick='dockerButtonOrphan(this);' "+disable+">";
+          buttonOutput += "<i class='fa fa-remove "+disable+"'>&nbsp;&nbsp;</i>Remove Orphaned Images</button>";
+        }
+        else
+        {
+          buttonOutput = "<div>"+buttonOutput+"</div>";
+        }
+        
+        AdvancedButtons.Target.after(buttonOutput);  
+
+      },"json");
+    }
+
+    // Plugins
+    var plugin_table = $("#plugin_table");
+    if (plugin_table.length)
+    {
+      $.post(AdvancedButtons.Url,{action:'get_content'}, function(data)
+      {
+        $.each(data, function( k, v )
+        {
+          AdvancedButtons[k] = v;
+        });
+      },"json");
+      buttonOutput  = "<span class='status vhshift'><button id='UpdateAllPlugins' style='margin-left:7px;' ";
+      buttonOutput += "onclick='pluginsUpdate(\"update\",AdvancedButtons.PluginsUp);' disabled>";
+      buttonOutput += "<i class='fa fa-cloud-download' disabled>&nbsp;&nbsp;</i>Update All Plugins</button></span>";
+      $(".tabs").append(buttonOutput);
+
+      plugin_table.arrive("tr",{onceOnly:false},function()
+      {
+        tr = $(this);
+        id = tr.find("td > input[type='button'][value='update']").prop("id");
+        if (! id )
+        {
+          console.log(tr);
+          return false;
+        }
+        plg = id.slice(0, -6) + ".plg";
+        AdvancedButtons.PluginsAll.pushUnique(plg);
+        if ( tr.find("span.red-text").length )
+        {
+          if (plg.length )
+          {
+            AdvancedButtons.PluginsUp.pushUnique(plg);
+
+            $("#UpdateAllPlugins").attr("disabled",false).find("i").addClass("dupdate");   
+          }
+        }
+
+        update = tr.find("input[type='button'][value='update']");
+        update.prop("onclick",null).on("click", function(){disableElement(this); pluginsUpdate('update', $(this).prop("id").slice(0, -6) + ".plg" );});
+        remove = tr.find("input[type='button'][value='remove']");
+        remove.prop("onclick",null).on("click", function(){disableElement(this); pluginsUpdate('remove', $(this).prop("id").slice(0, -6) + ".plg" );});
+
+      });
+    };
+
+    $(document).arrive("div#pluginShadowBox",{onceOnly:false},function(){$(this).scrollLock().animate({ scrollTop:$(this).height()+300 }, "fast");});
+
+    fnStart   = function(e){e.preventDefault();dockerButtonCommand('start',   $(this).parents("ul").attr("id").split("-")[2]);};
+    fnStop    = function(e){e.preventDefault();dockerButtonCommand('stop',    $(this).parents("ul").attr("id").split("-")[2]);};
+    fnRestart = function(e){e.preventDefault();dockerButtonCommand('restart', $(this).parents("ul").attr("id").split("-")[2]);};
+    fnUpdate  = function(e){e.preventDefault();dockerButtonCommand('update',  $(this).parents("ul").attr("id").split("-")[2]);};
+
+    $(document).arrive("ul[id*='dropdown-context'] li > a[id^='event-']", function()
+    {
+      id = $(this).prop("id");
+
+      switch($(this).text().trim())
+      {
+        case 'Start':   $(document).off('click', "#" + id); $(document).on("click", "#"+id, fnStart);   break;
+
+        case 'Stop':    $(document).off('click', "#" + id); $(document).on("click", "#"+id, fnStop);    break;
+
+        case 'Restart': $(document).off('click', "#" + id); $(document).on("click", "#"+id, fnRestart); break;
+
+        case 'Update':  $(document).off('click', "#" + id); $(document).on("click", "#"+id, fnUpdate);  break;
+
+        default:;
+      }
+    });
+
+    $("td.updatecolumn > a.exec").add("td.updatecolumn > div.advanced > a.exec").each(function()
+    {
+      fnUplink = function(){dockerButtonCommand('update', $(this).closest("tr").find("td > div[id^='context-']").prop("id").split("-")[1])};
+      $(this).prop("onclick",null).off().on("click",fnUplink);
+    });
+
+    $("form[name='plugin_install']").on("submit", function(e, o)
+    {
+      e.preventDefault();
+      plugin = $(this).find("#plugin_file").val().trim();
+      if (plugin.length)
+      {
+        disableElement($(this).find('*'));
+        pluginsUpdate('install', plugin);
+      }
+      return false;
+    });
+
+    $("form[name='plugin_install'] > input[type='Button']").prop('onclick',null).off().on("click", function()
+    {
+      $("form[name='plugin_install']").submit();
+    });
+
+    $(document).arrive("input[type='button'][onclick*='arg1=checkall']", function()
+    {
+      $(this).prop("onclick",null).on("click", function(){disableElement(this);pluginsUpdate('check',AdvancedButtons["PluginsAll"])});
+    });
+
+
+  });
+
+  Array.prototype.pushUnique = function(element)
+  {
+    if (this.indexOf(element) === -1) {
+      this.push(element);
+    }
+  }; 
+
+  function dockerButtonSave(el)
+  {
+    $(".AdvancedButtons").attr("disabled", true).find("i").removeClass("dupdate started stopped");
+    $.post(AdvancedButtons.Url, {action:"save_status"}, function(data)
+    {
+      $.jGrowl("Current Containers saved.", {
+        glue:   'after',
+        closeTemplate: '',
+        life : 2000,
+        sticky: false,
+        theme: 'default',
+        header: "Saving Current Containers",
+        close: function(){location.reload();},
+        beforeOpen: function(e){e.removeClass("ui-state-highlight");},
+        afterOpen:  function(e){e.siblings(':first').after(e);},
+      });
+    });
+  }
+
+  function dockerButtonUnnamed(el)
+  {
+    $(el).attr("disabled", true);
+    dockerButtonsAlert("Removing Unnamed Containers","Please wait while removing Docker unnamed containers...");
+    $.post(AdvancedButtons.Url, {action:"remove_container", "container[]":AdvancedButtons.Unnamed}, function()
+    {
+      swal.close();
+      location.reload();
+    });
+  }
+
+  function dockerButtonOrphan(el)
+  {
+    $(el).attr("disabled", true);
+    dockerButtonsAlert("Removing Orphaned Images","Please wait while removing Docker orphaned images...");
+    $.post(AdvancedButtons.Url, {action:"remove_image", "image[]":AdvancedButtons.Orphaned}, function()
+    {
+      swal.close();
+      location.reload();
+    });
+  }
+
+  function enableElement(el)
+  {
+    if (typeof(el) === "undefined")
+    {
+      el = $(".abDisabled");
+    }
+    $(el).prop("disabled", false).removeClass("abDisabled");
+  }
+
+  function disableElement(el)
+  {
+    $(el).prop("disabled", true).addClass("abDisabled");
+  }
+
+
+  function getABDockerStatus(type)
+  {
+    clearTimeout(timers["get_docker_status"]);
+
+    $.post(AdvancedButtons.Url, {action:"get_docker_status"}).always(function(data)
+    {
+      try
+      {
+        data = JSON.parse(data);
+      }
+      catch(err)
+      {
+        data = [];
+      }
+
+      if (data.title)
+      {
+        if ( typeof(AdvancedButtons["Docker"]["TitleTarget"]) === "undefined" || ( ! $(AdvancedButtons["Docker"]["TitleTarget"]).length && ! AdvancedButtons["Docker"]["Dismiss"] ) )
+        {
+          $.jGrowl(data.message+"<br>"+data.status, {
+            glue:   'after',
+            theme:  'default',
+            sticky: true,
+            header: data.title,
+            group:  "docker_buttons_theme",
+            beforeOpen:  function(e){e.removeClass("ui-state-highlight"); return !$('div.jGrowl-notify').hasClass("docker_buttons_theme");},
+            afterOpen:   function(e){e.siblings(':first').after(e);},
+            beforeClose: function(e){$.post(AdvancedButtons.Url, {action:'remove_status',"scope":"docker"}); AdvancedButtons["Docker"]["Dismiss"] = true;},
+          });
+          AdvancedButtons["Docker"]["TitleTarget"]   = 'div.jGrowl-notify.docker_buttons_theme > div.jGrowl-header';
+          AdvancedButtons["Docker"]["StatusTarget"]  = 'div.jGrowl-notify.docker_buttons_theme > div.jGrowl-message';
+        }
+        $( AdvancedButtons["Docker"]["TitleTarget"] ).html( data.title );
+        $( AdvancedButtons["Docker"]["StatusTarget"] ).html( data.message+"<br>"+data.status );
+      }
+
+      if (data.type == "reload" )
+      { 
+        var closeFunction = function(reload) {
+          $('div.jGrowl-notify.docker_buttons_theme > div.jGrowl-message' ).html("Reloading...");
+          target_parent = $('div.jGrowl-notify.docker_buttons_theme > div.jGrowl-message').parent().remove();
+          $.post(AdvancedButtons.Url, {action:'remove_status',"scope":"docker"}, function(){ if(reload) location.reload();});
+        };
+        reload = false;
+        if(AdvancedButtons.Target.length)
+        {
+          reload = true;
+        }
+        setTimeout(closeFunction, 1000, reload);
+      }
+      else
+      {
+        timeout = (data.type == "static" || data.type == "stopped") ? 5000 : 300;
+        // timeout = (data.type == "reload") ? 50000 : timeout;
+        timers["get_docker_status"] = setTimeout(getABDockerStatus, timeout);    
+      }
+    });
+  }
+
+
+  function getABPluginStatus()
+  {
+    clearTimeout(timers["get_plugin_status"]);
+
+    $.post(AdvancedButtons.Url, {action:"get_plugin_status"}).always(function(data)
+    {
+      try
+      {
+        data = JSON.parse(data);
+      }
+      catch(err)
+      {
+        data = [];
+      }
+
+      if (data.title)
+      {
+        if ( typeof(AdvancedButtons.Plugin.TitleTarget) === "undefined" || ( ! $(AdvancedButtons.Plugin.TitleTarget).length && ! AdvancedButtons.Plugin.Dismiss ) )
+        {
+          $.jGrowl(data.message+"<br>"+data.status, {
+            glue:   'after',
+            theme:  'default',
+            sticky: true,
+            header: data.title,
+            group:  "plugin_buttons_theme",
+            beforeOpen:  function(e)
+            {
+              e.removeClass("ui-state-highlight");
+              e.find(".jGrowl-header ~ div").css("cursor", "pointer").on("click", function()
+              {
+                AdvancedButtons.Plugin.TitleTarget   = "#sb-title-inner";
+                AdvancedButtons.Plugin.StatusTarget  = null;
+                AdvancedButtons.Plugin.ContentTarget = "#sb-player";
+                Shadowbox.open(
+                {
+                  content:"<div id='pluginShadowBox' class='pluginShadowBox'>" + AdvancedButtons.Plugin.Content + "</div>",
+                  player:'html',
+                  title:AdvancedButtons["Plugin"]["Title"],
+                  height:600,
+                  width:900,
+                  options:
+                  {
+                    modal:true,
+                    onClose:function(){AdvancedButtons.Plugin.TitleTarget = "";AdvancedButtons.Plugin.Dismiss = false; getABPluginStatus();},
+                  }
+                });
+                e.trigger('jGrowl.close');
+              });
+              return !$('div.jGrowl-notify').hasClass("plugin_buttons_theme");
+            },
+            afterOpen:   function(e){e.siblings(':first').after(e);},
+            beforeClose: function(e){$.post(AdvancedButtons.Url, {action:'remove_status',"scope":"plugin"}); AdvancedButtons.Plugin.Dismiss = true;},
+          });
+
+          AdvancedButtons.Plugin.TitleTarget   = 'div.jGrowl-notify.plugin_buttons_theme > div.jGrowl-header';
+          AdvancedButtons.Plugin.StatusTarget  = 'div.jGrowl-notify.plugin_buttons_theme > div.jGrowl-message';
+          AdvancedButtons.Plugin.ContentTarget = null;
+        }
+        AdvancedButtons.Plugin.Title    = data.title;
+        AdvancedButtons.Plugin.Status   = data.message+"<br>"+data.status;
+        AdvancedButtons.Plugin.Content  = data.content.replace(/(?:\r\n|\r|\n)/g, '<br />');
+        AdvancedButtons.Plugin.Content += "<p style='text-align:center;'><button class='logLine' type='button' onclick='top.Shadowbox.close()'>Background</button></p>";
+
+        $( AdvancedButtons.Plugin.TitleTarget  ).html( AdvancedButtons.Plugin.Title );
+        $( AdvancedButtons.Plugin.StatusTarget ).html( AdvancedButtons.Plugin.Status );
+        
+        iFrameBody = $( AdvancedButtons.Plugin.ContentTarget );
+        if (iFrameBody.length )
+        {
+          targetDiv = iFrameBody.find("div#pluginShadowBox");
+          if (! targetDiv.length )
+          {
+            targetDiv = iFrameBody.append("<div id='pluginShadowBox' class='pluginShadowBox'></div>");
+          }
+          if (AdvancedButtons.Plugin.Content != AdvancedButtons.Plugin.OldContent)
+          {
+            targetDiv.html( AdvancedButtons.Plugin.Content );
+            targetDiv.animate({ scrollTop:targetDiv.height()+300 }, "fast");
+            AdvancedButtons.Plugin.OldContent = AdvancedButtons.Plugin.Content;
+          }
+        }
+      }
+
+      if (data.type == "reload")
+      { 
+        var closeFunction = function(reload)
+        {
+          if (reload)
+          {
+            target_parent = $('div.jGrowl-notify.plugin_buttons_theme > div.jGrowl-message');
+          }
+          $.post(AdvancedButtons.Url, {action:'remove_status',"scope":"plugin",disable_reload:true}, function()
+          { 
+            if(reload)
+            {
+              wait  = "<tr><td></td><td colspan='4' style='text-align:center;'><br><i class='fa fa-spinner fa-spin icon'></i>";
+              wait += "<em>Please wait, retrieving plugin information ...</em></td><td></td><tr>";
+              $('#plugin_list').html(wait);
+                $.get('/plugins/dynamix.plugin.manager/include/ShowPlugins.php',{stale:''},function(_data)
+                {
+                  if (_data)
+                  {
+                    $('#plugin_list').html(_data);
+                  }
+                  $('.desc_readmore').readmore({maxHeight:58});
+                  enableElement();
+                  $( AdvancedButtons.Plugin.StatusTarget ).html( AdvancedButtons.Plugin.Status );
+                });
+              }
+            }
+          );
+        };
+        reload = false;
+        if($("#plugin_table").length)
+        {
+          $('div.jGrowl-notify.plugin_buttons_theme > div.jGrowl-message' ).html("Reloading...");
+          reload = true;
+        }
+        setTimeout(closeFunction, 2000, reload);
+      }
+      else
+      {
+        timeout = (data.type == "static" || data.type == "stopped") ? 5000 : 300;
+        timers.get_plugin_status = setTimeout(getABPluginStatus, timeout);    
+      }
+    });
+  }
+
+
+  function dockerButtonCommand(command, target)
+  {
+    target = (typeof(target) !== "undefined") ? [target] : null;
+
+    Opts = new Object;
+    $(".AdvancedButtons").attr("disabled", true).find("i").removeClass("dupdate started stopped");
+
+    switch(command)
+    {
+      case 'start': 
+        containers = target ? target : AdvancedButtons.Startable;
+        Opts = {action:"start", "container[]":containers};
+        break;
+
+      case 'stop':
+        containers = target ? target : AdvancedButtons.Stoppable;
+        Opts = {action:"stop", "container[]":containers};
+        break;
+
+      case 'restart':
+        containers = target ? target : AdvancedButtons.Stoppable;
+        Opts = {action:"restart", "container[]":containers};
+        break;
+
+      case 'update':
+        containers = target ? target : AdvancedButtons.Updatable;
+        Opts = {action:"update_containers", "container[]":containers};
+        break;
+
+      case 'update_all_containers':
+        containers = target ? target : AdvancedButtons.ForceAll;
+        Opts = {action:"update_containers", "container[]":containers};
+        break;
+
+      case 'remove_unnamed':
+        containers = target ? target : AdvancedButtons.Unnamed;
+        Opts = {action:"remove_container", "container[]":containers};
+        break;
+
+      case 'restore_containers':
+        containers = target ? target : AdvancedButtons.Saved;
+        Opts = {action:"restore_containers", "container[]":containers};
+        break;
+
+    }
+
+    AdvancedButtons["Docker"]["Dismiss"] = false;
+    $.post(AdvancedButtons.Url, Opts, function(data)
+    {
+      getABDockerStatus();
+    });
+  }
+
+  function pluginsUpdate(method, plugin)
+  {
+    plugins = (typeof(plugin) === "object") ? plugin : [ plugin ];
+    $("#UpdateAllPlugins").prop("disabled", true);
+
+    $.post(AdvancedButtons.Url, {action:"plugin_update", "plugin[]":plugins, method:method}, function(data)
+    {
+      AdvancedButtons["Plugin"]["Dismiss"] = false;
+      getABPluginStatus();
+    });
+  }
+</script>

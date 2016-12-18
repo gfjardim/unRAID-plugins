@@ -1,0 +1,101 @@
+#!/usr/bin/php
+<?PHP
+$plugin = "docker.buttons";
+require_once("/usr/local/emhttp/plugins/${plugin}/assets/common.php");
+
+class NewDockerClient extends DockerClient
+{
+  public function stopContainer($id) {
+    $this->getDockerJSON("/containers/${id}/stop?t=30", "POST", $code);
+    $this->flushCaches(); // flush cache
+    $codes = [
+      "204" => true, // No error
+      "304" => "Container already stopped",
+      "404" => "No such container",
+      "500" => "Server error"
+    ];
+    return (array_key_exists($code, $codes)) ? $codes[$code] : 'Error code '.$code;
+  }
+  public function restartContainer($id) {
+    $this->getDockerJSON("/containers/${id}/restart?t=30", "POST", $code);
+    $this->allContainersCache = null; // flush cache
+    $codes = [
+      "204" => true, // No error
+      "404" => "No such container",
+      "500" => "Server error"
+    ];
+    return (array_key_exists($code, $codes)) ? $codes[$code] : 'Error code '.$code;
+  }
+}
+
+$DockerClient = new NewDockerClient();
+$operation    = $argv[1];
+$arguments    = array_slice($argv, 2);
+$StatusFile   = $Files["DockerStat"];
+
+switch ($operation) {
+  case 'start': 
+    $strings = [ 'Starting', 'start', 'started' ];
+    $running = "1";
+    $function = "startContainer";
+    break;
+
+  case 'stop':
+    $strings = [ 'Stopping', 'stop', 'stopped' ];
+    $function = "stopContainer";
+    $running = "0";
+    break;
+
+  case 'restart':
+    $strings = [ 'Restarting', 'restart', 'restarted' ];
+    $function = "restartContainer";
+    $running = null;
+    break;
+}
+
+@touch($Files["DockerStat"]);
+
+$Containers = $DockerClient->getDockerContainers();
+
+$success = true;
+
+foreach ($arguments as $key => $Name)
+{
+  $message = sprintf("${strings[0]} '%s' (%s of %s)", $Name, ($key + 1), count($arguments));
+  $title = "${strings[0]} Docker Containers"; 
+
+  saveStatus($StatusFile, $title, $message, "${strings[0]}...");
+
+  $container = array_values( array_filter($Containers, function($ct) use ($Name) {return ($ct["Name"] == $Name);}) );
+
+  if (! count($container))
+  {
+    saveStatus($StatusFile, $title, $message, "'$Name' not found, skipping..." );
+    sleep(1);
+    $success = false;
+    continue;
+  }
+  $container = $container[0];
+  if ($running !== null && $container["Running"] == $running)
+  {
+    saveStatus($StatusFile, $title, $message, "'$Name' already ${strings[2]}, skipping..." );
+    sleep(1);
+    $success = false;
+    continue;
+  }
+  
+  $err = $DockerClient->{$function}($Name);
+  if ( $err === true )
+  {
+    saveStatus($StatusFile, $title, $message, "'$Name' ${strings[2]} successfully." );
+  }
+  else
+  {
+    saveStatus($StatusFile, $title, $message, "'$Name' ${strings[1]} failed: $err" );
+    $success = false;
+  }
+  sleep(1);
+}
+saveStatus($StatusFile, $title, "Docker Containers ${strings[2]} successfully!", "", 0, "reload");
+
+?>

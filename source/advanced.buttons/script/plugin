@@ -1,0 +1,94 @@
+#!/usr/bin/php
+<?PHP
+$plugin = "docker.buttons";
+require_once("/usr/local/emhttp/plugins/${plugin}/assets/common.php");
+$DockerClient = new DockerClient();
+$arguments    = array_slice($argv, 2);
+$StatusFile   = $Files["PluginStat"];
+$pluginMethod = $argv[1];
+
+function saveOutput(&$output, &$key, &$append)
+{
+  global $Files;
+  $output[$key] = $append;
+  // Set the key to next array position
+  $key = count( $output );
+  // Save the output to file
+  file_put_contents($Files['PluginOut'], implode("\n", $output ));
+  // reset chars
+  $append = "";
+  print_r($output);
+}
+
+@touch($Files["PluginOut"]);
+
+$outArray = [];
+$OutKey   = 0;
+
+switch ($pluginMethod) {
+  case 'install':
+    $strings = ["Installing", "Installation", "installed", ""];
+    break;
+
+  case 'update':
+    $strings = ["Updating", "Update", "updated", ""];
+    break;
+
+  case 'remove':
+    $strings = ["Removing", "Removal", "removed", ""];
+    break;
+
+  case 'check':
+    $strings = ["Checking", "Check", "checked", "Update"];
+    break;
+}
+
+
+foreach ($arguments as $key => $plug) {
+
+  $title = "${strings[0]} Plugins ${strings[3]}";
+  $message = sprintf("${strings[0]} '%s' (%s of %s)", basename($plug), ($key + 1), count($arguments));
+  saveStatus($StatusFile, $title, $message, "");
+
+  $command = "/usr/local/emhttp/plugins/dynamix.plugin.manager/scripts/plugin";
+  $command = "${command} '${pluginMethod}' ".escapeshellarg($plug)." 2>&1";
+  $proc = popen($command, 'r');
+
+  $chars = "";
+  while (! feof($proc))
+  {
+    // Get character
+    $char = fgetc( $proc );
+
+    // Detect newline
+    if (! is_bool(strpos("\n", $char)) )
+    {
+      // Update status
+      saveStatus($StatusFile, $title, $message, $chars);
+      // Update Output
+      saveOutput($outArray, $OutKey, $chars);
+    }
+    // detect carriage return
+    else if (! is_bool(strpos("\r", $char)) )
+    {
+      // Update status
+      saveStatus($StatusFile, $title, $message, $chars);
+      // Update Output
+      saveOutput($outArray, $OutKey, $chars);
+      // Set the key to the previous array position
+      $OutKey = count( $outArray ) - 1;
+    }
+    else
+    {
+      // Append character
+      $chars .= $char;
+    }
+  }
+  $a = "\n";
+  saveOutput($outArray, $OutKey, $a);
+}
+sleep(2);
+
+saveStatus($StatusFile, $title, "Plugin ${strings[1]} has finished!" , "", 0, "reload");
+
+?>
