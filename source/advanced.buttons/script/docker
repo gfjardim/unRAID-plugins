@@ -1,6 +1,6 @@
 #!/usr/bin/php
 <?PHP
-$plugin = "docker.buttons";
+$plugin = "advanced.buttons";
 require_once("/usr/local/emhttp/plugins/${plugin}/assets/common.php");
 
 class NewDockerClient extends DockerClient

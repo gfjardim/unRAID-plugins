@@ -1,6 +1,6 @@
 #!/usr/bin/php
 <?PHP
-$plugin = "docker.buttons";
+$plugin = "advanced.buttons";
 require_once("/usr/local/emhttp/plugins/${plugin}/assets/common.php");
 require_once("${docroot}/webGui/include/Helpers.php");
 $display = @parse_ini_file("/boot/config/plugins/dynamix/dynamix.cfg", true)["display"] ?: [];
