@@ -4,7 +4,7 @@
 <!ENTITY name      "docker.buttons">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2016.10.31">
+<!ENTITY version   "2016.12.19">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
 ]>
@@ -13,6 +13,9 @@
 
 <CHANGES>
 ##&name;
+
+###2016.12.19
+- Plugin deprecation
 
 ###2016.10.31
 - Fix: advanced buttons showing on Dashboard
@@ -23,42 +26,25 @@
 - Initial release.
 </CHANGES>
 
-<!--
-The 'plugin' package file.
--->
-<FILE Name="/boot/config/plugins/&name;/&name;-&version;.txz">
-<URL>&gitURL;/archive/&name;-&version;.txz</URL>
-</FILE>
-
-<!--
-The 'plugin' MD5 hash.
--->
-<FILE Name="/boot/config/plugins/&name;/&name;-&version;.md5">
-<URL>&gitURL;/archive/&name;-&version;.md5</URL>
-</FILE>
-
 <FILE Run="/bin/bash">
 <INLINE>
-# Verify and install plugin package
-sum1=$(/usr/bin/md5sum /boot/config/plugins/&name;/&name;-&version;.txz)
-sum2=$(/usr/bin/cat /boot/config/plugins/&name;/&name;-&version;.md5)
-if [ "${sum1:0:32}" != "${sum2:0:32}" ]; then
-  echo "Wrong 'plugin' md5 hash."
-  rm /boot/config/plugins/&name;/&name;-&version;.txz
-  rm /boot/config/plugins/&name;/&name;-&version;.md5
-  exit 1
-else
-  upgradepkg --install-new /boot/config/plugins/&name;/&name;-&version;.txz
-fi
+# Remove plugin related files
+rm -rf /boot/config/plugins/&name;
+find /var/log/packages -type f -iname "&name;-*" -delete
 
-# Cleaning old source files
-find /boot/config/plugins/&name;/ -type f -iname "&name;*.txz" ! -iname "*&version;*" -delete
-find /boot/config/plugins/&name;/ -type f -iname "&name;*.md5" ! -iname "*&version;*" -delete
+
+cat&lt;&lt;'EOT' &gt;/tmp/rm_docker_buttons.sh
+sleep 5
+/usr/local/sbin/plugin install '&gitURL;/plugins/advanced.buttons.plg'
+rm /tmp/rm_docker_buttons.sh
+EOT
+
+nohup bash /tmp/rm_docker_buttons.sh &gt;/dev/null 2&gt;&amp;1  &amp;
 
 echo ""
 echo "-----------------------------------------------------------"
-echo " &name; has been installed."
-echo " This plugin requires Dynamix webGui to operate"
+echo " &name; has been uninstalled."
+echo " "
 echo " Copyright 2015-2016, gfjardim"
 echo " Version: &version;"
 echo "-----------------------------------------------------------"
