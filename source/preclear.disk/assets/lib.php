@@ -1,4 +1,6 @@
 <?
+$state_file   = "/var/state/{$plugin}/state.ini";
+$log_file     = "/var/log/{$plugin}.log";
 
 class Preclear
   {
@@ -63,12 +65,16 @@ class Preclear
 
   public function Script()
   {
-    echo "var plugin = '".$this->plugin."';";
-    echo "var authors = ".json_encode($this->Authors()).";";
-    echo "var scope  = 'gfjardim';";
-    echo "var scripts = ".json_encode($this->scriptFiles()).";";\
-    printf("var zip = '%s-%s-%s.zip';", str_replace(' ','_',strtolower($var['NAME'])), $this->plugin, date('Ymd-Hi') );
+    echo "var plugin = '".$this->plugin."';\n";
+    echo "var authors = ".json_encode($this->Authors()).";\n";
+    echo "var scope  = 'gfjardim';\n";
+    echo "var scripts = ".json_encode($this->scriptFiles()).";\n";
+    printf("var zip = '%s-%s-%s.zip';\n", str_replace(' ','_',strtolower($var['NAME'])), $this->plugin, date('Ymd-Hi') );
     echo file_get_contents("plugins/".$this->plugin."/assets/javascript.js");
+    if (count(glob("/boot/config/plugins/${plugin}/*.stats")))
+    {
+      echo "$(function(){getOpenStatistics()});\n";
+    }
   }
 
 
@@ -206,7 +212,7 @@ class Preclear
       $size .= "<option value='65536 -b ".($x*16)."'>{$x}M</option>";
     }
 
-    for ($i=1; $i <= 5; $i++)
+    for ($i=1; $i <= 7; $i++)
     {
       $cycles2 .= "<option value='$i'>$i</option>";
     }

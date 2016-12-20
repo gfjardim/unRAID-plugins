@@ -41,6 +41,7 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
       setTimeout(cleanUp,4000);
     });
   }
+
 </script>
 <style>
   table.preclear {padding:0px;margin:-21px 0px 22px 0px;border-collapse:collapse;white-space:nowrap;}

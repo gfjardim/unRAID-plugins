@@ -3,7 +3,20 @@ LC_CTYPE=C
 export LC_CTYPE
 
 # Version
-version="0.8-beta"
+version="0.8.1-beta"
+
+# PID
+script_pid=$BASHPID
+
+# Redirect errors to log
+for arg in "$@"; do
+  if [ -b "$arg" ]; then
+    exec 2> >(while read err; do echo "preclear_disk_$(basename $arg)_${script_pid}: ${err}" >> /var/log/preclear.disk.log; done)
+    break
+  else
+    exec 2> >(while read err; do echo "preclear_disk_${script_pid}: ${err}" >> /var/log/preclear.disk.log; done)
+  fi
+done
 
 # Let's make sure some features are supported by BASH
 BV=$(echo $BASH_VERSION|tr '.' "\n"|grep -Po "^\d+"|xargs printf "%.2d\n"|tr -d '\040\011\012\015')
@@ -34,12 +47,12 @@ trim() {
 }
 
 debug() {
-  cat <<< "preclear_disk_$(basename $theDisk): $@" >> /var/log/preclear.disk.log
+  cat <<< "preclear_disk_$(basename $theDisk)_${script_pid}: $@" >> /var/log/preclear.disk.log
 }
 
 list_unraid_disks(){
   local _result=$1
-  i=0
+  local i=0
   # Get flash disk device
   unraid_disks[$i]=$(readlink -f /dev/disk/by-label/UNRAID|grep -Po "[^\d]*")
 
@@ -55,8 +68,15 @@ list_unraid_disks(){
   fi
 
   # Get array disks using super.dat id's
-  if [ -f "/boot/config/super.dat" ]
-  then
+  if [ -f "/var/local/emhttp/disks.ini " ]; then
+    while read line; do
+      disk="/dev/${line}"
+      if [ -n "$disk" ]; then
+        let "i+=1"
+        unraid_disks[$i]=$(readlink -f $disk)
+      fi
+    done < <(cat /var/local/emhttp/disks.ini | grep -Po 'device="\K[^"]*')
+  elif [ -f "/boot/config/super.dat" ]; then
     while read line ; do
       disk=$(find /dev/disk/by-id/ -type l -iname "*-${line}*" ! -iname "*-part*")
       if [ -n "$disk" ]; then
@@ -314,6 +334,7 @@ write_zeroes(){
   local write_bs=""
   local time_start
   local output=$1
+  local output_speed=$2
   local display_pid=0
   local write_bs=2097152
 
@@ -427,7 +448,7 @@ write_zeroes(){
     send_mail "Zeroing Finished on $disk_name." "Zeroing Finished on $disk_name. Cycle ${cycle} of ${cycles}." "$report_out"
   fi
 
-  eval "$output='$(timer $time_start) @ $average_speed MB/s'"
+  eval "$output='$(timer $time_start) @ $average_speed MB/s';$output_speed='$average_speed MB/s'"
 }
 
 format_number() {
@@ -478,6 +499,7 @@ read_entire_disk() {
   local disk_name=${disk_properties[name]}
   local disk_blocks=${disk_properties[blocks_512]}
   local output=$3
+  local output_speed=$4
   local pause=${all_files[pause]}
   local percent_read=0
   local read_stress=$read_stress
@@ -688,7 +710,7 @@ read_entire_disk() {
     send_mail "$read_type_s Finished on $disk_name." "$read_type_s Finished on $disk_name. Cycle ${cycle} of ${cycles}." "$report_out" &
   fi
 
-  eval "$output='$(timer $time_start) @ $average_speed MB/s'"
+  eval "$output='$(timer $time_start) @ $average_speed MB/s';$output_speed='$average_speed MB/s'"
   return 0
 }
 
@@ -806,7 +828,7 @@ display_status(){
   if [[ -n "$cycle_timer" ]]; then
     footer="Cycle elapsed time: $(timer $cycle_timer) | $footer"
   fi
-  footer_num=$(echo "$footer"|tr -d "${bold}"|tr -d "${norm}"|tr -d "${ul}"|tr -d "${noul}"|wc -m)
+  footer_num=$(echo "$footer"|sed -e "s|\*\{3\}\([^\*]*\)\*\{3\}|\1|g"|sed -e "s|\#\{3\}\([^\#]*\)\#\{3\}|\1|g"|wc -m)
   tput cup $(( $height + $hpos - 1)) $(( $width/2 - $footer_num/2  )) >> $out
   echo "$footer" >> $out
 
@@ -989,7 +1011,7 @@ output_smart() {
     fi
     sed -i "/^$attr/ s/$/|${msg}/" $nfinal
   done < <(cat $nfinal | tail -n +2)
-  cat $nfinal | column -t -s '|' -o '    '> $output
+  cat $nfinal | column -t -s '|' -o '  '> $output
   smartctl --health $type $device | sed -n '/SMART DATA SECTION/,/^$/p'| tail -n +2 | head -n 1 >> $output
 }
 
@@ -1012,6 +1034,79 @@ get_disk_temp() {
   done < <(smartctl --attributes $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" | \
            grep -v "ATTRIBUTE_NAME" | grep -v "^$" | awk '{ print $1 "|" $2 "|" $10}')
   echo "n/a"
+}
+
+save_report() {
+  local success=$1
+  local preread_speed=${2:-"n/a"}
+  local postread_speed=${3:-"n/a"}
+  local zeroing_speed=${4:-"n/a"}
+  local title="preclear_disk_${disk_properties[name]}_${script_pid}"
+  local size=$(numfmt --to=si --suffix=B --format='%1.f' ${disk_properties[size]})
+  local model=${disk_properties[model]}
+  local time=$(timer cycle_timer)
+  local smart=${disk_properties[smart_type]}
+  local form_out=${all_files[form_out]}
+
+  cat "/var/log/preclear.disk.log" | grep -Po "$title: \K.*" | tr '"' "'" | sed ':a;N;$!ba;s/\n/^n/g' > $form_out
+  local log=$(cat ${form_out})
+
+  cat <<EOF |sed "s/^  //g" > /boot/config/plugins/preclear.disk/$(( $RANDOM * 19318203981230 + 40 )).stats
+  [model]
+  entry = 'entry.1754350191'
+  title = "Disk Model"
+  value = "${model}"
+
+  [size]
+  entry = 'entry.1497914868'
+  title = "Disk Size"
+  value = "${size}"
+
+  [controller]
+  entry = 'entry.2002415860'
+  title = 'Disk Controller'
+  value = "${disk_properties[controller]}"
+
+  [preread]
+  entry  = 'entry.2099803197'
+  title = "Pre-Read Average Speed"
+  value = ${preread_speed}
+
+  [postread]
+  entry = 'entry.1410821652'
+  title = "Post-Read Average Speed"
+  value = "${postread_speed}"
+
+  [zeroing]
+  entry  = 'entry.1433994509'
+  title = "Zeroing Average Speed"
+  value = "${zeroing_speed}"
+
+  [cycles]
+  entry = "entry.765505609"
+  title = "Cycles"
+  value = "${cycles}"
+
+  [time]
+  entry = 'entry.899329837'
+  title = "Total Elapsed Time"
+  value = "${time}"
+
+  [smart]
+  entry = 'entry.1973215494'
+  title = "SMART Device Type"
+  value = ${smart}
+
+  [success]
+  entry = 'entry.704369346'
+  title = "Success"
+  value = "${success}"
+
+  [log]
+  entry = 'entry.1470248957'
+  title = "Log"
+  value = "${log}"
+EOF
 }
 
 ######################################################
@@ -1077,9 +1172,6 @@ fi
 
 theDisk=$(echo $1|xargs)
 
-# redirect errors to log
-exec 2> >(read err; echo "preclear_disk_$(basename $theDisk): ${err}" >> /var/log/preclear.disk.log)
-
 debug "Command: $command"
 
 # diff /tmp/.init <(set -o >/dev/null; set)
@@ -1100,6 +1192,10 @@ append disk_properties 'name'        $(basename ${disk_properties[device]} 2>/de
 append disk_properties 'parts'       $(grep -c "${disk_properties[name]}[0-9]" /proc/partitions 2>/dev/null)
 append disk_properties 'serial_long' $(udevadm info --query=property --name ${disk_properties[device]} 2>/dev/null|grep -Po 'ID_SERIAL=\K.*')
 append disk_properties 'serial'      $(udevadm info --query=property --name ${disk_properties[device]} 2>/dev/null|grep -Po 'ID_SERIAL_SHORT=\K.*')
+append disk_properties 'smart_type'  "default"
+
+disk_controller=$(udevadm info --query=property --name ${disk_properties[device]} | grep -Po 'DEVPATH.*0000:\K[^/]*')
+append disk_properties 'controller'  "$(lspci | grep -Po "${disk_controller}[^:]*: \K.*")"
 
 if [ "${disk_properties[parts]}" -gt 0 ]; then
   for part in $(seq 1 "${disk_properties[parts]}" ); do
@@ -1123,28 +1219,44 @@ for type in "" scsi ata auto sat,auto sat,12 usbsunplus usbcypress usbjmicron us
     type="-d $type"
   fi
   smartInfo=$(smartctl --all $type "$theDisk" 2>/dev/null)
-  if [[ $smartInfo == *"Reallocated_Sector_Ct"* ]]; then
-    disable_smart=n
+  if [[ $smartInfo == *"START OF INFORMATION SECTION"* ]]; then
     smart_type=$type
+
+    if [ -z "$type" ]; then
+      type='default'
+    fi
+
+    append disk_properties 'smart_type' "$type"
+
+    if [[ $smartInfo == *"Reallocated_Sector_Ct"* ]]; then
+      disable_smart=n
+    fi
+    
+    while read line ; do
+      if [[ $line =~ Model\ Family:\ (.*) ]]; then
+        append disk_properties 'family' "$(echo "${BASH_REMATCH[1]}"|xargs)"
+      elif [[ $line =~ Device\ Model:\ (.*) ]]; then
+        append disk_properties 'model' "$(echo "${BASH_REMATCH[1]}"|xargs)"
+      elif [[ $line =~ User\ Capacity:\ (.*) ]]; then
+        append disk_properties 'size_human' "$(echo "${BASH_REMATCH[1]}"|xargs)"
+      elif [[ $line =~ Firmware\ Version:\ (.*) ]]; then
+        append disk_properties 'firmware' "$(echo "${BASH_REMATCH[1]}"|xargs)"
+      elif [[ $line =~ Vendor:\ (.*) ]]; then
+        append disk_properties 'vendor' "$(echo "${BASH_REMATCH[1]}"|xargs)"
+      elif [[ $line =~ Product:\ (.*) ]]; then
+        append disk_properties 'product' "$(echo "${BASH_REMATCH[1]}"|xargs)"
+      fi
+    done < <(echo -n "$smartInfo")
+
+    if [ -z "${disk_properties[model]}" ] && [ -n "${disk_properties[vendor]}" ] && [ -n "${disk_properties[product]}" ]; then
+      append disk_properties 'model' "${disk_properties[vendor]} ${disk_properties[product]}"
+    fi
+
+    append disk_properties 'temp' "$(get_disk_temp $theDisk "$smart_type")"
+
     break
   fi
 done
-
-if [ "$disable_smart" != "y" ]; then
-  # Parse SMART info
-  while read line ; do
-    if [[ $line =~ Model\ Family:\ (.*) ]]; then
-      append disk_properties 'family' "$(echo "${BASH_REMATCH[1]}"|xargs)"
-    elif [[ $line =~ Device\ Model:\ (.*) ]]; then
-      append disk_properties 'model' "$(echo "${BASH_REMATCH[1]}"|xargs)"
-    elif [[ $line =~ User\ Capacity:\ (.*) ]]; then
-      append disk_properties 'size_human' "$(echo "${BASH_REMATCH[1]}"|xargs)"
-    elif [[ $line =~ Firmware\ Version:\ (.*) ]]; then
-      append disk_properties 'firmware' "$(echo "${BASH_REMATCH[1]}"|xargs)"
-    fi
-  done < <(echo -n "$smartInfo")
-  append disk_properties 'temp' "$(get_disk_temp $theDisk "$smart_type")"
-fi
 
 # Used files
 append all_files 'dir'           "/tmp/.preclear/${disk_properties[name]}"
@@ -1157,6 +1269,7 @@ append all_files 'stat'          "/tmp/preclear_stat_${disk_properties[name]}"
 append all_files 'smart_prefix'  "${all_files[dir]}/smart_"
 append all_files 'smart_final'   "${all_files[dir]}/smart_final"
 append all_files 'smart_out'     "${all_files[dir]}/smart_out"
+append all_files 'form_out'      "${all_files[dir]}/form_out"
 
 mkdir -p "${all_files[dir]}"
 trap "rm -rf ${all_files[dir]}" EXIT;
@@ -1300,7 +1413,6 @@ if [ "$write_disk_mbr" == "y" ]; then
   exit 0
 fi
 
-
 ######################################################
 ##                 PRECLEAR THE DISK                ##
 ######################################################
@@ -1343,7 +1455,7 @@ for cycle in $(seq $cycles); do
   # Do a preread if not skipped
   if [ "$skip_preread" != "y" ]; then
     display_status "Pre-Read in progress ..." ''
-    if read_entire_disk no-verify preread preread_average; then
+    if read_entire_disk no-verify preread preread_average preread_speed; then
       append display_step "Pre-read verification:|[${preread_average}] ***SUCCESS***"
       display_status
     else
@@ -1352,13 +1464,14 @@ for cycle in $(seq $cycles); do
       echo "${disk_properties[name]}|NY|Pre-read verification failed - Aborted|$$" > ${all_files[stat]}
       send_mail "FAIL! Pre-read verification failed." "FAIL! Pre-read verification failed." "Pre-read verification failed - Aborted" "" "alert"
       echo "--> FAIL: Result: Pre-Read failed."
+      save_report "No - Pre-read verification failed." "$preread_speed" "$postread_speed" "$zeroing_speed"
       exit 1
     fi
   fi
 
   # Zero the disk
   display_status "Zeroing in progress ..." ''
-  write_zeroes zeroing_average
+  write_zeroes zeroing_average zeroing_speed
   # sleep 10
   append display_step "Zeroing the disk:|[${zeroing_average}] ***SUCCESS***"
   # sleep 10
@@ -1378,20 +1491,21 @@ for cycle in $(seq $cycles); do
   if verify_mbr $theDisk; then
     append display_step "Verifying unRAID's Preclear signature:|***SUCCESS*** "
     display_status
-    echo "${disk_properties[name]}|NN|unRAID's signature on the MBR successful|$$" > ${all_files[stat]}
+    echo "${disk_properties[name]}|NN|unRAID's signature on the MBR is valid|$$" > ${all_files[stat]}
   else
     append display_step "Verifying unRAID's Preclear signature:|***FAIL*** "
     display_status
     echo -e "--> FAIL: unRAID's Preclear signature not valid. \n\n"
     echo "${disk_properties[name]}|NY|unRAID's signature on the MBR failed - Aborted|$$" > ${all_files[stat]}
     send_mail "FAIL! unRAID's signature on the MBR failed." "FAIL! unRAID's signature on the MBR failed." "unRAID's signature on the MBR failed - Aborted" "" "alert"
+    save_report  "No - unRAID's Preclear signature not valid." "$preread_speed" "$postread_speed" "$zeroing_speed"
     exit 1
   fi
 
   # Do a post-read if not skipped
   if [ "$skip_postread" != "y" ]; then
     display_status "Post-Read in progress ..." ""
-    if read_entire_disk verify postread postread_average; then
+    if read_entire_disk verify postread postread_average postread_speed; then
       append display_step "Post-Read verification:|[${postread_average}] ***SUCCESS*** "
       display_status
       echo "${disk_properties[name]}|NY|Post-Read verification successful|$$" > ${all_files[stat]}
@@ -1401,6 +1515,7 @@ for cycle in $(seq $cycles); do
       echo -e "--> FAIL: Post-Read verification failed. Your drive is not zeroed.\n\n"
       echo "${disk_properties[name]}|NY|Post-Read verification failed - Aborted|$$" > ${all_files[stat]}
       send_mail "FAIL! Post-Read verification failed." "FAIL! Post-Read verification failed." "Post-Read verification failed - Aborted" "" "alert"
+      save_report "No - Post-Read verification failed." "$preread_speed" "$postread_speed" "$zeroing_speed"
       exit 1
     fi
   fi
@@ -1481,3 +1596,6 @@ if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 1 ]; then
   report_out+="\\n\\n"
   send_mail "Preclear: PASS! Preclearing Disk ${disk_properties[name]} Finished!!!" "Preclear: PASS! Preclearing Disk ${disk_properties[name]} Finished!!! Cycle ${cycle} of ${cycles}" "${report_out}"
 fi
+
+save_report "Yes" "$preread_speed" "$postread_speed" "$zeroing_speed"
+
