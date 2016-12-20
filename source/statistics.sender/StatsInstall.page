@@ -1,0 +1,36 @@
+Menu="Buttons:10"
+Link="nav-user"
+---
+<?
+$plugin = "statistics.sender";
+$is_installed = is_file(glob("/boot/config/plugins/${plugin}/${plugin}*.txz")[0]);
+$is_dismissed = is_file("/boot/config/plugins/${plugin}/dismissed");
+$plugin_file  = "https://raw.githubusercontent.com/gfjardim/unRAID-plugins/master/plugins/${plugin}.plg";
+if (! $is_installed && ! $is_dismissed):
+?>
+<script type="text/javascript">
+  swal(
+  {
+    title: "Install Statistics Sender",
+    text: "This plugin is used to send statistics anonymously using Google Forms and TOR. <br>Don't worry, you will be asked before sending evert report.",
+    type: "info",
+    confirmButtonText: "Install",
+    showCancelButton: true,
+    cancelButtonText: "Cancel",
+    closeOnConfirm: true,
+    showLoaderOnConfirm: true,
+    html: true
+  },
+  function(isConfirm)
+  {
+    if(isConfirm)
+    {
+      openBox('/plugins/dynamix.plugin.manager/scripts/plugin&arg1=install&arg2=<?=$plugin_file;?>','Install Plugin',600,900,true);
+    }
+    else
+    {
+      $.post("/update.php",{"#file":"/boot/config/plugins/<?=$plugin;?>/dismissed"});
+    }
+  });
+</script>
+<?endif;?>

@@ -83,13 +83,12 @@ switch ($_REQUEST['action'])
       {
         shell_exec("echo report sent.|logger -t'${plugin}'");
         echo json_encode(["success"=>true]);
-        @unlink($file);
+        @rename($file,"${file}.sent");
       }
       else
       {
         shell_exec("echo send report failed.|logger -t'${plugin}'");
-        echo json_encode(["success"=>false]);
-        @unlink($file);
+        echo json_encode(["success"=>false,"output"=>"Error code: $exit_code"]);
       }
 
       // Stop TOR
@@ -100,7 +99,8 @@ switch ($_REQUEST['action'])
 
 
   case 'remove_statistics':
-    @unlink($_POST["file"]);
+    $file = $_POST["file"];
+    @rename($file,"${file}.dismiss");
     break;
 }
 

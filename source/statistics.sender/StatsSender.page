@@ -35,7 +35,7 @@ function getReports()
 
 ?>
 <script type="text/javascript">
-  var SenderURL = '/plugins/<?=$plugin;?>/ReportSender.php'
+  var SenderURL = '/plugins/<?=$plugin;?>/StatsSender.php'
 
   <?if (count(getReports())):?>
   $(function(){
@@ -62,7 +62,7 @@ function getReports()
         swal(
         {
           title: data.report.title,
-          text: data.report.text + "<br><br><span style='font-weight:bold;'>Statistics Info:</span> "+info+". ",
+          text: data.report.text + "<br><br><span style='font-weight:bold;'>Info:</span> "+info+". ",
           type: "warning",
           confirmButtonText: "Send",
           showCancelButton: true,
@@ -75,18 +75,18 @@ function getReports()
         {
           if (isConfirm)
           {
-            $.post(SenderURL,{action:'send_statistics',file:data.report.file},function()
+            $.post(SenderURL,{action:'send_statistics',file:data.report.file},function(data)
             {
               if (data.success === true)
               {
-                swal({title:"Report Sent",type:"success"},function()
+                swal({title:"Report Sent!",type:"success"},function()
                 {
                   setTimeout("getAvailableReports()", 1000);
                 });
               }
               else
               {
-                swal({title:"Send Report Failed",type:"error"},function()
+                swal({title:"Send Report Failed!",type:"error", text: data.output},function()
                 {
                   setTimeout("getAvailableReports()", 1000);
                 });
