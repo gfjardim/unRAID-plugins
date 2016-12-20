@@ -3,7 +3,7 @@ LC_CTYPE=C
 export LC_CTYPE
 
 # Version
-version="0.8.1-beta"
+version="0.8.2-beta"
 
 # PID
 script_pid=$BASHPID
@@ -1047,11 +1047,22 @@ save_report() {
   local time=$(timer cycle_timer)
   local smart=${disk_properties[smart_type]}
   local form_out=${all_files[form_out]}
+  local title="Preclear Disk<br>Send Anonymous Statistics"
+
+  local text="Send <span style='font-weight:bold;'>anonymous</span> statistics (using TOR) to the developer, helping on bug fixes, "
+  text+="performance tunning and usage statistics that will be open to the community. For detailed information, please visit the "
+  text+="<a href='http://lime-technology.com/forum/index.php?topic=39985.0'>support forum topic</a>."
 
   cat "/var/log/preclear.disk.log" | grep -Po "$title: \K.*" | tr '"' "'" | sed ':a;N;$!ba;s/\n/^n/g' > $form_out
   local log=$(cat ${form_out})
 
-  cat <<EOF |sed "s/^  //g" > /boot/config/plugins/preclear.disk/$(( $RANDOM * 19318203981230 + 40 )).stats
+  cat <<EOF |sed "s/^  //g" > /boot/config/plugins/preclear.disk/$(( $RANDOM * $RANDOM * $RANDOM )).sreport
+
+  [report]
+  url = "https://docs.google.com/forms/d/e/1FAIpQLSfIzz2yKJknHCrrpw3KmUjlNhbYabDoECq_vVe9XyFeE_gs-w/formResponse"
+  title = "${title}"
+  text = "${text}"
+
   [model]
   entry = 'entry.1754350191'
   title = "Disk Model"

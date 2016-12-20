@@ -71,10 +71,6 @@ class Preclear
     echo "var scripts = ".json_encode($this->scriptFiles()).";\n";
     printf("var zip = '%s-%s-%s.zip';\n", str_replace(' ','_',strtolower($var['NAME'])), $this->plugin, date('Ymd-Hi') );
     echo file_get_contents("plugins/".$this->plugin."/assets/javascript.js");
-    if (count(glob("/boot/config/plugins/${plugin}/*.stats")))
-    {
-      echo "$(function(){getOpenStatistics()});\n";
-    }
   }
 
 

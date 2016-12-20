@@ -12,7 +12,7 @@ if (! $is_installed && ! $is_dismissed):
   swal(
   {
     title: "Install Statistics Sender",
-    text: "This plugin is used to send statistics anonymously using Google Forms and TOR. <br>Don't worry, you will be asked before every report send.",
+    text: "This plugin is used to send statistics anonymously using Google Forms and TOR. <br>Don't worry, you will be asked before sending evert report.",
     type: "info",
     confirmButtonText: "Install",
     showCancelButton: true,

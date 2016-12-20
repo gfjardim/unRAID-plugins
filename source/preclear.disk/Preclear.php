@@ -653,52 +653,6 @@ switch ($_POST['action'])
       echo "true";
     }
     break;
-
-
-  case 'get_statistics':
-    $stats = glob("/boot/config/plugins/${plugin}/*.stats");
-    if (count($stats))
-    {
-      $stat = parse_ini_file($stats[0],true) ?: [];
-      $stat = array_merge(["file" => $stats[0]], $stat);
-      echo json_encode($stat);
-    }
-    break;
-
-
-  case 'send_statistics':
-    $file = $_POST["file"];
-    $stat = parse_ini_file($file,true) ?: [];
-    $form_url = "https://docs.google.com/forms/d/e/1FAIpQLSfIzz2yKJknHCrrpw3KmUjlNhbYabDoECq_vVe9XyFeE_gs-w/formResponse";
-
-    shell_exec("/etc/rc.d/rc.tor start 2>&1");
-
-    $myip = trim(shell_exec("curl -s http://whatismyip.akamai.com 2>/dev/null"));
-    $torip = trim(shell_exec("curl -s --socks5-hostname 127.0.0.1:9050 http://whatismyip.akamai.com 2>/dev/null"));
-
-    if ($myip == $torip)
-    {
-      exit();
-    }
-
-    shell_exec("echo sending preclear report:|logger -t'preclear_disk'");
-    shell_exec("echo my ip = $myip|logger -t'preclear_disk'");
-    shell_exec("echo tor ip = $torip|logger -t'preclear_disk'");
-    $cmd = "curl -s --socks5-hostname 127.0.0.1:9050 \"${form_url}\" -d ifq";
-    foreach ($stat as $key => $value)
-    {
-      $cmd .= " -d \"{$value['entry']}=".str_replace("^n", "\n", $value['value'])."\"";
-    }
-    shell_exec("$cmd 2>&1");
-    shell_exec("echo report sent.|logger -t'preclear_disk'");
-    shell_exec("/etc/rc.d/rc.tor stop 2>&1");
-    @unlink($file);
-    break;
-
-
-  case 'remove_statistics':
-    @unlink($_POST["file"]);
-    break;
 }
 
 
