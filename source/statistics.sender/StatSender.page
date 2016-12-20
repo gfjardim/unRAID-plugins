@@ -1,0 +1,106 @@
+Menu="Buttons:10"
+Link="nav-user"
+---
+<?
+$plugin = "statistics.sender";
+
+function lsDir($root, $ext = null)
+{
+  $iter = new RecursiveIteratorIterator(
+          new RecursiveDirectoryIterator($root,
+          RecursiveDirectoryIterator::SKIP_DOTS),
+          RecursiveIteratorIterator::SELF_FIRST,
+          RecursiveIteratorIterator::CATCH_GET_CHILD);
+  $paths = [];
+  foreach ($iter as $path => $fileinfo)
+  {
+    $fext = $fileinfo->getExtension();
+    if ($ext && ($ext != $fext))
+    {
+      continue;
+    }
+    if ($fileinfo->isFile())
+    {
+      $paths[] = $path;
+    }
+  }
+  return $paths;
+}
+
+
+function getReports()
+{
+  return lsDir("/boot/config/plugins/","sreport");
+}
+
+?>
+<script type="text/javascript">
+  var SenderURL = '/plugins/<?=$plugin;?>/ReportSender.php'
+
+  <?if (count(getReports())):?>
+  $(function(){
+    getAvailableReports();
+  });
+  <?endif;?>
+
+  function getAvailableReports()
+  {
+    $.post(SenderURL,{action:'get_statistics'}, function(data)
+    {
+      if (data)
+      {
+        info = [];
+        keys = Object.keys(data);
+        keys.splice(keys.indexOf('report'),1);
+        $.each(keys, function(k,v)
+        {
+          info.push(data[v]["title"]);
+        });
+        info = info.join(", ");
+        info = info.replace(/,([^,]*)$/,' and $1');
+
+        swal(
+        {
+          title: data.report.title,
+          text: data.report.text + "<br><br><span style='font-weight:bold;'>Statistics Info:</span> "+info+". ",
+          type: "warning",
+          confirmButtonText: "Send",
+          showCancelButton: true,
+          cancelButtonText: "Cancel",
+          closeOnConfirm: false,
+          showLoaderOnConfirm: true,
+          html: true
+        },
+        function(isConfirm)
+        {
+          if (isConfirm)
+          {
+            $.post(SenderURL,{action:'send_statistics',file:data.report.file},function()
+            {
+              if (data.success === true)
+              {
+                swal({title:"Report Sent",type:"success"},function()
+                {
+                  setTimeout("getAvailableReports()", 1000);
+                });
+              }
+              else
+              {
+                swal({title:"Send Report Failed",type:"error"},function()
+                {
+                  setTimeout("getAvailableReports()", 1000);
+                });
+              }  
+            },"json");
+          }
+          else
+          {
+            $.post(SenderURL,{action:'remove_statistics',file:data.report.file},function(data){
+              setTimeout("getAvailableReports()", 1000);
+            });;
+          }
+        }); 
+      }
+    }, "json");
+  }
+</script>
