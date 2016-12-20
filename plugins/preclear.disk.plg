@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2016.12.19">
+<!ENTITY version   "2016.12.20">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -15,7 +15,11 @@
 <CHANGES>
 ##&name;
 
-### 2016.12.19
+###2016.12.20
+- Fix: recompile TOR package, avoiding logrotate error
+- Add: TOR SlackBuild sources to GitHub
+
+###2016.12.19
 - Add: send statistics;
 - Add: tor package;
 - Fix: removed array disk appearing as unavailable disk;
@@ -205,11 +209,11 @@ The 'plugin' package MD5 hash.
 </FILE>
 
 <!--
-The 'tor-0.2.9.8-x86_64-1_SBo.tgz' package file.
+The 'tor-0.2.9.8-x86_64-2_unRAID.txz' package file.
 -->
-<FILE Name="/boot/config/plugins/&name;/tor-0.2.9.8-x86_64-1_SBo.tgz" Run="upgradepkg --install-new">
-<URL>&gitURL;/source/packages/tor-0.2.9.8-x86_64-1_SBo.tgz</URL>
-<MD5>956059d634de98e1f4d56af0d4372da2</MD5>
+<FILE Name="/boot/config/plugins/&name;/tor-0.2.9.8-x86_64-2_unRAID.txz" Run="upgradepkg --install-new">
+<URL>&gitURL;/source/packages/tor-0.2.9.8-x86_64-2_unRAID.txz</URL>
+<MD5>5c805294545b7ae498c753f3b436dace</MD5>
 </FILE>
 
 <!--
@@ -276,6 +280,7 @@ ln -sf /usr/local/emhttp/plugins/&name;/script/preclear.sh /usr/local/bin/precle
 # Cleaning old source files
 find /boot/config/plugins/&name;/ -type f -iname "&name;*.txz" ! -iname "*&version;*" -delete
 find /boot/config/plugins/&name;/ -type f -iname "&name;*.md5" ! -iname "*&version;*" -delete
+find /boot/config/plugins/&name;/ -type f -iname "tor-*.txz"   ! -iname "*0.2.9.8*"   -delete
 
 echo ""
 echo "-----------------------------------------------------------"

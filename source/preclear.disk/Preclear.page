@@ -79,6 +79,9 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
   </tbody>
 </table>
 <blockquote class='inline_help'>
-  <input type="button" value="Download Log" onclick="getlog()">
+  <input type="button" value="View Log" onclick="openWindow('/webGui/scripts/tail_log&arg1=preclear.disk.log','Log Information',600,900);">
+  <p>Click on the <strong>'View Log'</strong> button to view Preclear Disk log.</p>
+  
+  <input type="button" value="Download Log" onclick="getlog()">&nbsp;
   <p>Click on the <strong>'Download Log'</strong> button to download a compressed log of Preclear Disk plugin.</p>
 </blockquote>
