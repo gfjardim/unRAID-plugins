@@ -212,14 +212,6 @@ The 'plugin' package MD5 hash.
 </FILE>
 
 <!--
-The 'tor-0.2.9.8-x86_64-2_unRAID.txz' package file.
--->
-<FILE Name="/boot/config/plugins/&name;/tor-0.2.9.8-x86_64-2_unRAID.txz" Run="upgradepkg --install-new">
-<URL>&gitURL;/source/packages/tor-0.2.9.8-x86_64-2_unRAID.txz</URL>
-<MD5>5c805294545b7ae498c753f3b436dace</MD5>
-</FILE>
-
-<!--
 The 'post-install' script.
 -->
 <FILE Run="/bin/bash">
@@ -283,7 +275,7 @@ ln -sf /usr/local/emhttp/plugins/&name;/script/preclear.sh /usr/local/bin/precle
 # Cleaning old source files
 find /boot/config/plugins/&name;/ -type f -iname "&name;*.txz" ! -iname "*&version;*" -delete
 find /boot/config/plugins/&name;/ -type f -iname "&name;*.md5" ! -iname "*&version;*" -delete
-find /boot/config/plugins/&name;/ -type f -iname "tor-*.txz"   ! -iname "*0.2.9.8*"   -delete
+find /boot/config/plugins/&name;/ -type f -iname "tor-*.txz" -delete
 
 echo ""
 echo "-----------------------------------------------------------"
