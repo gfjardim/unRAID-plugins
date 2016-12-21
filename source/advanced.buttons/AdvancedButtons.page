@@ -93,7 +93,7 @@ $plugin = "advanced.buttons";
           buttonOutput += "<i class='fa fa-floppy-o "+disable+"'>&nbsp;&nbsp;</i>Save Current Containers</button>";
 
           disable = (Object.keys(AdvancedButtons.Unnamed).length && ! AdvancedButtons.DockerRunning) ? "stopped" : "disabled";
-          buttonOutput += "<button class='AdvancedButtons advanced' style='display:"+advanced+";' onclick='dockerButtonUnnamed(this);' "+disable+">";
+          buttonOutput += "<button class='AdvancedButtons advanced' style='display:"+advanced+";' onclick='dockerButtonCommand(\"remove_unnamed\");' "+disable+">";
           buttonOutput += "<i class='fa fa-remove "+disable+"'>&nbsp;&nbsp;</i>Remove Unnamed Containers</button>";
 
           disable = (! AdvancedButtons.DockerRunning) ? "dupdate" : "disabled";
@@ -101,7 +101,7 @@ $plugin = "advanced.buttons";
           buttonOutput += "<i class='fa fa-cloud-download "+disable+"'>&nbsp;&nbsp;</i>Force All Updates</button>";
           
           disable = (Object.keys(AdvancedButtons.Orphaned).length && ! AdvancedButtons.DockerRunning) ? "stopped" : "disabled";
-          buttonOutput += "<button class='AdvancedButtons advanced' style='display:"+advanced+";' onclick='dockerButtonOrphan(this);' "+disable+">";
+          buttonOutput += "<button class='AdvancedButtons advanced' style='display:"+advanced+";' onclick='dockerButtonCommand(\"remove_orphaned\");' "+disable+">";
           buttonOutput += "<i class='fa fa-remove "+disable+"'>&nbsp;&nbsp;</i>Remove Orphaned Images</button>";
         }
         else
@@ -134,13 +134,11 @@ $plugin = "advanced.buttons";
       {
         tr = $(this);
         id = tr.find("td > input[type='button'][value='update']").prop("id");
-        if (! id )
+        if ( id )
         {
-          console.log(tr);
-          return false;
+          plg = id.slice(0, -6) + ".plg";
+          AdvancedButtons.PluginsAll.pushUnique(plg);
         }
-        plg = id.slice(0, -6) + ".plg";
-        AdvancedButtons.PluginsAll.pushUnique(plg);
         if ( tr.find("span.red-text").length )
         {
           if (plg.length )
@@ -173,13 +171,9 @@ $plugin = "advanced.buttons";
       switch($(this).text().trim())
       {
         case 'Start':   $(document).off('click', "#" + id); $(document).on("click", "#"+id, fnStart);   break;
-
         case 'Stop':    $(document).off('click', "#" + id); $(document).on("click", "#"+id, fnStop);    break;
-
         case 'Restart': $(document).off('click', "#" + id); $(document).on("click", "#"+id, fnRestart); break;
-
         case 'Update':  $(document).off('click', "#" + id); $(document).on("click", "#"+id, fnUpdate);  break;
-
         default:;
       }
     });
@@ -436,27 +430,27 @@ $plugin = "advanced.buttons";
               wait  = "<tr><td></td><td colspan='4' style='text-align:center;'><br><i class='fa fa-spinner fa-spin icon'></i>";
               wait += "<em>Please wait, retrieving plugin information ...</em></td><td></td><tr>";
               $('#plugin_list').html(wait);
-                $.get('/plugins/dynamix.plugin.manager/include/ShowPlugins.php',{stale:''},function(_data)
+              $.get('/plugins/dynamix.plugin.manager/include/ShowPlugins.php',{stale:''}).always(function(data)
+              {
+                if (data)
                 {
-                  if (_data)
-                  {
-                    $('#plugin_list').html(_data);
-                  }
+                  $('#plugin_list').html(data);
                   $('.desc_readmore').readmore({maxHeight:58});
-                  enableElement();
-                  $( AdvancedButtons.Plugin.StatusTarget ).html( AdvancedButtons.Plugin.Status );
-                });
-              }
+                  $("#plugin_table").trigger("update",[true]);
+                }
+                enableElement();
+                $( AdvancedButtons.Plugin.StatusTarget ).html( AdvancedButtons.Plugin.Status );
+              });
             }
-          );
-        };
+          }
+        )};
         reload = false;
         if($("#plugin_table").length)
         {
           $('div.jGrowl-notify.plugin_buttons_theme > div.jGrowl-message' ).html("Reloading...");
           reload = true;
         }
-        setTimeout(closeFunction, 2000, reload);
+        setTimeout(closeFunction, 700, reload);
       }
       else
       {
@@ -504,6 +498,11 @@ $plugin = "advanced.buttons";
       case 'remove_unnamed':
         containers = target ? target : AdvancedButtons.Unnamed;
         Opts = {action:"remove_container", "container[]":containers};
+        break;
+
+      case 'remove_orphaned':
+        images = target ? target : AdvancedButtons.Orphaned;
+        Opts = {action:"remove_image", "image[]":images};
         break;
 
       case 'restore_containers':

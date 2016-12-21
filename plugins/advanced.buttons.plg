@@ -4,7 +4,7 @@
 <!ENTITY name      "advanced.buttons">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2016.12.18a">
+<!ENTITY version   "2016.12.21">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
 ]>
@@ -13,6 +13,9 @@
 
 <CHANGES>
 ##&name;
+
+###2016.12.21
+- Fix: minor bugfixes
 
 ###2016.12.18a
 - Fix: executable scripts pointing to invalid requirement.
