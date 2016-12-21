@@ -159,10 +159,10 @@ $plugin = "advanced.buttons";
 
     $(document).arrive("div#pluginShadowBox",{onceOnly:false},function(){$(this).scrollLock().animate({ scrollTop:$(this).height()+300 }, "fast");});
 
-    fnStart   = function(e){e.preventDefault();dockerButtonCommand('start',   $(this).parents("ul").attr("id").split("-")[2]);};
-    fnStop    = function(e){e.preventDefault();dockerButtonCommand('stop',    $(this).parents("ul").attr("id").split("-")[2]);};
-    fnRestart = function(e){e.preventDefault();dockerButtonCommand('restart', $(this).parents("ul").attr("id").split("-")[2]);};
-    fnUpdate  = function(e){e.preventDefault();dockerButtonCommand('update',  $(this).parents("ul").attr("id").split("-")[2]);};
+    fnStart   = function(e){e.preventDefault();dockerButtonCommand('start',   $(this).parents("ul").attr("id").replace("dropdown-context-", ""));};
+    fnStop    = function(e){e.preventDefault();dockerButtonCommand('stop',    $(this).parents("ul").attr("id").replace("dropdown-context-", ""));};
+    fnRestart = function(e){e.preventDefault();dockerButtonCommand('restart', $(this).parents("ul").attr("id").replace("dropdown-context-", ""));};
+    fnUpdate  = function(e){e.preventDefault();dockerButtonCommand('update',  $(this).parents("ul").attr("id").replace("dropdown-context-", ""));};
 
     $(document).arrive("ul[id*='dropdown-context'] li > a[id^='event-']", function()
     {
