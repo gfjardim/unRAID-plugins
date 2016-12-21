@@ -65,8 +65,9 @@ function getReports()
           text: data.report.text + "<br><br><span style='font-weight:bold;'>Info:</span> "+info+". ",
           type: "warning",
           confirmButtonText: "Send",
+          allowOutsideClick: false,
           showCancelButton: true,
-          cancelButtonText: "Cancel",
+          cancelButtonText: "Dismiss",
           closeOnConfirm: false,
           showLoaderOnConfirm: true,
           html: true
