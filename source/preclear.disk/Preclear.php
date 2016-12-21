@@ -528,15 +528,7 @@ switch ($_POST['action'])
       $test      = (isset($_POST['--test']) && $_POST['--test'] == "on") ? " --test" : "";
       $noprompt  = " --no-prompt";
 
-      if (!$op)
-      {
-        $cmd = "$script {$op}${notify}${frequency}{$cycles}{$pre_read}{$post_read}{$noprompt}{$test} /dev/$device";
-      }
-
-      else
-      {
-        $cmd = "$script {$op}${notify}{$frequency}{$test} /dev/$device";
-      }
+      $cmd = "$script {$op}${notify}${frequency}{$cycles}{$pre_read}{$post_read}{$noprompt}{$test} /dev/$device";
       
     }
 
@@ -551,7 +543,7 @@ switch ($_POST['action'])
       $post_read = (isset($_POST['-X']) && $_POST['-X'] == "on") ? " -X" : "";
       $fast_read = (isset($_POST['-f']) && $_POST['-f'] == "on") ? " -f" : "";
       $confirm   = (! $op || $op == " -z" || $op == " -V") ? TRUE : FALSE;
-      $test      = isset($TEST) ? " -s" : "";
+      $test      = (isset($_POST['-s']) && $_POST['-s'] == "on") ? " -s" : "";
 
       $capable  = array_key_exists("joel", $script_files) ? $Preclear->scriptCapabilities($script_files["joel"]) : [];
       $noprompt = (array_key_exists("noprompt", $capable) && $capable["noprompt"]) ? " -J" : "";

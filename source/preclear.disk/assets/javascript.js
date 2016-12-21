@@ -132,6 +132,7 @@ function startPreclear(device)
           opts["-w"]  = getVal(this, "-w");
           opts["-W"]  = getVal(this, "-W");
           opts["-f"]  = getVal(this, "-f");
+          opts["-s"]  = getVal(this, "-s");
         }
 
         else
@@ -211,25 +212,49 @@ function getVal(el, name)
 
 
 function toggleSettings(el) {
-  if ( el.selectedIndex > 0 && el.selectedIndex != 1 )
+  var value = $(el).val();
+  switch(value)
   {
-    $(el).parent().siblings('.clear_options').css('display','none');
-    $(el).parent().siblings('.test_options').css('display','none');
-    $(el).parent().siblings('.clear_verify_options').css('display','none');
-  }
+    case '0':
+      $(el).parent().siblings('.read_options').css('display',    'block');
+      $(el).parent().siblings('.write_options').css('display',   'block');
+      $(el).parent().siblings('.postread_options').css('display','block');
+      $(el).parent().siblings('.notify_options').css('display',  'block');
+      break;
 
-  else if ( el.selectedIndex == 1 )
-  {
-    $(el).parent().siblings('.clear_options').css('display','none');
-    $(el).parent().siblings('.test_options').css('display','none');
-    $(el).parent().siblings('.clear_verify_options').css('display','block');
-  }
+    case '--verify':
+    case '--signature':
+    case '-V':
+      $(el).parent().siblings('.write_options').css('display',   'none');
+      $(el).parent().siblings('.read_options').css('display',    'block');
+      $(el).parent().siblings('.postread_options').css('display','block');
+      $(el).parent().siblings('.notify_options').css('display',  'block');
+      break;
 
-  else
-  {
-    $(el).parent().siblings('.clear_options').css('display','block');
-    $(el).parent().siblings('.test_options').css('display','block');
-    $(el).parent().siblings('.clear_verify_options').css('display','block');
+    case '--erase':
+      $(el).parent().siblings('.write_options').css('display',   'none');
+      $(el).parent().siblings('.read_options').css('display',    'block');
+      $(el).parent().siblings('.postread_options').css('display','block');
+      $(el).parent().siblings('.notify_options').css('display',  'block');
+      $(el).parent().siblings('.cycles_options').css('display',  'block');
+      break;
+
+    case '-t':
+    case '-C 64':
+    case '-C 63':
+    case '-z':
+      $(el).parent().siblings('.read_options').css('display',    'none');
+      $(el).parent().siblings('.write_options').css('display',   'none');
+      $(el).parent().siblings('.postread_options').css('display','none');
+      $(el).parent().siblings('.notify_options').css('display',  'none');
+      break;
+
+    default:
+      $(el).parent().siblings('.read_options').css('display',    'block');
+      $(el).parent().siblings('.write_options').css('display',   'block');
+      $(el).parent().siblings('.postread_options').css('display','block');
+      $(el).parent().siblings('.notify_options').css('display',  'block');
+      break;
   }
 }
 

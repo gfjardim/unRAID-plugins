@@ -235,14 +235,14 @@ class Preclear
               <option value='-z'>Zero only the MBR</option>
             </select>
           </dd>
-          <div class='clear_options'>
+          <div class='write_options'>
             <dt>Cycles: </dt>
             <dd>
               <select name="-c"><?=$cycles;?></select>
             </dd>
           </div>
           <?if ( array_key_exists("notifications", $capabilities) && $capabilities["notifications"] ):?>
-          <div class="clear_verify_options">
+          <div class="notify_options">
             <dt>Notifications:</dt>
             <dd style="font-weight: normal;">
               <input type="checkbox" name="preclear_notify1" onchange="toggleFrequency(this, '-M');">Browser &nbsp;
@@ -260,13 +260,15 @@ class Preclear
               </dd>
           </div>
           <?endif;?>
-          <div class='clear_options'>
+          <div class='read_options'>
             <dt>Read size: </dt>
             <dd>
               <select name="-r">
                 <option value="0">Default</option><?=$size;?>
               </select>
             </dd>
+          </div>
+          <div class='write_options'>
             <dt>Write size: </dt>
             <dd>
               <select name="-w">
@@ -279,13 +281,19 @@ class Preclear
             </dd>
           </div>
           <?if ( array_key_exists("fast_postread", $capabilities) && $capabilities["fast_postread"] ):?>
-          <div class='test_options'>
+          <div class='postread_options'>
             <dt>Fast post-read verify: </dt>
             <dd>
               <input type="checkbox" name="-f" class="switch" >
             </dd>
           </div>
           <?endif;?>
+          <div class='inline_help'>
+            <dt>Enable Testing (just for debugging):</dt>
+            <dd>
+              <input type="checkbox" name="-s" class="switch" >
+            </dd>
+          </div>
         </dl>
       </div>
 
@@ -297,15 +305,16 @@ class Preclear
               <option value="0">Clear</option>
               <option value="--verify">Verify All the Disk</option>
               <option value="--signature">Verify MBR Only</option>
+              <option value="--erase">Erase All the Disk</option>
             </select>
           </dd>
-          <div class="clear_options">
+          <div class="write_options cycles_options">
             <dt>Cycles: </dt>
             <dd>
               <select name="--cycles"><?=$cycles2;?></select>
             </dd>
           </div>
-          <div class="clear_verify_options">
+          <div class="notify_options">
             <dt>Notifications:</dt>
             <dd style="font-weight: normal;">
               <input type="checkbox" name="preclear_notify1" onchange="toggleFrequency(this, '--frequency');">Browser &nbsp;
@@ -322,7 +331,7 @@ class Preclear
               </select>
             </dd>
           </div>
-          <div class="clear_options">
+          <div class="write_options">
             <dt>Skip Pre-Read: </dt>
             <dd>
               <input type="checkbox" name="--skip-preread" class="switch" >
