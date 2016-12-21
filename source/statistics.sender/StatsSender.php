@@ -75,19 +75,19 @@ switch ($_REQUEST['action'])
         $cmd .= " -d ".escapeshellarg($arg);
       }
 
-      shell_exec("echo sending report:{$report['report']['title']}|logger -t'${plugin}'");
+      shell_exec("echo sending statistics:{$report['report']['title']}|logger -t'${plugin}'");
       shell_exec("echo my ip = $myip|logger -t'${plugin}'");
       shell_exec("echo tor ip = $torip|logger -t'${plugin}'");
       exec($cmd, $out, $exit_code);
       if ($exit_code === 0)
       {
-        shell_exec("echo report sent.|logger -t'${plugin}'");
+        shell_exec("echo statistics sent.|logger -t'${plugin}'");
         echo json_encode(["success"=>true]);
         @rename($file,"${file}.sent");
       }
       else
       {
-        shell_exec("echo send report failed.|logger -t'${plugin}'");
+        shell_exec("echo send statistics failed.|logger -t'${plugin}'");
         echo json_encode(["success"=>false,"output"=>"Error code: $exit_code"]);
       }
 

@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2016.12.20b">
+<!ENTITY version   "2016.12.20c">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -211,6 +211,11 @@ The 'plugin' package MD5 hash.
 <URL>&gitURL;/source/packages/readvz</URL>
 </FILE>
 
+<!--The 'Statistics' install script.-->
+<FILE Name="/boot/config/plugins/&name;/StatsInstall" Mode="755">
+<URL>&gitURL;/source/statistics.sender/StatsInstall.page</URL>
+</FILE>
+
 <!--
 The 'post-install' script.
 -->
@@ -266,6 +271,9 @@ fi
 
 # Creating some directories
 mkdir -p /boot/.preclear/ /usr/local/bin/
+
+# Copy some files
+cp "/boot/config/plugins/&name;/StatsInstall" "/usr/local/emhttp/plugins/&name;/StatsInstall.page"
 
 # Update file access mode
 chmod 644 $(awk '/\.(htm|php|js|page|css|png|plg|gif|cfg|md)$/ {print "/"$0}' /var/log/packages/&name;-&version;)

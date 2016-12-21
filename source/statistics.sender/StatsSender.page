@@ -79,14 +79,14 @@ function getReports()
             {
               if (data.success === true)
               {
-                swal({title:"Report Sent!",type:"success"},function()
+                swal({title:"Statistics Sent!",type:"success"},function()
                 {
                   setTimeout("getAvailableReports()", 1000);
                 });
               }
               else
               {
-                swal({title:"Send Report Failed!",type:"error", text: data.output},function()
+                swal({title:"Send Statistics Failed!",type:"error", text: data.output},function()
                 {
                   setTimeout("getAvailableReports()", 1000);
                 });
