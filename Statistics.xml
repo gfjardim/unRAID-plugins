@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Containers>
+<Plugin>True</Plugin>
+<PluginURL>https://raw.githubusercontent.com/gfjardim/unRAID-plugins/master/plugins/statistics.sender.plg</PluginURL>
+<PluginAuthor>gfjardim</PluginAuthor>
+<Beta>False</Beta>
+<Category>Tools:System</Category>
+<Name>Statistics</Name>
+<Description>
+  This plugin is used to send statistics anonymously using Google Forms and TOR. Don't worry, you will be asked before sending every report.
+</Description>
+<Support></Support>
+<Icon>https://raw.githubusercontent.com/gfjardim/unRAID-plugins/master/source/statistics.sender/images/statistics.sender.png</Icon>
+</Containers>
