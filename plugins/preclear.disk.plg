@@ -276,7 +276,7 @@ fi
 mkdir -p /boot/.preclear/ /usr/local/bin/
 
 # Copy some files
-sed -e "s#@PLUGIN@#Preclear Diks#g" /boot/config/plugins/&name;/StatsInstall" "/usr/local/emhttp/plugins/&name;/StatsInstall.page"
+sed -e "s#@PLUGIN@#Preclear Diks#g" "/boot/config/plugins/&name;/StatsInstall" &gt; "/usr/local/emhttp/plugins/&name;/StatsInstall.page"
 
 # Update file access mode
 chmod 644 $(awk '/\.(htm|php|js|page|css|png|plg|gif|cfg|md)$/ {print "/"$0}' /var/log/packages/&name;-&version;)
