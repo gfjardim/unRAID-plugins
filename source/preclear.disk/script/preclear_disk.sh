@@ -11,10 +11,10 @@ script_pid=$BASHPID
 # Redirect errors to log
 for arg in "$@"; do
   if [ -b "$arg" ]; then
-    exec 2> >(while read err; do echo "preclear_disk_$(basename $arg)_${script_pid}: ${err}" >> /var/log/preclear.disk.log; done)
+    exec 2> >(while read err; do echo "preclear_disk_$(basename $arg)_${script_pid}: ${err}" >> /var/log/preclear.disk.log; echo "${err}"; done; >&2)
     break
   else
-    exec 2> >(while read err; do echo "preclear_disk_${script_pid}: ${err}" >> /var/log/preclear.disk.log; done)
+    exec 2> >(while read err; do echo "preclear_disk_${script_pid}: ${err}" >> /var/log/preclear.disk.log; echo "${err}"; done)
   fi
 done
 
@@ -445,10 +445,21 @@ write_disk(){
     fi
   done
 
+  wait $dd_pid;
+  dd_exit=$?
+
   # Wait last display refresh
   while kill -0 $display_pid &>/dev/null; do
     sleep 1
   done
+
+  # Exit if dd failed
+  if [ "$dd_exit" -eq 0 ]; then
+    debug "${write_type_s}: $dd_exit"
+  else
+    debug "${write_type_s}: dd command failed, exit code: $dd_exit"
+    return 1
+  fi
 
   # Send final notification
   if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 3 ] ; then
@@ -701,10 +712,21 @@ read_entire_disk() {
     fi
   done
 
+  wait $dd_pid;
+  dd_exit=$?
+
   # Wait last display refresh
   while kill -0 $display_pid &>/dev/null; do
     sleep 1
   done
+
+  # Exit if dd failed
+  if [ "$dd_exit" -eq 0 ]; then
+    debug "${read_type_s}: $dd_exit"
+  else
+    debug "${read_type_s}: dd command failed, exit code: $dd_exit"
+    return 1
+  fi
 
   # Fail if not zeroed or error
   if grep -q "differ" "$cmp_output" &>/dev/null; then
@@ -1450,8 +1472,12 @@ all_timer=$(timer)
 
 if [ "$erase_disk" == "y" ]; then
   op_title="Erase"
+  title_write="Erasing"
+  write_op="erase"
 else
   op_title="Preclear"
+  title_write="Zeroing"
+  write_op="zero"
 fi
 
 for cycle in $(seq $cycles); do
@@ -1501,23 +1527,27 @@ for cycle in $(seq $cycles); do
       display_status
       echo "${disk_properties[name]}|NY|Pre-read verification failed - Aborted|$$" > ${all_files[stat]}
       send_mail "FAIL! Pre-read verification failed." "FAIL! Pre-read verification failed." "Pre-read verification failed - Aborted" "" "alert"
-      echo "--> FAIL: Result: Pre-Read failed."
+      echo -e "--> FAIL: Result: Pre-Read failed.\n\n"
       save_report "No - Pre-read verification failed." "$preread_speed" "$postread_speed" "$write_speed"
       exit 1
     fi
   fi
 
-  if [ "$erase_disk" == "y" ]; then
-    # Erase the disk
-    display_status "Erasing in progress ..." ''
-    write_disk erase write_average write_speed
-    append display_step "Erasing the disk:|[${write_average}] ***SUCCESS***"
+  # Erase/Zero the disk
+  display_status "${title_write} in progress ..." ''
+  if write_disk $write_op write_average write_speed; then
+    append display_step "${title_write} the disk:|[${write_average}] ***SUCCESS***"
   else
-    # Zero the disk
-    display_status "Zeroing in progress ..." ''
-    write_disk zero write_average write_speed
-    append display_step "Zeroing the disk:|[${write_average}] ***SUCCESS***"
+    append display_step "${title_write} the disk:|${bold}FAIL${norm}"
+    display_status
+    echo "${disk_properties[name]}|NY|${title_write} the disk failed - Aborted|$$" > ${all_files[stat]}
+    send_mail "FAIL! ${title_write} the disk failed." "FAIL! ${title_write} the disk failed." "${title_write} the disk failed - Aborted" "" "alert"
+    echo -e "--> FAIL: Result: ${title_write} the disk failed.\n\n"
+    save_report "No - ${title_write} the disk failed." "$preread_speed" "$postread_speed" "$write_speed"
+    exit 1
+  fi
 
+  if [ "$erase_disk" != "y" ]; then
     # Write unRAID's preclear signature to the disk
     display_status "Writing unRAID's Preclear signature to the disk ..." ''
     echo "${disk_properties[name]}|NN|Writing unRAID's Preclear signature|$$" > ${all_files[stat]}
