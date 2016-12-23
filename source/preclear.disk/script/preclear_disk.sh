@@ -349,26 +349,23 @@ write_disk(){
   else
     write_type_s="Erasing"
     device="/dev/urandom"
-    dd_cmd="openssl enc -aes-256-ctr -pass pass:\"$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 -w 0)\" -nosalt < /dev/zero 2>/dev/null | "
-    dd_cmd+="dd of=${disk} bs=${write_bs} seek=1 iflag=fullblock"
+    dd_cmd="openssl enc -aes-256-ctr -pass pass:\"$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 -w 0)\" -nosalt < /dev/zero 2>/dev/null | \
+            dd of=${disk} bs=${write_bs} seek=1 iflag=fullblock"
   fi
 
   if [ "$short_test" == "y" ]; then
     total_bytes=$(($write_bs * 2048))
+    dd_cmd="${dd_cmd} count=$(($total_bytes / $write_bs)) ${dd_flags}"
   else
     total_bytes=${disk_properties[size]}
+    dd_cmd="${dd_cmd} ${dd_flags}"
   fi
   tb_formatted=$(format_number $total_bytes)
 
   # Empty the MBR partition table
-  dd if=$device bs=512 count=100 of=$disk >/dev/null 2>&1
+  dd if=$device bs=512 count=4096 of=$disk >/dev/null 2>&1
   blockdev --rereadpt $disk
 
-  if [ "$short_test" == "y" ]; then
-    dd_cmd="${dd_cmd} count=$(($total_bytes / $write_bs)) ${dd_flags}"
-  else
-    dd_cmd="${dd_cmd} ${dd_flags}"
-  fi
   debug "${write_type_s}: $dd_cmd"
   eval "$dd_cmd 2>$dd_output &"
   dd_pid=$!
@@ -712,21 +709,10 @@ read_entire_disk() {
     fi
   done
 
-  wait $dd_pid;
-  dd_exit=$?
-
   # Wait last display refresh
   while kill -0 $display_pid &>/dev/null; do
     sleep 1
   done
-
-  # Exit if dd failed
-  if [ "$dd_exit" -eq 0 ]; then
-    debug "${read_type_s}: $dd_exit"
-  else
-    debug "${read_type_s}: dd command failed, exit code: $dd_exit"
-    return 1
-  fi
 
   # Fail if not zeroed or error
   if grep -q "differ" "$cmp_output" &>/dev/null; then
