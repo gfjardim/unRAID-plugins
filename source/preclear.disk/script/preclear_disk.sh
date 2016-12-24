@@ -3,7 +3,7 @@ LC_CTYPE=C
 export LC_CTYPE
 
 # Version
-version="0.8.2-beta"
+version="0.8.3-beta"
 
 # PID
 script_pid=$BASHPID
@@ -11,10 +11,10 @@ script_pid=$BASHPID
 # Redirect errors to log
 for arg in "$@"; do
   if [ -b "$arg" ]; then
-    exec 2> >(while read err; do echo "preclear_disk_$(basename $arg)_${script_pid}: ${err}" >> /var/log/preclear.disk.log; echo "${err}"; done; >&2)
+    exec 2> >(while read err; do echo "$(date +"%b %d %T" ) preclear_disk_$(basename $arg)_${script_pid}: ${err}" >> /var/log/preclear.disk.log; echo "${err}"; done; >&2)
     break
   else
-    exec 2> >(while read err; do echo "preclear_disk_${script_pid}: ${err}" >> /var/log/preclear.disk.log; echo "${err}"; done)
+    exec 2> >(while read err; do echo "$(date +"%b %d %T" ) preclear_disk_${script_pid}: ${err}" >> /var/log/preclear.disk.log; echo "${err}"; done)
   fi
 done
 
@@ -47,7 +47,7 @@ trim() {
 }
 
 debug() {
-  cat <<< "preclear_disk_$(basename $theDisk)_${script_pid}: $@" >> /var/log/preclear.disk.log
+  cat <<< "$(date +"%b %d %T" ) preclear_disk_$(basename $theDisk)_${script_pid}: $@" >> /var/log/preclear.disk.log
 }
 
 list_unraid_disks(){
@@ -367,7 +367,7 @@ write_disk(){
   blockdev --rereadpt $disk
 
   debug "${write_type_s}: $dd_cmd"
-  eval "$dd_cmd 2>$dd_output &"
+  $dd_cmd 2>$dd_output &
   dd_pid=$!
   debug "${write_type_s}: dd pid [$dd_pid]"
 
@@ -380,7 +380,7 @@ write_disk(){
   fi
 
   # if we are interrupted, kill the background zeroing of the disk.
-  trap 'kill -9 $dd_pid 2>/dev/null;exit' 2
+  trap 'kill -9 $dd_pid 2>/dev/null;exit' EXIT
 
   # Send initial notification
   if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 3 ] ; then
@@ -389,7 +389,7 @@ write_disk(){
     next_notify=25
   fi
 
-  while kill -0 $dd_pid >/dev/null 2>&1; do
+  while kill -0 $dd_pid &>/dev/null; do
     sleep 3 && kill -USR1 $dd_pid 2>/dev/null && sleep 2
     # ensure bytes_wrote is a number
     bytes_dd=$(awk 'END{print $1}' $dd_output|xargs)
@@ -445,6 +445,13 @@ write_disk(){
   wait $dd_pid;
   dd_exit=$?
 
+  bytes_dd=$(awk 'END{print $1}' $dd_output|xargs)
+  if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
+    bytes_wrote=$bytes_dd
+  fi
+
+  debug "${write_type_s}: dd - wrote ${bytes_wrote} of ${total_bytes}."
+
   # Wait last display refresh
   while kill -0 $display_pid &>/dev/null; do
     sleep 1
@@ -455,7 +462,6 @@ write_disk(){
     debug "${write_type_s}: $dd_exit"
   else
     debug "${write_type_s}: dd command failed, exit code: $dd_exit"
-    return 1
   fi
 
   # Send final notification
@@ -589,7 +595,6 @@ read_entire_disk() {
     for i in $(seq 5); do
       dd_pid=$(ps --ppid $block_pid | awk '/dd/{print $1}')
       if [ -n "$dd_pid" ]; then
-        debug "${read_type_s}: dd pid [$dd_pid]"
         break;
       else
         sleep 1
@@ -607,6 +612,8 @@ read_entire_disk() {
     $dd_cmd > $dd_output 2>&1 &
     dd_pid=$!
   fi
+
+  debug "${read_type_s}: dd pid [$dd_pid]"
 
   sleep 1
 
@@ -713,6 +720,13 @@ read_entire_disk() {
   while kill -0 $display_pid &>/dev/null; do
     sleep 1
   done
+
+  bytes_dd=$(awk 'END{print $1}' $dd_output|xargs)
+  if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
+    bytes_read=$bytes_dd
+  fi
+
+  debug "${read_type_s}: dd - read ${bytes_read} of ${total_bytes}."
 
   # Fail if not zeroed or error
   if grep -q "differ" "$cmp_output" &>/dev/null; then
@@ -1208,6 +1222,7 @@ fi
 theDisk=$(echo $1|xargs)
 
 debug "Command: $command"
+debug "Preclear Disk Version: ${version}"
 
 # diff /tmp/.init <(set -o >/dev/null; set)
 # exit 0
@@ -1241,9 +1256,11 @@ else
   append disk_properties 'start_sector' "0"
 fi
 
+
 # Disable read_stress if preclearing a SSD
 discard=$(cat "/sys/block/${disk_properties[name]}/queue/discard_max_bytes")
 if [ "$discard" -gt "0" ]; then
+  debug "Disk ${theDisk} is a SSD, disabling head stress test." 
   read_stress=n
 fi
 
@@ -1255,15 +1272,19 @@ for type in "" scsi ata auto sat,auto sat,12 usbsunplus usbcypress usbjmicron us
   fi
   smartInfo=$(smartctl --all $type "$theDisk" 2>/dev/null)
   if [[ $smartInfo == *"START OF INFORMATION SECTION"* ]]; then
+
     smart_type=$type
 
     if [ -z "$type" ]; then
       type='default'
     fi
 
+    debug "S.M.A.R.T. info type: ${type}"
+
     append disk_properties 'smart_type' "$type"
 
     if [[ $smartInfo == *"Reallocated_Sector_Ct"* ]]; then
+      debug "S.M.A.R.T. attrs type: ${type}"
       disable_smart=n
     fi
     
@@ -1353,6 +1374,7 @@ if [ -f "${all_files[pid]}" ]; then
   pid=$(cat ${all_files[pid]})
   if [ -e "/proc/${pid}" ]; then
     echo "An instance of Preclear for disk '$theDisk' is already running."
+    debug "An instance of Preclear for disk '$theDisk' is already running."
     trap '' EXIT
     exit 1
   else
