@@ -1,4 +1,11 @@
 <?
+#load emhttp variables if needed.
+$docroot = $docroot ?: @$_SERVER['DOCUMENT_ROOT'] ?: '/usr/local/emhttp';
+if (!isset($var)) {
+  if (!is_file("$docroot/state/var.ini")) shell_exec("wget -qO /dev/null localhost:$(lsof -nPc emhttp | grep -Po 'TCP[^\d]*\K\d+')");
+  $var = @parse_ini_file("$docroot/state/var.ini");
+}
+
 $state_file   = "/var/state/{$plugin}/state.ini";
 $log_file     = "/var/log/{$plugin}.log";
 

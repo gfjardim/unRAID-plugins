@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2016.12.24">
+<!ENTITY version   "2017.01.27">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,9 @@
 
 <CHANGES>
 ##&name;
+
+###2017.01.27
+- Fix: comply with unRAID's XSS and CSRF hardening
 
 ###2016.12.24
 - Add: increase verbosity of script
@@ -286,6 +289,7 @@ mkdir -p /boot/.preclear/ /usr/local/bin/
 
 # Copy some files
 sed -e "s#@PLUGIN@#Preclear Disks#g" "/boot/config/plugins/&name;/StatsInstall" &gt; "/usr/local/emhttp/plugins/&name;/StatsInstall.page"
+touch /var/log/preclear.disk.log
 
 # Update file access mode
 chmod 644 $(awk '/\.(htm|php|js|page|css|png|plg|gif|cfg|md)$/ {print "/"$0}' /var/log/packages/&name;-&version;)

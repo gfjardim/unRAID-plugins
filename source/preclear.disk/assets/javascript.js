@@ -369,3 +369,56 @@ function rmReport(file, el)
 
   });
 }
+
+
+function addButtonTab(Button, Target, autoHide, Append)
+{
+  var Tab   = $("input[name$=tabs] + label:contains('"+Target+"')").closest("div.tab");
+  var Title = $("div#title *:contains('"+Target+"')").closest("div");
+  if (typeof(autoHide) == "undefined") autoHide = true;
+  if (typeof(Append)   == "undefined") Append   = true;
+
+  if (! Tab.length && Title.length > 0)
+  {
+    var element = "<span class='status vhshift' style=''>"+Button+"&nbsp;</span>";
+    if (Append)
+    {
+      Title.append(element);
+    }
+    else
+    {
+      Title.prepend(element);
+    }
+    Title.append();
+  }
+  else if (Tab.length)
+  {
+    var TabId = Tab.find("input[type=radio]").attr("id");
+    var date = new Date();
+    var element = "<span id='"+elementId+"' class='status vhshift' style='display: none;'>"+Button+"&nbsp;</span>";
+    var elementId = 'event-' + date.getTime() * Math.floor(Math.random()*100000);
+
+    if (Append)
+    {
+      $('.tabs').append(element);
+    }
+    else
+    {
+      $('.tabs').prepend(element);
+    }
+
+    $('#'+TabId).bind({click:function(){$('#'+elementId).show();}});
+
+    if ($('#'+TabId).is(':checked') || ! autoHide) {
+      $('#'+elementId).show();
+    }
+
+    $("input[name$=tabs]").each(function()
+    {
+      if ( $(this).attr("id") != TabId && autoHide )
+      {
+        $(this).bind({click:function(){$('#'+elementId).hide();}});
+      }
+    });
+  }
+}

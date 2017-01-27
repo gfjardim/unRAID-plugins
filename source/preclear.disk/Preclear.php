@@ -667,10 +667,11 @@ switch ($_GET['action']) {
       var timers = {};
       var URL = "/plugins/<?=$plugin;?>/Preclear.php";
       var device = "<?=$device;?>";
+
       function get_preclear()
       {
         clearTimeout(timers.preclear);
-        $.post(URL,{action:"get_preclear",device:device},function(data) {
+        $.post(URL,{action:"get_preclear",device:device,csrf_token:"<?=$var['csrf_token'];?>"},function(data) {
           if (data.content)
           {
             $("#data_content").html(data.content);
@@ -681,13 +682,13 @@ switch ($_GET['action']) {
       }
       function hit_yes(device)
       {
-        $.post(URL,{action:"hit_yes",device:device});
+        $.post(URL,{action:"hit_yes",device:device,csrf_token:"<?=$var['csrf_token'];?>"});
       }
       $(function() {
         document.title='Preclear for disk /dev/<?=$device;?> ';
         get_preclear();
+        new Clipboard('.btn');
       });
-      new Clipboard('.btn');
     </script>
     <div style="text-align: center;"><button class="btn" data-clipboard-target="#data_content">Copy to clipboard</button></div>
     </body>
