@@ -34,7 +34,8 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
     }
   }
 
-  function getlog() {
+  function getlog()
+  {
     $('input[value="Download"]').val('Downloading...').prop('disabled',true);
     $.post('/webGui/include/Download.php',{cmd:'save',source:'/var/log/<?=$plugin;?>.log',file:'<?=$zipFile;?>'},function(zip)
     {
@@ -42,6 +43,7 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
       setTimeout(cleanUp,4000);
     });
   }
+  
   $(function(){
     addButtonTab('<input type="button" value="Download Log" onclick="getlog()">', "Preclear Disk", true, true);
     addButtonTab('<input type="button" value="View Log" onclick="openWindow(\'/webGui/scripts/tail_log&arg1=preclear.disk.log\',\'Log Information\',600,900);">', "Preclear Disk", true, true);
