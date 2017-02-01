@@ -27,7 +27,7 @@ if (! $is_installed && ! $is_dismissed):
     allowOutsideClick: false,
     showCancelButton: true,
     cancelButtonText: "Dismiss",
-    closeOnConfirm: true,
+    closeOnConfirm: false,
     showLoaderOnConfirm: true,
     html: true
   },

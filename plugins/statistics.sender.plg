@@ -4,7 +4,7 @@
 <!ENTITY name      "statistics.sender">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2016.12.21">
+<!ENTITY version   "2017.02.01">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
 ]>
@@ -13,6 +13,11 @@
 
 <CHANGES>
 ##&name;
+
+###2017.02.01
+- Update: TOR to 0.2.9.9
+- Fix: avoid logrotate emails
+- Fix: make sure google is reachable through tor network
 
 ###2016.12.21
 - Fix: minor bug fixes
@@ -34,13 +39,13 @@ The 'plugin' package MD5 hash.
 <FILE Name="/boot/config/plugins/&name;/&name;-&version;.md5">
 <URL>&gitURL;/archive/&name;-&version;.md5</URL>
 </FILE>
-
+  
 <!--
-The 'tor-0.2.9.8-x86_64-2_unRAID.txz' package file.
+The 'tor-0.2.9.9-x86_64-1_unRAID.txz' package file.
 -->
-<FILE Name="/boot/config/plugins/&name;/tor-0.2.9.8-x86_64-2_unRAID.txz" Run="upgradepkg --install-new">
-<URL>&gitURL;/source/packages/tor-0.2.9.8-x86_64-2_unRAID.txz</URL>
-<MD5>5c805294545b7ae498c753f3b436dace</MD5>
+<FILE Name="/boot/config/plugins/&name;/tor-0.2.9.9-x86_64-1_unRAID.txz" Run="upgradepkg --install-new">
+<URL>&gitURL;/source/packages/tor-0.2.9.9-x86_64-1_unRAID.txz</URL>
+<MD5>69e9c023a077ff5171b2cea5cab2959f</MD5>
 </FILE>
 
 <!--
@@ -60,10 +65,13 @@ else
   upgradepkg --install-new /boot/config/plugins/&name;/&name;-&version;.txz
 fi
 
+chmod +x /etc/logrotate.d/tor*
+chmod -R +x /usr/local/emhttp/plugins/&name;/scripts/
+
 # Cleaning old source files
 find /boot/config/plugins/&name;/ -type f -iname "&name;*.txz" ! -iname "*&version;*" -delete
 find /boot/config/plugins/&name;/ -type f -iname "&name;*.md5" ! -iname "*&version;*" -delete
-find /boot/config/plugins/&name;/ -type f -iname "tor-*.txz"   ! -iname "*0.2.9.8*"   -delete
+find /boot/config/plugins/&name;/ -type f -iname "tor-*.txz"   ! -iname "*0.2.9.9*"   -delete
 
 echo ""
 echo "-----------------------------------------------------------"

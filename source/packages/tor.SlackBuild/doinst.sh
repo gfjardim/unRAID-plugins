@@ -1,9 +1,11 @@
 config() {
   NEW="$1"
   OLD="$(dirname $NEW)/$(basename $NEW .new)"
+  NEW_PERMS=$(stat -c "%a" "$NEW" 2>/dev/null)
   # If there's no config file by that name, mv it over:
   if [ ! -r $OLD ]; then
     mv $NEW $OLD
+    chmod $NEW_PERMS $OLD
   elif [ "$(cat $OLD | md5sum)" = "$(cat $NEW | md5sum)" ]; then
     # toss the redundant copy
     rm $NEW

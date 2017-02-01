@@ -27,9 +27,9 @@
 umask 0022
 
 PRGNAM=tor
-VERSION=${VERSION:-0.2.9.8}
+VERSION=${VERSION:-0.2.9.9}
 BUILD=${BUILD:-1}
-TAG=${TAG:-_SBo}
+TAG=${TAG:-_unRAID}
 
 # Select tor's default user/group
 TOR_USER=${TOR_USER:-nobody}

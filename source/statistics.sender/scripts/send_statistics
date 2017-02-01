@@ -1,0 +1,104 @@
+#!/usr/bin/env php
+<?PHP
+$plugin = "statistics.sender";
+
+function isAnonymized($url = Null)
+{
+  global $plugin;
+  $myip     = trim(shell_exec("curl -s http://whatismyip.akamai.com 2>/dev/null"));
+  $torip    = trim(shell_exec("curl -s --socks5-hostname 127.0.0.1:9050 http://whatismyip.akamai.com 2>/dev/null"));
+  $diffip   = ($myip != $torip);
+  if ($url)
+  {
+    // $resp = trim(shell_exec("ping -c 1 ".escapeshellarg($url)." &> /dev/null; echo $?"));  
+    $resp = trim(shell_exec("curl -sSf --socks5-hostname 127.0.0.1:9050 ".escapeshellarg($url)." &> /dev/null; echo $?"));
+    if ($resp == "0" && $diffip)
+    {
+      shell_exec("echo 'my ip = $myip'|logger -t'${plugin}'");
+      shell_exec("echo 'tor ip = $torip'|logger -t'${plugin}'");
+      shell_exec("echo 'host [${url}] reachable'|logger -t'${plugin}'");
+      shell_exec("echo 'successfully established anonymous connection'|logger -t'${plugin}'");
+      return true;
+    }
+  }
+  else
+  {
+    if ($diffip)
+    {
+      shell_exec("echo my ip = $myip|logger -t'${plugin}'");
+      shell_exec("echo tor ip = $torip|logger -t'${plugin}'");
+      shell_exec("successfully established anonymous connection|logger -t'${plugin}'");
+      return true;
+    }
+    else
+    {
+      shell_exec("anonymous connection failed.|logger -t'${plugin}'");
+      return false;
+    }
+  }
+}
+
+
+$file   = $argv[1];
+
+$report = @parse_ini_file($file,true) ?: [];
+
+if (array_key_exists("report", $report))
+{
+  $url = $report["report"]["url"];
+
+  // Start TOR
+  shell_exec("/etc/rc.d/rc.tor start 2>&1");
+
+  // Try 10 times to establish an anonymous connection through tor
+  $anonymized = false;
+  for ($i=0; $i < 10; $i++) { 
+    if (isAnonymized("https://docs.google.com"))
+    {
+      $anonymized = true;
+      break;
+    }
+    else
+    {
+      shell_exec("restarting tor...|logger -t'${plugin}'");
+      shell_exec("/etc/rc.d/rc.tor restart 2>&1");
+    }
+    sleep(1);
+  }
+
+  if (! $anonymized)
+  {
+    shell_exec("an anonymous connection couldn't be established, aborting...|logger -t'${plugin}'");
+    // Stop TOR
+    shell_exec("/etc/rc.d/rc.tor stop 2>&1");
+    exit();
+  }
+
+  unset($report["report"]);
+  $cmd = "curl -s --socks5-hostname 127.0.0.1:9050 ".escapeshellarg($url)." -d ifq";
+  foreach ($report as $key => $value)
+  {
+    $arg = str_replace("^n", "\n", $value['value']);
+    $arg = urlencode($value['entry'])."=".urlencode($arg);
+    $cmd .= " -d ".escapeshellarg($arg);
+  }
+
+  shell_exec("echo sending statistics:{$report['report']['title']}|logger -t'${plugin}'");
+  exec($cmd, $out, $exit_code);
+  if ($exit_code === 0)
+  {
+    shell_exec("echo statistics sent.|logger -t'${plugin}'");
+    echo json_encode(["success"=>true]);
+    @rename($file,"${file}.sent");
+  }
+  else
+  {
+    shell_exec("echo send statistics failed.|logger -t'${plugin}'");
+    echo json_encode(["success"=>false,"output"=>"Error code: $exit_code"]);
+  }
+
+  // Stop TOR
+  shell_exec("/etc/rc.d/rc.tor stop 2>&1");
+}
+
+?>
