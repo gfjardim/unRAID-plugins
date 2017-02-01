@@ -22,9 +22,9 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/glyphicons.css">
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/style-<?=$display['theme'];?>.css">
 <script type="text/javascript">
-  var display = <?=json_encode($display);?>;
-  <?if (isset($_GET['disk']) && ! $Preclear->isRunning($_GET['disk']) ) echo "startDisk = '{$_GET[disk]}';";?>
+
   <?=$Preclear->Script();?>
+
   function cleanUp() {
     if (document.hasFocus()) {
       $('input[value="Downloading..."]').val('Download').prop('disabled',false);
@@ -43,11 +43,12 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
       setTimeout(cleanUp,4000);
     });
   }
-  
-  $(function(){
-    addButtonTab('<input type="button" value="Download Log" onclick="getlog()">', "Preclear Disk", true, true);
-    addButtonTab('<input type="button" value="View Log" onclick="openWindow(\'/webGui/scripts/tail_log&arg1=preclear.disk.log\',\'Log Information\',600,900);">', "Preclear Disk", true, true);
-  });
+
+  function addTooltip(target)
+  {
+    $(target).tooltipster({delay:100, trigger:'custom', triggerOpen:{mouseenter: true}, triggerClose:{click:false,scroll:true,mouseleave:true}});
+    
+  }
 
 </script>
 <style>
@@ -66,6 +67,7 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
   i.partition{margin-left: 18px;}
   .exec{cursor: pointer;}
   i.glyphicon-append{margin:0px;font-size: 0.8em;position: relative; left:-0.5em;top:0.7em;}
+
 </style>
 <?=$Preclear->html();?>
 <table class='preclear custom_head'>
@@ -92,3 +94,31 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
   <input type="button" value="Download Log" onclick="getlog()">&nbsp;
   <p>Click on the <strong>'Download Log'</strong> button to download a compressed log of Preclear Disk plugin.</p>
 </blockquote>
+<script type="text/javascript">
+  var display = <?=json_encode($display);?>;
+  <?if (isset($_GET['disk']) && ! $Preclear->isRunning($_GET['disk']) ) echo "startDisk = '{$_GET[disk]}';";?>
+
+  $(function(){
+    addButtonTab('<a class="tooltip" style="cursor:pointer" onclick="getlog()" title="Download Log"><i class="fa fa-download"></i></a>', "Preclear Disk", true, true);
+    addButtonTab('<a class="tooltip" style="cursor:pointer" onclick="openWindow(\'/webGui/scripts/tail_log&arg1=preclear.disk.log\',\'Log Information\',600,900);"title="Show Log"><i class="fa fa-file-text-o"></i></a>', "Preclear Disk", true, true);
+
+    // Load tooltipster if needed
+    if (! $.prototype.tooltipsters)
+    {
+      $.get("/plugins/<?=$plugin;?>/assets/tooltipster.bundle.hibrid.css", function(css)
+      {
+        $('<style type="text/css"></style>').html(css).appendTo("head");
+        $.getScript("/plugins/<?=$plugin;?>/assets/tooltipster.bundle.min.js").done(function()
+        {
+          addTooltip(".tooltip");
+        });
+      });
+    }
+    else
+    {
+      addTooltip(".tooltip");
+    }
+  });
+
+
+</script>

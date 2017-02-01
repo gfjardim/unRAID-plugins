@@ -3,7 +3,7 @@ LC_CTYPE=C
 export LC_CTYPE
 
 # Version
-version="0.8.3-beta"
+version="0.8.4-beta"
 
 # PID
 script_pid=$BASHPID
@@ -1077,8 +1077,8 @@ save_report() {
   local postread_speed=${3:-"n/a"}
   local zeroing_speed=${4:-"n/a"}
   local controller=${disk_properties[controller]}
-  local title="preclear_disk_${disk_properties[name]}_${script_pid}"
-  local size=$(numfmt --to=si --suffix=B --format='%1.f' ${disk_properties[size]})
+  local log_entry="preclear_disk_${disk_properties[name]}_${script_pid}"
+  local size=$(numfmt --to=si --suffix=B --format='%1.f' --round=nearest ${disk_properties[size]})
   local model=${disk_properties[model]}
   local time=$(timer cycle_timer)
   local smart=${disk_properties[smart_type]}
@@ -1089,8 +1089,7 @@ save_report() {
   text+="performance tunning and usage statistics that will be open to the community. For detailed information, please visit the "
   text+="<a href='http://lime-technology.com/forum/index.php?topic=39985.0'>support forum topic</a>."
 
-  cat "/var/log/preclear.disk.log" | grep -Po "$title: \K.*" | tr '"' "'" | sed ':a;N;$!ba;s/\n/^n/g' > $form_out
-  local log=$(cat ${form_out})
+  local log=$(cat "/var/log/preclear.disk.log" | grep -Po "$log_entry: \K.*" | tr '"' "'" | sed ':a;N;$!ba;s/\n/^n/g')
 
   cat <<EOF |sed "s/^  //g" > /boot/config/plugins/preclear.disk/$(( $RANDOM * $RANDOM * $RANDOM )).sreport
 

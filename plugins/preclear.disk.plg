@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2017.01.28">
+<!ENTITY version   "2017.02.01">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,12 @@
 
 <CHANGES>
 ##&name;
+
+###2017.02.01
+- Add: tooltipster
+- Fix: replace buttons to icons
+- Fix: disk size wrongly reported
+- Fix: log not being reported
 
 ###2017.01.27
 - Fix: comply with unRAID's XSS and CSRF hardening
@@ -287,8 +293,16 @@ fi
 # Creating some directories
 mkdir -p /boot/.preclear/ /usr/local/bin/
 
-# Copy some files
+# Statistics Sender
 sed -e "s#@PLUGIN@#Preclear Disks#g" "/boot/config/plugins/&name;/StatsInstall" &gt; "/usr/local/emhttp/plugins/&name;/StatsInstall.page"
+dismissed="/boot/config/plugins/statistics.sender/dismissed"
+version_dismiss="/boot/config/plugins/&name;/statistics.sender.dismissed-&version;"
+if [ ! -f "$version_dismiss" ]; then
+  rm "$dismissed"
+  touch "$version_dismiss"
+fi
+
+# Make sure log file exists
 touch /var/log/preclear.disk.log
 
 # Update file access mode

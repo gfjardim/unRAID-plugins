@@ -370,33 +370,48 @@ function rmReport(file, el)
   });
 }
 
+function get_tab_title_by_name(name) {
+  var tab    = $("input[name$=tabs] + label").filter(function(){return $(this).text() === name;}).prev();
+  var title  = $("div#title > span.left"    ).filter(function(){return $(this).text() === name;}).parent();
+  if (tab.length) {
+    return tab
+  } else if (title.length) {
+    return title
+  } else {
+    return $(document)
+  }
+}
 
-function addButtonTab(Button, Target, autoHide, Append)
+
+function addButtonTab(Button, Name, autoHide, Append)
 {
-  var Tab   = $("input[name$=tabs] + label:contains('"+Target+"')").closest("div.tab");
-  var Title = $("div#title *:contains('"+Target+"')").closest("div");
   if (typeof(autoHide) == "undefined") autoHide = true;
   if (typeof(Append)   == "undefined") Append   = true;
 
-  if (! Tab.length && Title.length > 0)
+  var Target    = get_tab_title_by_name(Name);
+  var elementId = 'event-' + new Date().getTime() * Math.floor(Math.random()*100000);
+  var element   = $("<span id='"+elementId+"' class='status'>"+Button+"</span>");
+  
+  if (element.find("input[type='button']").length)
   {
-    var element = "<span class='status vhshift' style=''>"+Button+"&nbsp;</span>";
+    element.addClass("vhshift");
+    element.find("input[type='button']").prop("style","padding-top: 5px; padding-bottom: 5px;");
+  }
+
+  if (Target.prop('nodeName') === "DIV")
+  {
     if (Append)
     {
-      Title.append(element);
+      Target.append(element);
     }
     else
     {
-      Title.prepend(element);
+      Target.prepend(element);
     }
-    Title.append();
   }
-  else if (Tab.length)
+  else if (Target.prop('nodeName') === "INPUT")
   {
-    var TabId = Tab.find("input[type=radio]").attr("id");
-    var date = new Date();
-    var element = "<span id='"+elementId+"' class='status vhshift' style='display: none;'>"+Button+"&nbsp;</span>";
-    var elementId = 'event-' + date.getTime() * Math.floor(Math.random()*100000);
+    element.css("display","none");
 
     if (Append)
     {
@@ -407,18 +422,22 @@ function addButtonTab(Button, Target, autoHide, Append)
       $('.tabs').prepend(element);
     }
 
-    $('#'+TabId).bind({click:function(){$('#'+elementId).show();}});
+    Target.bind({click:function(){$('#'+elementId).fadeIn('slow');}});
 
-    if ($('#'+TabId).is(':checked') || ! autoHide) {
-      $('#'+elementId).show();
+    if (Target.is(':checked') || ! autoHide) {
+      $('#'+elementId).fadeIn('slow');
     }
 
     $("input[name$=tabs]").each(function()
     {
-      if ( $(this).attr("id") != TabId && autoHide )
+      if (! $(this).is(Target) && autoHide )
       {
-        $(this).bind({click:function(){$('#'+elementId).hide();}});
+        $(this).bind({click:function(){$('#'+elementId).fadeOut('slow');}});
       }
     });
+  }
+  else
+  {
+    return false;
   }
 }
