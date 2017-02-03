@@ -114,7 +114,7 @@ $plugin = "advanced.buttons";
       },"json");
     }
 
-    // Plugins
+    // Bind Plugins Table
     var plugin_table = $("#plugin_table");
     if (plugin_table.length)
     {
@@ -157,13 +157,16 @@ $plugin = "advanced.buttons";
       });
     };
 
+    // Scroll down ShadowBox when open 
     $(document).arrive("div#pluginShadowBox",{onceOnly:false},function(){$(this).scrollLock().animate({ scrollTop:$(this).height()+300 }, "fast");});
 
+    // Docker context functions
     fnStart   = function(e){e.preventDefault();dockerButtonCommand('start',   $(this).parents("ul").attr("id").replace("dropdown-context-", ""));};
     fnStop    = function(e){e.preventDefault();dockerButtonCommand('stop',    $(this).parents("ul").attr("id").replace("dropdown-context-", ""));};
     fnRestart = function(e){e.preventDefault();dockerButtonCommand('restart', $(this).parents("ul").attr("id").replace("dropdown-context-", ""));};
     fnUpdate  = function(e){e.preventDefault();dockerButtonCommand('update',  $(this).parents("ul").attr("id").replace("dropdown-context-", ""));};
 
+    // Bind Docker context menus
     $(document).arrive("ul[id*='dropdown-context'] li > a[id^='event-']", function()
     {
       id = $(this).prop("id");
@@ -178,12 +181,14 @@ $plugin = "advanced.buttons";
       }
     });
 
+    // Bind Update link in Docker
     $("td.updatecolumn > a.exec").add("td.updatecolumn > div.advanced > a.exec").each(function()
     {
       fnUplink = function(){dockerButtonCommand('update', $(this).closest("tr").find("td > div[id^='context-']").prop("id").split("-")[1])};
       $(this).prop("onclick",null).off().on("click",fnUplink);
     });
 
+    // Replace plugin_intall form submission
     $("form[name='plugin_install']").on("submit", function(e, o)
     {
       e.preventDefault();
@@ -196,15 +201,30 @@ $plugin = "advanced.buttons";
       return false;
     });
 
+    // Bind plugin_install to the new routine
     $("form[name='plugin_install'] > input[type='Button']").prop('onclick',null).off().on("click", function()
     {
       $("form[name='plugin_install']").submit();
     });
 
+    // Bind Plugin checkall button
     $(document).arrive("input[type='button'][onclick*='arg1=checkall']", function()
     {
       $(this).prop("onclick",null).on("click", function(){disableElement(this);pluginsUpdate('check',AdvancedButtons["PluginsAll"])});
     });
+
+
+    // // Add Clear All Cookies to Tools
+    // if (document.location.pathname == "/Tools" )
+    // {
+    //   titlebar = $("div#title > span.left"    ).filter(function(){return $(this).text() === "WebGUI";}).parent();
+    //   if (titlebar.prop("nodeName") == "DIV")
+    //   {
+    //     element  = '<div class="Panel"><a style="cursor:pointer" onclick="eraseAllCookies()"><img class="PanelImg" src="/webGui/images/default.png">'
+    //     element += '<br><div class="PanelText">Clear All Cookies</div></a></div>';
+    //     titlebar.nextUntil( "div#title" ).last().after(element);
+    //   }
+    // }
 
 
   });
@@ -214,7 +234,8 @@ $plugin = "advanced.buttons";
     if (this.indexOf(element) === -1) {
       this.push(element);
     }
-  }; 
+  };
+
 
   function dockerButtonSave(el)
   {
