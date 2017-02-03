@@ -77,6 +77,11 @@ Link="nav-user"
           setTimeout(callback, 1000);
         });
       }
+
+      // Fix swal bug
+      div = $(".la-ball-fall").clone();
+      $("button.confirm").wrap("<div class='sa-confirm-button-container'>").after(div);
+      $("head").append("<style type='text/css'>.la-ball-fall {color: #6AB034}</style>");
     });
   }
 
@@ -107,8 +112,9 @@ Link="nav-user"
           {
             // reset modal overflow
             $('.showSweetAlert').css('overflow', '');
-            val = $('.chosen.swal').val();
-            askStatistics(JSON.parse(decodeURIComponent($('.chosen.swal').val())), "");
+            val = JSON.parse(decodeURIComponent($('.chosen.swal').val()));
+            setTimeout(askStatistics, 300, val);
+            swal.close();
           }
           else
           {

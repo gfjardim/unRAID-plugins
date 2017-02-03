@@ -4,7 +4,7 @@
 <!ENTITY name      "statistics.sender">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2017.02.02">
+<!ENTITY version   "2017.02.03">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
 ]>
@@ -13,6 +13,9 @@
 
 <CHANGES>
 ##&name;
+
+###2017.02.03
+- Add: CURL human error
 
 ###2017.02.02
 - Add: Send Dismissed Statistics to Tools
