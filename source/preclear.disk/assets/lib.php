@@ -313,6 +313,7 @@ class Preclear
               <option value="--verify">Verify All the Disk</option>
               <option value="--signature">Verify MBR Only</option>
               <option value="--erase">Erase All the Disk</option>
+              <option value="--erase-clear">Erase and Clear the Disk</option>
             </select>
           </dd>
           <div class="write_options cycles_options">

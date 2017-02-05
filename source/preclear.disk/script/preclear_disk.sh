@@ -340,6 +340,7 @@ write_disk(){
   local write_bs=2097152
 
   time_start=$(timer)
+  touch $dd_output
 
   # Type of write: zero or random
   if [ "$write_type" == "zero" ]; then
@@ -349,8 +350,8 @@ write_disk(){
   else
     write_type_s="Erasing"
     device="/dev/urandom"
-    dd_cmd="openssl enc -aes-256-ctr -pass pass:\"$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 -w 0)\" -nosalt < /dev/zero 2>/dev/null | \
-            dd of=${disk} bs=${write_bs} seek=1 iflag=fullblock"
+    pass=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 -w 0)
+    dd_cmd="openssl enc -aes-256-ctr -pass pass:'${pass}' -nosalt < /dev/zero 2>/dev/null | dd of=${disk} bs=${write_bs} seek=1 iflag=fullblock"
   fi
 
   if [ "$short_test" == "y" ]; then
@@ -367,8 +368,18 @@ write_disk(){
   blockdev --rereadpt $disk
 
   debug "${write_type_s}: $dd_cmd"
-  $dd_cmd 2>$dd_output &
-  dd_pid=$!
+  eval "$dd_cmd 2>$dd_output &"
+  block_pid=$!
+
+  for i in $(seq 5); do
+    dd_pid=$(ps --ppid $script_pid | awk '/dd/{print $1}')
+    if [ -n "$dd_pid" ]; then
+      break;
+    else
+      sleep 1
+    fi
+  done
+
   debug "${write_type_s}: dd pid [$dd_pid]"
 
   sleep 1
@@ -588,12 +599,12 @@ read_entire_disk() {
     # Verify the rest of the disk
     dd_cmd="dd if=$disk bs=$read_bs $count skip=1 $dd_flags 2>$dd_output | cmp - /dev/zero &>$cmp_output"
     debug "${read_type_s}: $dd_cmd "
-    { dd if=$disk bs=$read_bs $count skip=1 $dd_flags 2>$dd_output | cmp - /dev/zero &>$cmp_output ; } &
+    dd if=$disk bs=$read_bs $count skip=1 $dd_flags 2>$dd_output | cmp - /dev/zero &>$cmp_output &
     block_pid=$!
 
     # get pid of dd
     for i in $(seq 5); do
-      dd_pid=$(ps --ppid $block_pid | awk '/dd/{print $1}')
+      dd_pid=$(ps --ppid $script_pid | awk '/dd/{print $1}')
       if [ -n "$dd_pid" ]; then
         break;
       else
@@ -716,6 +727,9 @@ read_entire_disk() {
     fi
   done
 
+  wait $dd_pid;
+  dd_exit=$?
+
   # Wait last display refresh
   while kill -0 $display_pid &>/dev/null; do
     sleep 1
@@ -727,6 +741,8 @@ read_entire_disk() {
   fi
 
   debug "${read_type_s}: dd - read ${bytes_read} of ${total_bytes}."
+
+  debug "${write_type_s}: $dd_exit"
 
   # Fail if not zeroed or error
   if grep -q "differ" "$cmp_output" &>/dev/null; then
@@ -1167,6 +1183,7 @@ read_stress=y
 cycles=1
 append display_step ""
 erase_disk=n
+erase_preclear=n
 verify_mbr_only=n
 refresh_period=30
 append canvas 'width'  '123'
@@ -1176,9 +1193,9 @@ smart_type=auto
 notify_channel=0
 notify_freq=0
 opts_long="frequency:,notify:,skip-preread,skip-postread,read-size:,write-size:,read-blocks:,"
-opts_long+="test,no-stress,list,cycles:,signature,verify,no-prompt,version,preclear-only,format-html,erase"
+opts_long+="test,no-stress,list,cycles:,signature,verify,no-prompt,version,preclear-only,format-html,erase,erase-clear"
 
-OPTS=$(getopt -o f:n:sSr:w:b:tdlc:ujvome \
+OPTS=$(getopt -o f:n:sSr:w:b:tdlc:ujvomer \
       --long $opts_long -n "$(basename $0)" -- "$@")
 
 if [ "$?" -ne "0" ]; then
@@ -1189,24 +1206,25 @@ eval set -- "$OPTS"
 # (set -o >/dev/null; set >/tmp/.init)
 while true ; do
   case "$1" in
-    -f|--frequency)     is_numeric notify_freq    "$1" "$2"; shift 2;;
-    -n|--notify)        is_numeric notify_channel "$1" "$2"; shift 2;;
-    -s|--skip-preread)  skip_preread=y;                      shift 1;;
-    -S|--skip-postread) skip_postread=y;                     shift 1;;
-    -r|--read-size)     is_numeric read_size      "$1" "$2"; shift 2;;
-    -w|--write-size)    is_numeric write_size     "$1" "$2"; shift 2;;
-    -b|--read-blocks)   is_numeric read_blocks    "$1" "$2"; shift 2;;
-    -t|--test)          short_test=y;                        shift 1;;
-    -d|--no-stress)     read_stress=n;                       shift 1;;
-    -l|--list)          list_device_names;                   exit 0;;
-    -c|--cycles)        is_numeric cycles         "$1" "$2"; shift 2;;
-    -u|--signature)     verify_disk_mbr=y;                   shift 1;;
-    -p|--verify)        verify_disk_mbr=y;  verify_zeroed=y; shift 1;;
-    -j|--no-prompt)     no_prompt=y;                         shift 1;;
-    -v|--version)       echo "$0 version: $version"; exit 0; shift 1;;
-    -o|--preclear-only) write_disk_mbr=y;                    shift 1;;
-    -m|--format-html)   format_html=y;                       shift 1;;
-    -e|--erase)         erase_disk=y;                        shift 1;;
+    -f|--frequency)      is_numeric notify_freq    "$1" "$2"; shift 2;;
+    -n|--notify)         is_numeric notify_channel "$1" "$2"; shift 2;;
+    -s|--skip-preread)   skip_preread=y;                      shift 1;;
+    -S|--skip-postread)  skip_postread=y;                     shift 1;;
+    -r|--read-size)      is_numeric read_size      "$1" "$2"; shift 2;;
+    -w|--write-size)     is_numeric write_size     "$1" "$2"; shift 2;;
+    -b|--read-blocks)    is_numeric read_blocks    "$1" "$2"; shift 2;;
+    -t|--test)           short_test=y;                        shift 1;;
+    -d|--no-stress)      read_stress=n;                       shift 1;;
+    -l|--list)           list_device_names;                   exit 0;;
+    -c|--cycles)         is_numeric cycles         "$1" "$2"; shift 2;;
+    -u|--signature)      verify_disk_mbr=y;                   shift 1;;
+    -p|--verify)         verify_disk_mbr=y;  verify_zeroed=y; shift 1;;
+    -j|--no-prompt)      no_prompt=y;                         shift 1;;
+    -v|--version)        echo "$0 version: $version"; exit 0; shift 1;;
+    -o|--preclear-only)  write_disk_mbr=y;                    shift 1;;
+    -m|--format-html)    format_html=y;                       shift 1;;
+    -e|--erase)          erase_disk=y;                        shift 1;;
+    -r|--erase-clear)    erase_preclear=y;                    shift 1;;
 
     --) shift ; break ;;
     * ) echo "Internal error!" ; exit 1 ;;
@@ -1504,19 +1522,22 @@ for cycle in $(seq $cycles); do
   
   # Adjust the number of steps
   if [ "$erase_disk" == "y" ]; then
-    max_steps=3
+    max_steps=4
 
     # Disable pre-read and post-read if erasing
     skip_preread="y"
     skip_postread="y"
   else
-    max_steps=5
+    max_steps=6
   fi
 
   if [ "$skip_preread" == "y" ]; then
     let max_steps-=1
   fi
   if [ "$skip_postread" == "y" ]; then
+    let max_steps-=1
+  fi
+  if [ "$erase_preclear" != "y" ]; then
     let max_steps-=1
   fi
 
@@ -1536,6 +1557,23 @@ for cycle in $(seq $cycles); do
       send_mail "FAIL! Pre-read verification failed." "FAIL! Pre-read verification failed." "Pre-read verification failed - Aborted" "" "alert"
       echo -e "--> FAIL: Result: Pre-Read failed.\n\n"
       save_report "No - Pre-read verification failed." "$preread_speed" "$postread_speed" "$write_speed"
+      exit 1
+    fi
+  fi
+
+  # Erase the disk in erase-clear op
+  if [ "$erase_preclear" == "y" ]; then
+    # Erase the disk
+    display_status "Erasing in progress ..." ''
+    if write_disk erase write_average write_speed; then
+      append display_step "Erasing the disk:|[${write_average}] ***SUCCESS***"
+    else
+      append display_step "Erasing the disk:|${bold}FAIL${norm}"
+      display_status
+      echo "${disk_properties[name]}|NY|Erasing the disk failed - Aborted|$$" > ${all_files[stat]}
+      send_mail "FAIL! Erasing the disk failed." "FAIL! Erasing the disk failed." "Erasing the disk failed - Aborted" "" "alert"
+      echo -e "--> FAIL: Result: Erasing the disk failed.\n\n"
+      save_report "No - Erasing the disk failed." "$preread_speed" "$postread_speed" "$write_speed"
       exit 1
     fi
   fi

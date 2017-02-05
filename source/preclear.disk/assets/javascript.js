@@ -216,6 +216,7 @@ function toggleSettings(el) {
   switch(value)
   {
     case '0':
+    case '--erase-clear':
       $(el).parent().siblings('.read_options').css('display',    'block');
       $(el).parent().siblings('.write_options').css('display',   'block');
       $(el).parent().siblings('.postread_options').css('display','block');
