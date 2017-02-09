@@ -4,7 +4,7 @@
 <!ENTITY name      "statistics.sender">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2017.02.05">
+<!ENTITY version   "2017.02.09">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
 ]>
@@ -47,11 +47,11 @@ The 'plugin' package MD5 hash.
 </FILE>
   
 <!--
-The 'tor-0.2.9.9-x86_64-1_unRAID.txz' package file.
+The 'tor-0.2.9.9-x86_64-2_unRAID.txz' package file.
 -->
-<FILE Name="/boot/config/plugins/&name;/tor-0.2.9.9-x86_64-1_unRAID.txz" Run="upgradepkg --install-new">
-<URL>&gitURL;/source/packages/tor-0.2.9.9-x86_64-1_unRAID.txz</URL>
-<MD5>69e9c023a077ff5171b2cea5cab2959f</MD5>
+<FILE Name="/boot/config/plugins/&name;/tor-0.2.9.9-x86_64-2_unRAID.txz" Run="upgradepkg --install-new">
+<URL>&gitURL;/source/packages/tor-0.2.9.9-x86_64-2_unRAID.txz</URL>
+<MD5>3a175b365f70391babb8d5508a6d0e11</MD5>
 </FILE>
 
 <!--
