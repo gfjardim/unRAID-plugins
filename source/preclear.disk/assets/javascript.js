@@ -49,38 +49,38 @@ function getPreclearContent()
 }
 
 
-function openPreclear(device)
+function openPreclear(serial)
 {
   var width   = 985;
   var height  = 730;
   var top     = (screen.height-height)/2;
   var left    = (screen.width-width)/2;
   var options = 'resizeable=yes,scrollbars=yes,height='+height+',width='+width+',top='+top+',left='+left;
-  window.open('/plugins/'+plugin+'/Preclear.php?action=show_preclear&device='+device, 'Preclear', options);
+  window.open('/plugins/'+plugin+'/Preclear.php?action=show_preclear&serial='+serial, 'Preclear', options);
 }
 
 
-function toggleScript(el, device)
+function toggleScript(el, serial)
 {
   window.scope = $(el).val();
   $( "#preclear-dialog" ).dialog( "close" );
-  startPreclear( device );
+  startPreclear( serial );
 }
 
 
-function startPreclear(device)
+function startPreclear(serial)
 {
-  if (typeof(device) === 'undefined')
+  if (typeof(serial) === 'undefined')
   {
     return false;
   }
 
   var title = 'Start Preclear';
-  $( "#preclear-dialog" ).html("<dl><dt>Model Family:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(device, 'family')+"</span></dd></dl>");
-  $( "#preclear-dialog" ).append("<dl><dt>Device Model:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(device, 'model')+"</span></dd></dl>");
-  $( "#preclear-dialog" ).append("<dl><dt>Serial Number:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(device, 'serial_short')+"</span></dd></dl>");
-  $( "#preclear-dialog" ).append("<dl><dt>Firmware Version:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(device, 'firmware')+"</span></dd></dl>");
-  $( "#preclear-dialog" ).append("<dl><dt>Size:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(device, 'size')+"</span></dd></dl><hr style='margin-left:12px;'>");
+  $( "#preclear-dialog" ).html("<dl><dt>Model Family:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(serial, 'family')+"</span></dd></dl>");
+  $( "#preclear-dialog" ).append("<dl><dt>Device Model:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(serial, 'model')+"</span></dd></dl>");
+  $( "#preclear-dialog" ).append("<dl><dt>Serial Number:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(serial, 'serial_short')+"</span></dd></dl>");
+  $( "#preclear-dialog" ).append("<dl><dt>Firmware Version:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(serial, 'firmware')+"</span></dd></dl>");
+  $( "#preclear-dialog" ).append("<dl><dt>Size:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(serial, 'size')+"</span></dd></dl><hr style='margin-left:12px;'>");
 
   if (typeof(scripts) !== 'undefined')
   {
@@ -88,7 +88,7 @@ function startPreclear(device)
 
     if (size)
     {
-      var options = "<dl><dt>Script<st><dd><select onchange='toggleScript(this,\""+device+"\");'>";
+      var options = "<dl><dt>Script<st><dd><select onchange='toggleScript(this,\""+serial+"\");'>";
       $.each( scripts, function( key, value )
         {
           var sel = ( key == scope ) ? "selected" : "";
@@ -117,7 +117,7 @@ function startPreclear(device)
         $(e.target).attr('disabled', true);
         var opts       = new Object();
         opts["action"] = "start_preclear";
-        opts["device"] = device;
+        opts["device"] = getDiskInfo(serial, 'device');
         opts["op"]     = getVal(this, "op");
         opts["scope"]  = scope;
 
@@ -149,7 +149,7 @@ function startPreclear(device)
 
         $.post(PreclearURL, opts, function(data)
                 {
-                  openPreclear(device);
+                  openPreclear(serial);
                 }
               ).always(function(data)
                 {
@@ -167,10 +167,11 @@ function startPreclear(device)
 }
 
 
-function stopPreclear(serial, device, ask)
+function stopPreclear(serial, ask)
 {
   var title = 'Stop Preclear';
-  var exec  = '$.post(PreclearURL,{action:"stop_preclear",device:device});'
+  var exec  = '$.post(PreclearURL,{action:"stop_preclear",serial:serial});'
+  var model = getDiskInfo(serial,"serial");
 
   if (ask != "ask")
   {
@@ -179,7 +180,7 @@ function stopPreclear(serial, device, ask)
     return true;
   }
 
-  $( "#preclear-dialog" ).html('Disk: '+serial);
+  $( "#preclear-dialog" ).html('Disk: ' + model);
   $( "#preclear-dialog" ).append( "<br><br><span style='color: #E80000;'>Are you sure?</span>" );
   $( "#preclear-dialog" ).dialog({
     title: title,
@@ -293,9 +294,9 @@ function toggleNotification(el) {
 }
 
 
-function getDiskInfo(device, info){
+function getDiskInfo(serial, info){
   for (var i = disksInfo.length - 1; i >= 0; i--) {
-    if (disksInfo[i]['device'].indexOf(device) > -1 ){
+    if (disksInfo[i]['serial_short'].indexOf(serial) > -1 ){
       return disksInfo[i][info];
     }
   }

@@ -8,15 +8,27 @@ version="0.8.4-beta"
 # PID
 script_pid=$BASHPID
 
-# Redirect errors to log
+# Serial
 for arg in "$@"; do
   if [ -b "$arg" ]; then
-    exec 2> >(while read err; do echo "$(date +"%b %d %T" ) preclear_disk_$(basename $arg)_${script_pid}: ${err}" >> /var/log/preclear.disk.log; echo "${err}"; done; >&2)
+    serial_number=$(udevadm info --query=all --name="${arg}" | awk -F'=' '/ID_SERIAL_SHORT/{print $2}')
     break
   else
-    exec 2> >(while read err; do echo "$(date +"%b %d %T" ) preclear_disk_${script_pid}: ${err}" >> /var/log/preclear.disk.log; echo "${err}"; done)
+    serial_number=""
   fi
 done
+
+# Log prefix
+if [ -n "$serial_number" ]; then
+  log_prefix="preclear_disk_${serial_number}_${script_pid}:"
+else
+  log_prefix="preclear_disk_${script_pid}:"
+fi
+
+
+# Redirect errors to log
+exec 2> >(while read err; do echo "$(date +"%b %d %T" ) ${log_prefix} ${err}" >> /var/log/preclear.disk.log; echo "${err}"; done; >&2)
+
 
 # Let's make sure some features are supported by BASH
 BV=$(echo $BASH_VERSION|tr '.' "\n"|grep -Po "^\d+"|xargs printf "%.2d\n"|tr -d '\040\011\012\015')
@@ -47,7 +59,7 @@ trim() {
 }
 
 debug() {
-  cat <<< "$(date +"%b %d %T" ) preclear_disk_$(basename $theDisk)_${script_pid}: $@" >> /var/log/preclear.disk.log
+  cat <<< "$(date +"%b %d %T" ) ${log_prefix} $@" >> /var/log/preclear.disk.log
 }
 
 list_unraid_disks(){
@@ -1093,7 +1105,7 @@ save_report() {
   local postread_speed=${3:-"n/a"}
   local zeroing_speed=${4:-"n/a"}
   local controller=${disk_properties[controller]}
-  local log_entry="preclear_disk_${disk_properties[name]}_${script_pid}"
+  local log_entry=$log_prefix
   local size=$(numfmt --to=si --suffix=B --format='%1.f' --round=nearest ${disk_properties[size]})
   local model=${disk_properties[model]}
   local time=$(timer cycle_timer)
@@ -1105,7 +1117,7 @@ save_report() {
   text+="performance tunning and usage statistics that will be open to the community. For detailed information, please visit the "
   text+="<a href='http://lime-technology.com/forum/index.php?topic=39985.0'>support forum topic</a>."
 
-  local log=$(cat "/var/log/preclear.disk.log" | grep -Po "$log_entry: \K.*" | tr '"' "'" | sed ':a;N;$!ba;s/\n/^n/g')
+  local log=$(cat "/var/log/preclear.disk.log" | grep -Po "${log_entry} \K.*" | tr '"' "'" | sed ':a;N;$!ba;s/\n/^n/g')
 
   cat <<EOF |sed "s/^  //g" > /boot/config/plugins/preclear.disk/$(( $RANDOM * $RANDOM * $RANDOM )).sreport
 
@@ -1512,7 +1524,7 @@ for cycle in $(seq $cycles); do
   # Reset canvas
   unset display_title
   unset display_step && append display_step ""
-  append display_title "${ul}unRAID Server ${op_title} of disk${noul} ${bold}$theDisk${norm}"
+  append display_title "${ul}unRAID Server ${op_title} of disk${noul} ${bold}${disk_properties['serial']}${norm}"
 
   if [ "$erase_disk" == "y" ]; then
     append display_title "Cycle ${bold}${cycle}$norm of ${cycles}."
@@ -1674,7 +1686,7 @@ echo -e "--> RESULT: ${op_title} Finished Successfully!.\n\n"
 # # Saving report
 report="${all_files[dir]}/report"
 
-tmux_window="preclear_disk_${disk_properties[name]}"
+tmux_window="preclear_disk_${disk_properties[serial]}"
 if [ "$(tmux ls 2>/dev/null | grep -c "${tmux_window}")" -gt 0 ]; then
   tmux capture-pane -t "${tmux_window}" && tmux show-buffer >$report 2>&1
 else
@@ -1687,6 +1699,7 @@ else
 
   tmux new-session -d -x 140 -y 200 -s "${report_tmux}"
   tmux send -t "${report_tmux}" "cat '$report'" ENTER
+  sleep 1
 
   tmux capture-pane -t "${report_tmux}" && tmux show-buffer >$report 2>&1
   tmux kill-session -t "${report_tmux}" >/dev/null 2>&1

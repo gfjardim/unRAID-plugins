@@ -72,75 +72,6 @@ function _echo($m)
 };
 
 
-function sendLog() {
-  global $var, $paths;
-  $url = "http://gfjardim.maxfiles.org";
-  $max_size = 2097152; # in bytes
-  $notify = "/usr/local/emhttp/webGui/scripts/notify";
-  $data = array('data'     => shell_exec("cat '{$GLOBALS['log_file']}' 2>&1 | tail -c $max_size -"),
-                'language' => 'text',
-                'title'    => '[Preclear Disk log]',
-                'private'  => true,
-                'expire'   => '2592000');
-  $tmpfile = "/tmp/tmp-".mt_rand().".json";
-  file_put_contents($tmpfile, json_encode($data));
-  $out = shell_exec("curl -s -k -L -X POST -H 'Content-Type: application/json' --data-binary  @$tmpfile ${url}/api/json/create");
-  unlink($tmpfile);
-  $server = strtoupper($var['NAME']);
-  $out = json_decode($out, TRUE);
-  if (isset($out['result']['error'])){
-    echo shell_exec("$notify -e 'Preclear Disk log upload failed' -s 'Alert [$server] - $title upload failed.' -d 'Upload of Unassigned Devices Log has failed: ".$out['result']['error']."' -i 'alert 1'");
-    echo '{"result":"failed"}';
-  } else {
-    $resp = "${url}/".$out['result']['id']."/".$out['result']['hash'];
-    exec("$notify -e 'Preclear Disk log uploaded - [".$out['result']['id']."]' -s 'Notice [$server] - $title uploaded.' -d 'A new copy of Unassigned Devices Log has been uploaded: $resp' -i 'normal 1'");
-    echo '{"result":"'.$resp.'"}';
-  }
-}
-
-function is_tmux_executable()
-{
-  return is_file("/usr/bin/tmux") ? (is_executable("/usr/bin/tmux") ? TRUE : FALSE) : FALSE;
-}
-
-
-function tmux_is_session($name)
-{
-  exec('/usr/bin/tmux ls 2>/dev/null|cut -d: -f1', $screens);
-  return in_array($name, $screens);
-}
-
-
-function tmux_new_session($name)
-{
-  if (! tmux_is_session($name))
-  {
-    exec("/usr/bin/tmux new-session -d -x 140 -y 200 -s '${name}' 2>/dev/null");
-  }
-}
-
-
-function tmux_get_session($name)
-{
-  return (tmux_is_session($name)) ? shell_exec("/usr/bin/tmux capture-pane -t '${name}' 2>/dev/null;/usr/bin/tmux show-buffer 2>&1") : NULL;
-}
-
-
-function tmux_send_command($name, $cmd)
-{
-  exec("/usr/bin/tmux send -t '$name' '$cmd' ENTER 2>/dev/null");
-}
-
-
-function tmux_kill_window($name)
-{
-  if (tmux_is_session($name))
-  {
-    exec("/usr/bin/tmux kill-session -t '${name}' >/dev/null 2>&1");
-  }
-}
-
-
 function reload_partition($name)
 {
   exec("hdparm -z /dev/{$name} >/dev/null 2>&1 &");
@@ -415,7 +346,6 @@ $start_time = time();
 switch ($_POST['action'])
 {
 
-
   case 'get_content':
     debug("Starting get_content: ".(time() - $start_time),'DEBUG');
     $disks = benchmark("get_all_disks_info");
@@ -508,15 +438,16 @@ switch ($_POST['action'])
     break;
 
 
-
   case 'start_preclear':
     $device  = urldecode($_POST['device']);
-    $session = "preclear_disk_{$device}";
+    $serial  = $Preclear->diskSerial($device);
+    $session = "preclear_disk_{$serial}";
     $op      = (isset($_POST['op']) && $_POST['op'] != "0") ? urldecode($_POST['op']) : "";
     $scope   = $_POST['scope'];
     $script  = $script_files[$scope];
+    $devname = basename($device);
 
-    @file_put_contents("/tmp/preclear_stat_{$device}","{$device}|NN|Starting...");
+    @file_put_contents("/tmp/preclear_stat_{$devname}","{$devname}|NN|Starting...");
 
     if ($scope == "gfjardim")
     {
@@ -528,7 +459,7 @@ switch ($_POST['action'])
       $test      = (isset($_POST['--test']) && $_POST['--test'] == "on") ? " --test" : "";
       $noprompt  = " --no-prompt";
 
-      $cmd = "$script {$op}${notify}${frequency}{$cycles}{$pre_read}{$post_read}{$noprompt}{$test} /dev/$device";
+      $cmd = "$script {$op}${notify}${frequency}{$cycles}{$pre_read}{$post_read}{$noprompt}{$test} $device";
       
     }
 
@@ -556,33 +487,33 @@ switch ($_POST['action'])
       
       if (! $op )
       {
-        $cmd = "$script {$op}{$mail}{$notify}{$passes}{$read_sz}{$write_sz}{$pre_read}{$post_read}{$fast_read}{$noprompt}{$test} /dev/$device";
+        $cmd = "$script {$op}{$mail}{$notify}{$passes}{$read_sz}{$write_sz}{$pre_read}{$post_read}{$fast_read}{$noprompt}{$test} $device";
       }
 
       else if ( $op == "-V" )
       {
-        $cmd = "$script {$op}{$fast_read}{$mail}{$notify}{$read_sz}{$write_sz}{$noprompt}{$test} /dev/$device";
+        $cmd = "$script {$op}{$fast_read}{$mail}{$notify}{$read_sz}{$write_sz}{$noprompt}{$test} $device";
       }
 
       else
       {
-        $cmd = "$script {$op}{$noprompt} /dev/$device";
-        @unlink("/tmp/preclear_stat_{$device}");
+        $cmd = "$script {$op}{$noprompt} $device";
+        @unlink("/tmp/preclear_stat_{$devname}");
       }
     }
 
-    tmux_kill_window( $session );
-    tmux_new_session( $session );
-    tmux_send_command($session, "$cmd");
+    TMUX::killSession( $session );
+    TMUX::NewSession( $session );
+    TMUX::sendCommand($session, "$cmd");
 
     if ( $confirm && ! $noprompt )
     {
       foreach( range(0, 3) as $x )
       {
-        if ( strpos(tmux_get_session($session), "Answer Yes to continue") )
+        if ( strpos(TMUX::getSession($session), "Answer Yes to continue") )
         {
           sleep(1);
-          tmux_send_command($session, "Yes");
+          TMUX::sendCommand($session, "Yes");
           break;
         }
 
@@ -597,43 +528,45 @@ switch ($_POST['action'])
 
 
   case 'stop_preclear':
-    $device = urldecode($_POST['device']);
-    tmux_kill_window("preclear_disk_{$device}");
+    $serial = urldecode($_POST['serial']);
+    $device = basename($Preclear->serialDisk($serial));
+    TMUX::killSession("preclear_disk_{$serial}");
     @unlink("/tmp/preclear_stat_{$device}");
-    reload_partition($device);
+    reload_partition($serial);
     echo "<script>parent.location=parent.location;</script>";
     break;
 
 
   case 'clear_preclear':
-    $device = urldecode($_POST['device']);
-    tmux_kill_window("preclear_disk_{$device}");
+    $serial = urldecode($_POST['serial']);
+    $device = basename($Preclear->serialDisk($serial));
+    TMUX::killSession("preclear_disk_{$serial}");
     @unlink("/tmp/preclear_stat_{$device}");
     echo "<script>parent.location=parent.location;</script>";
     break;
 
 
   case 'get_preclear':
-    $device  = urldecode($_POST['device']);
-    $session = "preclear_disk_{$device}";
-    if ( ! tmux_is_session($session))
+    $serial  = urldecode($_POST['serial']);
+    $session = "preclear_disk_{$serial}";
+    if ( ! TMUX::hasSession($session))
     {
       $output = "<script>window.close();</script>";
     }
-    $content = tmux_get_session($session);
+    $content = TMUX::getSession($session);
     $output .= "<pre>".preg_replace("#\n{5,}#", "<br>", $content)."</pre>";
     if ( strpos($content, "Answer Yes to continue") )
     {
-      $output .= "<br><center><button onclick='hit_yes(\"{$device}\")'>Answer Yes</button></center>";
+      $output .= "<br><center><button onclick='hit_yes(\"{$serial}\")'>Answer Yes</button></center>";
     }
     echo json_encode(array("content" => $output));
     break;
 
 
   case 'hit_yes':
-    $device  = urldecode($_POST['device']);
-    $session = "preclear_disk_{$device}";
-    tmux_send_command($session, "Yes");
+    $serial  = urldecode($_POST['serial']);
+    $session = "preclear_disk_{$serial}";
+    TMUX::sendCommand($session, "Yes");
     break;
 
 
@@ -651,7 +584,7 @@ switch ($_POST['action'])
 switch ($_GET['action']) {
 
   case 'show_preclear':
-    $device = urldecode($_GET['device']);
+    $serial = urldecode($_GET['serial']);
     ?>
     <html>
     <body>
@@ -666,12 +599,12 @@ switch ($_GET['action']) {
     <script>
       var timers = {};
       var URL = "/plugins/<?=$plugin;?>/Preclear.php";
-      var device = "<?=$device;?>";
+      var serial = "<?=$serial;?>";
 
       function get_preclear()
       {
         clearTimeout(timers.preclear);
-        $.post(URL,{action:"get_preclear",device:device,csrf_token:"<?=$var['csrf_token'];?>"},function(data) {
+        $.post(URL,{action:"get_preclear",serial:serial,csrf_token:"<?=$var['csrf_token'];?>"},function(data) {
           if (data.content)
           {
             $("#data_content").html(data.content);
@@ -680,12 +613,12 @@ switch ($_GET['action']) {
           timers.preclear=setTimeout('get_preclear()',1000);
         });
       }
-      function hit_yes(device)
+      function hit_yes(serial)
       {
-        $.post(URL,{action:"hit_yes",device:device,csrf_token:"<?=$var['csrf_token'];?>"});
+        $.post(URL,{action:"hit_yes",serial:serial,csrf_token:"<?=$var['csrf_token'];?>"});
       }
       $(function() {
-        document.title='Preclear for disk /dev/<?=$device;?> ';
+        document.title='Preclear for disk <?=$serial;?> ';
         get_preclear();
         new Clipboard('.btn');
       });

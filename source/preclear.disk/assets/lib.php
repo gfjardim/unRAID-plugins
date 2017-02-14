@@ -9,11 +9,89 @@ if (!isset($var)) {
 $state_file   = "/var/state/{$plugin}/state.ini";
 $log_file     = "/var/log/{$plugin}.log";
 
+
+class TMUX
+{
+
+  public function isExecutable()
+  {
+    return is_file("/usr/bin/tmux") ? (is_executable("/usr/bin/tmux") ? TRUE : FALSE) : FALSE;
+  }
+
+
+  public function hasSession($name)
+  {
+    exec('/usr/bin/tmux ls 2>/dev/null|cut -d: -f1', $screens);
+    return in_array($name, $screens);
+  }
+
+
+  public function NewSession($name)
+  {
+    if (! TMUX::hasSession($name))
+    {
+      exec("/usr/bin/tmux new-session -d -x 140 -y 200 -s '${name}' 2>/dev/null");
+    }
+  }
+
+
+  public function getSession($name)
+  {
+    return (TMUX::hasSession($name)) ? shell_exec("/usr/bin/tmux capture-pane -t '${name}' 2>/dev/null;/usr/bin/tmux show-buffer 2>&1") : NULL;
+  }
+
+
+  public function sendCommand($name, $cmd)
+  {
+    exec("/usr/bin/tmux send -t '$name' '$cmd' ENTER 2>/dev/null");
+  }
+
+
+  public function killSession($name)
+  {
+    if (TMUX::hasSession($name))
+    {
+      exec("/usr/bin/tmux kill-session -t '${name}' >/dev/null 2>&1");
+    }
+  }
+
+}
+
+
 class Preclear
   {
 
   public $plugin = "preclear.disk";
+
+  function __construct()
+  {
+    exec("/bin/lsblk -nbP -o name,type,label,size,mountpoint,fstype,serial 2>/dev/null", $blocks);
+    foreach ($blocks as $b)
+    {
+      $block = parse_ini_string(preg_replace("$\s+$", PHP_EOL, $b));
+      if ($block['TYPE'] == "disk")
+      {
+        $this->allDisks[$block['NAME']] = $block;
+      }
+    }
+  }
+
+
+  public function diskSerial($disk)
+  {
+    $disk  = basename(trim($disk));
+    $disks = array_filter($this->allDisks, function($k) use ($disk) {return $k == $disk;}, ARRAY_FILTER_USE_KEY);
+    return count($disks) ? $disks[$disk]["SERIAL"] : NULL;
+  }
+
   
+  public function serialDisk($serial)
+  {
+    $disks = array_values(array_filter($this->allDisks, function($v) use ($serial) {return $v["SERIAL"] == $serial;}));
+    var_dump($disks);
+    return count($disks) ? "/dev/{$disks[0]['NAME']}" : NULL;
+  }
+
 
   public function Authors()
   {
@@ -83,38 +161,18 @@ class Preclear
 
   public function Link($disk, $type)
   {
-    $disk = file_exists($disk) ? basename($disk) : $disk;
-    $icon = "<a title='Preclear Disk' class='exec' onclick='startPreclear(\"{$disk}\")'><img src='/plugins/".$this->plugin."/icons/precleardisk.png'></a>";
-    $text = "<a title='Preclear Disk' class='exec' onclick='startPreclear(\"{$disk}\")'>Start Preclear</a>";
+    $serial = $this->diskSerial($disk);
+    $icon   = "<a title='Preclear Disk' class='exec' onclick='startPreclear(\"{$serial}\")'><img src='/plugins/".$this->plugin."/icons/precleardisk.png'></a>";
+    $text   = "<a title='Preclear Disk' class='exec' onclick='startPreclear(\"{$serial}\")'>Start Preclear</a>";
     return ($type == "text") ? $text : $icon;
-  }
-
-
-  private function is_tmux_executable()
-  {
-    return is_file("/usr/bin/tmux") ? (is_executable("/usr/bin/tmux") ? TRUE : FALSE) : FALSE;
-  }
-
-
-  private function tmux_is_session($disk)
-  {
-    if (is_tmux_executable())
-    {
-      exec('/usr/bin/tmux ls 2>/dev/null|cut -d: -f1', $screens);
-      return in_array($disk, $screens);
-    }
-
-    else
-    {
-      return false;
-    }
   }
 
 
   public function isRunning($disk)
   {
-    $disk = file_exists($disk) ? basename($disk) : $disk;
-    if ( $this->tmux_is_session("preclear_disk_{$disk}") )
+    $disk   = basename($disk);
+    $serial = $this->diskSerial($disk);
+    if ( TMUX::hasSession("preclear_disk_{$serial}") )
     {
       return true;
     }
@@ -129,10 +187,11 @@ class Preclear
   {
     $status  = "";
     $file    = "/tmp/preclear_stat_{$disk}";
-    $session = $this->tmux_is_session("preclear_disk_{$disk}");
-    $rm      = "<a class='exec' style='color:#CC0000;font-weight:bold;margin-left:5px;' title='%s' onclick='stopPreclear(\"{$serial}\",\"{$disk}\",\"%s\");'>";
+    $serial  = $this->diskSerial($disk);
+    $session = TMUX::hasSession("preclear_disk_{$serial}");
+    $rm      = "<a class='exec' style='color:#CC0000;font-weight:bold;margin-left:5px;' title='%s' onclick='stopPreclear(\"{$serial}\",\"%s\");'>";
     $rm     .= "<i class='glyphicon glyphicon-remove hdd'></i></a>";
-    $preview = "<a class='exec' style='margin-left:5px;' onclick='openPreclear(\"{$disk}\");' title='Preview'><i class='glyphicon glyphicon-eye-open hdd'></i></a>";
+    $preview = "<a class='exec' style='margin-left:5px;' onclick='openPreclear(\"{$serial}\");' title='Preview'><i class='glyphicon glyphicon-eye-open hdd'></i></a>";
     
     if (is_file($file))
     {
