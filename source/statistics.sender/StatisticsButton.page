@@ -3,6 +3,9 @@ Link="nav-user"
 ---
 <?$plugin = "statistics.sender";?>
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/chosen.min.css">
+<style type="text/css">
+  #preload-01 { background: url(/plugins/<?=$plugin;?>/images/<?=$plugin;?>.png) no-repeat -9999px -9999px; }
+</style>
 <script type="text/javascript" src="/plugins/<?=$plugin;?>/assets/chosen.jquery.min.js"></script>
 <script type="text/javascript">
 

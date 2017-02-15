@@ -166,7 +166,8 @@ if (array_key_exists("report", $report))
   {
     shell_exec("echo report sent.|logger -t'${plugin}'");
     echo json_encode(["success"=>true]);
-    @rename($file,"${file}.sent");
+    $new = str_replace(".dismiss", "", $file);
+    @rename($file,"${new}.sent");
   }
   else
   {
