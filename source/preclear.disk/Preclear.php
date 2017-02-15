@@ -401,7 +401,7 @@ switch ($_POST['action'])
         if ($Preclear->isRunning($disk_name))
         {
           $status  = $Preclear->Status($disk_name, $serial);
-          $all_status[$disk_name] = $status;
+          $all_status[$disk['serial_short']] = $status;
         }
         else
         {

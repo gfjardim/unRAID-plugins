@@ -1,14 +1,34 @@
 var PreclearURL = '/plugins/'+plugin+'/Preclear.php'
 
+if (! $.prototype.tooltipsters)
+{
+  $("<link rel='stylesheet' type='text/css' href='/plugins/"+plugin+"/assets/tooltipster.bundle.hibrid.css'>").appendTo("head");
+  $("<script type='text/javascript' src='/plugins/"+plugin+"/assets/tooltipster.bundle.min.js'>").appendTo("head");
+}
+
+$('body').on('mouseenter', '.tooltip:not(.tooltipstered)', function()
+{
+  $(this).tooltipster(
+  {
+    delay:100,
+    zIndex:100,
+    trigger:'custom',
+    triggerOpen:{mouseenter: true},
+    triggerClose:{click:false, scroll:true, mouseleave:true}
+  }).tooltipster('open');
+});
+
 $(function()
   {
     getPreclearContent();
     if ( $('#usb_devices_list').length )
     {
-      $('#usb_devices_list').change(function(e)
+      $('#usb_devices_list').bind("change", function(e)
       {
-        getPreclearContent();
+        clearTimeout(timers.preclear);
+        timers.preclear = setTimeout('getPreclearContent()', 100);
       });
+      $('#usb_devices_list').trigger("change");
     }
   }
 );
@@ -19,11 +39,14 @@ function getPreclearContent()
   clearTimeout(timers.preclear);
   $.post(PreclearURL,{action:'get_content',display:display},function(data)
   {
+    var hovered = $( ".tooltip:hover" ).map(function(){return this.id;}).get();
     if ( $('#preclear-table-body').length )
-    { 
+    {
+      var target = $( '#preclear-table-body' );
+      var opened = [];
       currentScroll  = $(window).scrollTop();
       currentToggled = getToggledReports();
-      $( '#preclear-table-body' ).html( data.disks );
+      target.html( data.disks );
       toggleReports(currentToggled);
       $(window).scrollTop(currentScroll);
     }
@@ -31,9 +54,13 @@ function getPreclearContent()
     {
       $.each(data.status, function(i,v)
       {
+        var target = $("#preclear_"+i);
+        var opened = [];
+        target.find(".tooltip:hover").each(function(){ opened.push($(this).attr("id")); });
         $("#preclear_"+i).html("<i class='glyphicon glyphicon-dashboard hdd'></i><span style='margin:6px;'></span>"+v);
       });
     }
+    $.each(hovered, function(k,v){ if(v.length) { $("#"+v).trigger("mouseenter");} });
 
     window.disksInfo = JSON.parse(data.info);
 

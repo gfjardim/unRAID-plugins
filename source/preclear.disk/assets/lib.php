@@ -162,8 +162,8 @@ class Preclear
   public function Link($disk, $type)
   {
     $serial = $this->diskSerial($disk);
-    $icon   = "<a title='Preclear Disk' class='exec' onclick='startPreclear(\"{$serial}\")'><img src='/plugins/".$this->plugin."/icons/precleardisk.png'></a>";
-    $text   = "<a title='Preclear Disk' class='exec' onclick='startPreclear(\"{$serial}\")'>Start Preclear</a>";
+    $icon   = "<a title='Start Preclear' class='exec tooltip' onclick='startPreclear(\"{$serial}\")'><img src='/plugins/".$this->plugin."/icons/precleardisk.png'></a>";
+    $text   = "<a title='Start Preclear' class='exec' onclick='startPreclear(\"{$serial}\")'>Start Preclear</a>";
     return ($type == "text") ? $text : $icon;
   }
 
@@ -189,9 +189,9 @@ class Preclear
     $file    = "/tmp/preclear_stat_{$disk}";
     $serial  = $this->diskSerial($disk);
     $session = TMUX::hasSession("preclear_disk_{$serial}");
-    $rm      = "<a class='exec' style='color:#CC0000;font-weight:bold;margin-left:5px;' title='%s' onclick='stopPreclear(\"{$serial}\",\"%s\");'>";
+    $rm      = "<a id='preclear_rm' class='exec tooltip' style='color:#CC0000;font-weight:bold;margin-left:5px;' title='%s' onclick='stopPreclear(\"{$serial}\",\"%s\");'>";
     $rm     .= "<i class='glyphicon glyphicon-remove hdd'></i></a>";
-    $preview = "<a class='exec' style='margin-left:5px;' onclick='openPreclear(\"{$serial}\");' title='Preview'><i class='glyphicon glyphicon-eye-open hdd'></i></a>";
+    $preview = "<a id='preclear_open' class='exec tooltip' style='margin-left:5px;' onclick='openPreclear(\"{$serial}\");' title='Preview'><i class='glyphicon glyphicon-eye-open hdd'></i></a>";
     
     if (is_file($file))
     {

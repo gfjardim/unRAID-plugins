@@ -101,23 +101,6 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
   $(function(){
     addButtonTab('<a class="tooltip" style="cursor:pointer" onclick="getlog()" title="Download Log"><i class="fa fa-download"></i></a>', "Preclear Disk", true, true);
     addButtonTab('<a class="tooltip" style="cursor:pointer" onclick="openWindow(\'/webGui/scripts/tail_log&arg1=preclear.disk.log\',\'Log Information\',600,900);"title="Show Log"><i class="fa fa-file-text-o"></i></a>', "Preclear Disk", true, true);
-
-    // Load tooltipster if needed
-    if (! $.prototype.tooltipsters)
-    {
-      $.get("/plugins/<?=$plugin;?>/assets/tooltipster.bundle.hibrid.css", function(css)
-      {
-        $('<style type="text/css"></style>').html(css).appendTo("head");
-        $.getScript("/plugins/<?=$plugin;?>/assets/tooltipster.bundle.min.js").done(function()
-        {
-          addTooltip(".tooltip");
-        });
-      });
-    }
-    else
-    {
-      addTooltip(".tooltip");
-    }
   });
 
 
