@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2017.02.16">
+<!ENTITY version   "2017.02.16a">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -303,7 +303,7 @@ if [[ ! -e /root/mdcmd ]]; then
 fi
 
 # Creating some directories
-mkdir -p /boot/.preclear/ /usr/local/bin/
+mkdir -p /tmp/.preclear/ /usr/local/bin/
 
 # Statistics Sender
 sed -e "s#@PLUGIN@#Preclear Disks#g" "/boot/config/plugins/&name;/StatsInstall" &gt; "/usr/local/emhttp/plugins/&name;/StatsInstall.page"
