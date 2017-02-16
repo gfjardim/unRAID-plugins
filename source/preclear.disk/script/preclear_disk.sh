@@ -726,6 +726,10 @@ read_entire_disk() {
     fi
 
     if [ -f "$pause" ]; then
+      while [ -e "/proc/${display_pid}/exe" ]; do
+        sleep 1
+      done
+
       display_status "$read_type|###(${percent_read}% Done)### ***PAUSED***" "** PAUSED"
       echo "$disk_name|NN|${read_type_s}${cycle_disp}: PAUSED|$$" > $stat_file
 
