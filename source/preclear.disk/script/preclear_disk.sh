@@ -3,7 +3,7 @@ LC_CTYPE=C
 export LC_CTYPE
 
 # Version
-version="0.8.4-beta"
+version="0.8.5-beta"
 
 # PID
 script_pid=$BASHPID
@@ -470,7 +470,7 @@ write_disk(){
 
   bytes_dd=$(awk 'END{print $1}' $dd_output|xargs)
   if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
-    bytes_wrote=$bytes_dd
+    bytes_wrote=$(( $bytes_dd + $write_bs ))
   fi
 
   debug "${write_type_s}: dd - wrote ${bytes_wrote} of ${total_bytes}."
@@ -484,7 +484,7 @@ write_disk(){
   if [ "$dd_exit" -eq 0 ]; then
     debug "${write_type_s}: $dd_exit"
   else
-    debug "${write_type_s}: dd command failed, exit code: $dd_exit"
+    debug "${write_type_s}: $dd_exit"
   fi
 
   # Send final notification
@@ -738,6 +738,7 @@ read_entire_disk() {
       while [[ -f $pause ]]; do
         sleep 1
       done
+
       # Restore dd
       kill -CONT $dd_pid
     fi
@@ -753,12 +754,12 @@ read_entire_disk() {
 
   bytes_dd=$(awk 'END{print $1}' $dd_output|xargs)
   if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
-    bytes_read=$bytes_dd
+    bytes_read=$(( $bytes_dd + $read_bs ))
   fi
 
   debug "${read_type_s}: dd - read ${bytes_read} of ${total_bytes}."
 
-  debug "${write_type_s}: $dd_exit"
+  debug "${read_type_s}: $dd_exit"
 
   # Fail if not zeroed or error
   if grep -q "differ" "$cmp_output" &>/dev/null; then
@@ -1422,6 +1423,7 @@ if ! is_preclear_candidate $theDisk; then
   echo -e "\nPlease choose another one from below:\n"
   list_device_names
   echo -e "\n"
+  debug "Disk $theDisk is part of unRAID array. Aborted."
   exit 1
 fi
 

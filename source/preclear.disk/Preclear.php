@@ -120,6 +120,62 @@ function save_ini_file($file, $array)
   file_put_contents($file, implode(PHP_EOL, $res));
 }
 
+class Disk
+{
+  function __construct()
+  {
+    global $VERBOSE;
+    $this->verbose = $VERBOSE;
+  }
+
+  private function unasigned_disks()
+  {
+    $paths          = listDir("/dev/disk/by-id");
+    $disks_id       = preg_grep("#wwn-|-part#", $paths, PREG_GREP_INVERT);
+    $disks_real     = array_map(function($p){return realpath($p);}, $disks_id);
+    exec("/usr/bin/strings /boot/config/super.dat 2>/dev/null|grep -Po '.{10,}'", $disks_serial);
+    exec("udevadm info --query=property --name /dev/disk/by-label/UNRAID 2>/dev/null|grep -Po 'ID_SERIAL=\K.*'", $flash_serial);
+    $disks_cfg      = is_file("/boot/config/disk.cfg") ? parse_ini_file("/boot/config/disk.cfg") : array();
+    $cache_serial   = array_flip(preg_grep("#cacheId#i", array_flip($disks_cfg)));
+    $unraid_serials = array_merge($disks_serial,$cache_serial,$flash_serial);
+    $unraid_disks   = array();
+
+    if (is_file("/var/local/emhttp/disks.ini"))
+    {
+      $disksIni    = parse_ini_file("/var/local/emhttp/disks.ini", true);
+      $unraid_real = array_filter(array_map(function($disk){return $disk['device'] ? "/dev/${disk['device']}" : null;}, $disksIni));
+    }
+    else
+    {
+      foreach( $unraid_serials as $serial )
+      {
+        $unraid_disks = array_merge($unraid_disks, preg_grep("#-".preg_quote($serial, "#")."#", $disks_id));
+      }
+      $unraid_real = array_map(function($p){return realpath($p);}, $unraid_disks);
+    }
+
+    $unassigned  = array_flip(array_diff(array_combine($disks_id, $disks_real), $unraid_real));
+    natsort($unassigned);
+
+    foreach ( $unassigned as $k => $disk )
+    {
+      unset($unassigned[$k]);
+      $parts  = array_values(preg_grep("#{$disk}-part\d+#", $paths));
+      $device = realpath($disk);
+
+      if (! is_bool(strpos($device, "/dev/sd")) || ! is_bool(strpos($device, "/dev/hd")))
+      {
+        $unassigned[$disk] = array("device"=>$device,"partitions"=>$parts);
+      }
+    }
+    debug("\nDisks:\n+ ".implode("\n+ ", array_map(function($k,$v){return "$k => $v";}, $disks_real, $disks_id)), "DEBUG");
+    debug("\nunRAID Serials:\n+ ".implode("\n+ ", $unraid_serials), "DEBUG");
+    debug("\nunRAID Disks:\n+ ".implode("\n+ ", $unraid_disks), "DEBUG");
+    return $unassigned;
+  }
+
+}
+
 
 function get_unasigned_disks()
 {

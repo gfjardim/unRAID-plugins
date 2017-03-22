@@ -65,12 +65,13 @@ class Preclear
 
   function __construct()
   {
-    exec("/bin/lsblk -nbP -o name,type,label,size,mountpoint,fstype,serial 2>/dev/null", $blocks);
+    exec("/bin/lsblk -nbP -o name,type,label,size,mountpoint,fstype 2>/dev/null", $blocks);
     foreach ($blocks as $b)
     {
       $block = parse_ini_string(preg_replace("$\s+$", PHP_EOL, $b));
       if ($block['TYPE'] == "disk")
       {
+        $block['SERIAL'] = trim(shell_exec("udevadm info --query=property --name /dev/${block['NAME']} 2>/dev/null|grep -Po 'ID_SERIAL_SHORT=\K.*'"));
         $this->allDisks[$block['NAME']] = $block;
       }
     }
