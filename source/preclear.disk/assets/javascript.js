@@ -197,13 +197,13 @@ function startPreclear(serial)
 function stopPreclear(serial, ask)
 {
   var title = 'Stop Preclear';
-  var exec  = '$.post(PreclearURL,{action:"stop_preclear",serial:serial});'
+  var exec  = '$.post(PreclearURL,{action:"stop_preclear",serial:"'+serial+'"}).always(function(){window.location=window.location.pathname+window.location.hash});'
   var model = getDiskInfo(serial,"serial");
 
   if (ask != "ask")
   {
     eval(exec);
-    window.location=window.location.pathname+window.location.hash;
+    ;
     return true;
   }
 
@@ -221,7 +221,6 @@ function stopPreclear(serial, ask)
       {
         eval(exec);
         $( this ).dialog( "close" );
-        window.location=window.location.pathname+window.location.hash;
       },
       Cancel: function()
       {

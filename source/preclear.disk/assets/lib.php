@@ -90,7 +90,6 @@ class Preclear
   public function serialDisk($serial)
   {
     $disks = array_values(array_filter($this->allDisks, function($v) use ($serial) {return $v["SERIAL"] == $serial;}));
-    var_dump($disks);
     return count($disks) ? "/dev/{$disks[0]['NAME']}" : NULL;
   }
 
