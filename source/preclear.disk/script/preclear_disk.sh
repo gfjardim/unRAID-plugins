@@ -11,7 +11,11 @@ script_pid=$BASHPID
 # Serial
 for arg in "$@"; do
   if [ -b "$arg" ]; then
-    serial_number=$(udevadm info --query=all --name="${arg}" | awk -F'=' '/ID_SERIAL_SHORT/{print $2}')
+    attrs=$(udevadm info --query=property --name="${arg}")
+    serial_number=$(echo -e "$attrs" | awk -F'=' '/ID_SCSI_SERIAL/{print $2}')
+    if [ -z "$serial_number" ]; then
+      serial_number=$(echo -e "$attrs" | awk -F'=' '/ID_SERIAL_SHORT/{print $2}')
+    fi
     break
   else
     serial_number=""

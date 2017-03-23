@@ -71,7 +71,8 @@ class Preclear
       $block = parse_ini_string(preg_replace("$\s+$", PHP_EOL, $b));
       if ($block['TYPE'] == "disk")
       {
-        $block['SERIAL'] = trim(shell_exec("udevadm info --query=property --name /dev/${block['NAME']} 2>/dev/null|grep -Po 'ID_SERIAL_SHORT=\K.*'"));
+        $attrs = parse_ini_string(shell_exec("udevadm info --query=property --name /dev/${block['NAME']} 2>/dev/null"));
+        $block['SERIAL'] = isset($attrs["ID_SCSI_SERIAL"]) ? $attrs["ID_SCSI_SERIAL"] : $attrs['ID_SERIAL_SHORT'];
         $this->allDisks[$block['NAME']] = $block;
       }
     }
