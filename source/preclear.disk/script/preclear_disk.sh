@@ -29,15 +29,14 @@ else
   log_prefix="preclear_disk_${script_pid}:"
 fi
 
-
 # Redirect errors to log
 exec 2> >(while read err; do echo "$(date +"%b %d %T" ) ${log_prefix} ${err}" >> /var/log/preclear.disk.log; echo "${err}"; done; >&2)
-
 
 # Let's make sure some features are supported by BASH
 BV=$(echo $BASH_VERSION|tr '.' "\n"|grep -Po "^\d+"|xargs printf "%.2d\n"|tr -d '\040\011\012\015')
 if [ "$BV" -lt "040253" ]; then
   echo -e "Sorry, your BASH version isn't supported.\nThe minimum required version is 4.2.53.\nPlease update."
+  debug "Sorry, your BASH version isn't supported.\nThe minimum required version is 4.2.53.\nPlease update."
   exit 2
 fi
 
@@ -45,6 +44,7 @@ fi
 for dep in cat awk basename blockdev comm date dd find fold getopt grep kill openssl printf readlink seq sort strings sum tac tmux todos tput udevadm xargs; do
   if ! type $dep >/dev/null 2>&1 ; then
     echo -e "The following dependency isn'y met: [$dep]\nPlease install it and try again."
+    debug "The following dependency isn'y met: [$dep]\nPlease install it and try again."
     exit 1
   fi
 done
@@ -1060,7 +1060,7 @@ output_smart() {
   nfinal="${final}_$(( $RANDOM * 19318203981230 + 40 ))"
   cp -f "$final" "$nfinal"
   sed -i " 1 s/$/|STATUS/" $nfinal
-  status=$(smartctl --attributes $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" |\
+  status=$(smartctl --attributes $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" | \
            grep -v "ATTRIBUTE_NAME" | grep -v "^$" | awk '{print $1 "-" $2 "|" $9 }')
   while read line; do
     attr=$(echo $line | cut -d'|' -f1)

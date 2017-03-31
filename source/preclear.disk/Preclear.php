@@ -269,7 +269,7 @@ function get_info($device) {
   else
   {
     $disk =& $state[$device];
-    $udev = parse_ini_string(shell_exec("udevadm info --query=property --path $(udevadm info -q path -n $device 2>/dev/null) 2>/dev/null"));
+    $udev = parse_ini_string(shell_exec("udevadm info --query=property --name ${device} 2>/dev/null"));
     $disk = array_intersect_key($udev, array_flip($whitelist));
     exec("smartctl -i -d sat,auto $device 2>/dev/null", $smartInfo);
     $disk['FAMILY']   = $parse_smart($smartInfo, "Model Family");

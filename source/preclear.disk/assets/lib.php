@@ -65,13 +65,15 @@ class Preclear
 
   function __construct()
   {
-    exec("/bin/lsblk -nbP -o name,type,label,size,mountpoint,fstype 2>/dev/null", $blocks);
+    $this->allDisks = [];
+    exec("/bin/lsblk -nbP -o name,type,size 2>/dev/null", $blocks);
     foreach ($blocks as $b)
     {
-      $block = parse_ini_string(preg_replace("$\s+$", PHP_EOL, $b));
-      if ($block['TYPE'] == "disk")
+      $block = parse_ini_string(preg_replace('$"\s+(\w+=)$', '"'.PHP_EOL.'\1', $b)) ?: [];
+      $device = "/dev/${block['NAME']}";
+      if ($block['TYPE'] == "disk" && file_exists($device))
       {
-        $attrs = parse_ini_string(shell_exec("udevadm info --query=property --name /dev/${block['NAME']} 2>/dev/null"));
+        $attrs = parse_ini_string(shell_exec("udevadm info --query=property --name ${device} 2>/dev/null"));
         $block['SERIAL'] = isset($attrs["ID_SCSI_SERIAL"]) ? $attrs["ID_SCSI_SERIAL"] : $attrs['ID_SERIAL_SHORT'];
         $this->allDisks[$block['NAME']] = $block;
       }

@@ -99,7 +99,7 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
   <?if (isset($_GET['disk']) && ! $Preclear->isRunning($_GET['disk']) ) echo "startDisk = '{$_GET[disk]}';";?>
 
   $(function(){
-    addButtonTab('<a class="tooltip" style="cursor:pointer" onclick="getlog()" title="Download Log"><i class="fa fa-download"></i></a>', "Preclear Disk", true, true);
+    addButtonTab('<a class="tooltip" style="cursor:pointer" onclick="getlog(this)" title="Download Log"><i class="fa fa-download"></i></a>', "Preclear Disk", true, true);
     addButtonTab('<a class="tooltip" style="cursor:pointer" onclick="openWindow(\'/webGui/scripts/tail_log&arg1=preclear.disk.log\',\'Log Information\',600,900);"title="Show Log"><i class="fa fa-file-text-o"></i></a>', "Preclear Disk", true, true);
   });
 

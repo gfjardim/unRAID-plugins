@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2017.03.23">
+<!ENTITY version   "2017.03.31">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -314,12 +314,13 @@ mkdir -p /tmp/.preclear/ /usr/local/bin/
 
 # Statistics Sender
 sed -e "s#@PLUGIN@#Preclear Disks#g" "/boot/config/plugins/&name;/StatsInstall" &gt; "/usr/local/emhttp/plugins/&name;/StatsInstall.page"
-dismissed="/boot/config/plugins/statistics.sender/dismissed"
-version_dismiss="/boot/config/plugins/&name;/statistics.sender.dismissed-&version;"
-if [ ! -f "$version_dismiss" ]; then
-  rm "$dismissed"
-  touch "$version_dismiss"
-fi
+
+#dismissed="/boot/config/plugins/statistics.sender/dismissed"
+#version_dismiss="/boot/config/plugins/&name;/statistics.sender.dismissed-&version;"
+#if [ ! -f "$version_dismiss" ]; then
+#  rm "$dismissed"
+#  touch "$version_dismiss"
+#fi
 
 # Make sure log file exists
 touch /var/log/preclear.disk.log
