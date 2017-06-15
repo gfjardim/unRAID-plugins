@@ -95,341 +95,37 @@ function listDir($root)
   return $paths;
 }
 
-
-function save_ini_file($file, $array)
-{
-  $res = array();
-
-  foreach($array as $key => $val)
-  {
-    if(is_array($val))
-    {
-      $res[] = PHP_EOL."[".addslashes($key)."]";
-
-      foreach($val as $skey => $sval)
-      {
-        $res[] = "$skey = ".(is_numeric($sval) ? $sval : '"'.addslashes($sval).'"');
-      }
-    }
-
-    else
-    {
-      $res[] = "$key = ".(is_numeric($val) ? $val : '"'.addslashes($val).'"');
-    }
-  }
-  file_put_contents($file, implode(PHP_EOL, $res));
-}
-
-class Disk
-{
-  function __construct()
-  {
-    global $VERBOSE;
-    $this->verbose = $VERBOSE;
-  }
-
-  private function unasigned_disks()
-  {
-    $paths          = listDir("/dev/disk/by-id");
-    $disks_id       = preg_grep("#wwn-|-part#", $paths, PREG_GREP_INVERT);
-    $disks_real     = array_map(function($p){return realpath($p);}, $disks_id);
-    exec("/usr/bin/strings /boot/config/super.dat 2>/dev/null|grep -Po '.{10,}'", $disks_serial);
-    exec("udevadm info --query=property --name /dev/disk/by-label/UNRAID 2>/dev/null|grep -Po 'ID_SERIAL=\K.*'", $flash_serial);
-    $disks_cfg      = is_file("/boot/config/disk.cfg") ? parse_ini_file("/boot/config/disk.cfg") : array();
-    $cache_serial   = array_flip(preg_grep("#cacheId#i", array_flip($disks_cfg)));
-    $unraid_serials = array_merge($disks_serial,$cache_serial,$flash_serial);
-    $unraid_disks   = array();
-
-    if (is_file("/var/local/emhttp/disks.ini"))
-    {
-      $disksIni    = parse_ini_file("/var/local/emhttp/disks.ini", true);
-      $unraid_real = array_filter(array_map(function($disk){return $disk['device'] ? "/dev/${disk['device']}" : null;}, $disksIni));
-    }
-    else
-    {
-      foreach( $unraid_serials as $serial )
-      {
-        $unraid_disks = array_merge($unraid_disks, preg_grep("#-".preg_quote($serial, "#")."#", $disks_id));
-      }
-      $unraid_real = array_map(function($p){return realpath($p);}, $unraid_disks);
-    }
-
-    $unassigned  = array_flip(array_diff(array_combine($disks_id, $disks_real), $unraid_real));
-    natsort($unassigned);
-
-    foreach ( $unassigned as $k => $disk )
-    {
-      unset($unassigned[$k]);
-      $parts  = array_values(preg_grep("#{$disk}-part\d+#", $paths));
-      $device = realpath($disk);
-
-      if (! is_bool(strpos($device, "/dev/sd")) || ! is_bool(strpos($device, "/dev/hd")))
-      {
-        $unassigned[$disk] = array("device"=>$device,"partitions"=>$parts);
-      }
-    }
-    debug("\nDisks:\n+ ".implode("\n+ ", array_map(function($k,$v){return "$k => $v";}, $disks_real, $disks_id)), "DEBUG");
-    debug("\nunRAID Serials:\n+ ".implode("\n+ ", $unraid_serials), "DEBUG");
-    debug("\nunRAID Disks:\n+ ".implode("\n+ ", $unraid_disks), "DEBUG");
-    return $unassigned;
-  }
-
-}
-
-
-function get_unasigned_disks()
-{
-  $paths          = listDir("/dev/disk/by-id");
-  $disks_id       = preg_grep("#wwn-|-part#", $paths, PREG_GREP_INVERT);
-  $disks_real     = array_map(function($p){return realpath($p);}, $disks_id);
-  exec("/usr/bin/strings /boot/config/super.dat 2>/dev/null|grep -Po '.{10,}'", $disks_serial);
-  exec("udevadm info --query=property --name /dev/disk/by-label/UNRAID 2>/dev/null|grep -Po 'ID_SERIAL=\K.*'", $flash_serial);
-  $disks_cfg      = is_file("/boot/config/disk.cfg") ? parse_ini_file("/boot/config/disk.cfg") : array();
-  $cache_serial   = array_flip(preg_grep("#cacheId#i", array_flip($disks_cfg)));
-  $unraid_serials = array_merge($disks_serial,$cache_serial,$flash_serial);
-  $unraid_disks   = array();
-
-  if (is_file("/var/local/emhttp/disks.ini"))
-  {
-    $disksIni    = parse_ini_file("/var/local/emhttp/disks.ini", true);
-    $unraid_real = array_filter(array_map(function($disk){return $disk['device'] ? "/dev/${disk['device']}" : null;}, $disksIni));
-  }
-  else
-  {
-    foreach( $unraid_serials as $serial )
-    {
-      $unraid_disks = array_merge($unraid_disks, preg_grep("#-".preg_quote($serial, "#")."#", $disks_id));
-    }
-    $unraid_real = array_map(function($p){return realpath($p);}, $unraid_disks);
-  }
-
-  $unassigned  = array_flip(array_diff(array_combine($disks_id, $disks_real), $unraid_real));
-  natsort($unassigned);
-
-  foreach ( $unassigned as $k => $disk )
-  {
-    unset($unassigned[$k]);
-    $parts  = array_values(preg_grep("#{$disk}-part\d+#", $paths));
-    $device = realpath($disk);
-
-    if (! is_bool(strpos($device, "/dev/sd")) || ! is_bool(strpos($device, "/dev/hd")))
-    {
-      $unassigned[$disk] = array("device"=>$device,"partitions"=>$parts);
-    }
-  }
-  debug("\nDisks:\n+ ".implode("\n+ ", array_map(function($k,$v){return "$k => $v";}, $disks_real, $disks_id)), "DEBUG");
-  debug("\nunRAID Serials:\n+ ".implode("\n+ ", $unraid_serials), "DEBUG");
-  debug("\nunRAID Disks:\n+ ".implode("\n+ ", $unraid_disks), "DEBUG");
-  return $unassigned;
-}
-
-
-function is_mounted($dev)
-{
-  return (shell_exec("mount 2>&1|grep -c '${dev} '") == 0) ? FALSE : TRUE;
-}
-
-
-function get_all_disks_info($bus="all")
-{
-  $disks = benchmark( "get_unasigned_disks" );
-
-  foreach ($disks as $key => $disk)
-  {
-    if ($disk['type'] != $bus && $bus != "all")
-    {
-      continue;
-    }
-    $disk = array_merge($disk, get_disk_info($key));
-    $disks[$key] = $disk;
-  }
-
-  usort($disks, create_function('$a, $b','$key="device";if ($a[$key] == $b[$key]) return 0; return ($a[$key] < $b[$key]) ? -1 : 1;'));
-  return $disks;
-}
-
-
-function get_info($device) {
-  global $state_file;
-
-  $parse_smart = function($smart, $property) 
-  {
-    $value = trim(explode(":", array_values(preg_grep("#$property#", $smart))[0])[1]);
-    return ($value) ? $value : "n/a";
-  };
-
-  $whitelist = array("ID_MODEL","ID_SCSI_SERIAL","ID_SERIAL_SHORT");
-  $state = is_file($state_file) ? @parse_ini_file($state_file, true) : array();
-
-  if (array_key_exists($device, $state) && ! $reload)
-  {
-    return $state[$device];
-  }
-
-  else
-  {
-    $disk =& $state[$device];
-    $udev = parse_ini_string(shell_exec("udevadm info --query=property --name ${device} 2>/dev/null"));
-    $disk = array_intersect_key($udev, array_flip($whitelist));
-    exec("smartctl -i -d sat,auto $device 2>/dev/null", $smartInfo);
-    $disk['FAMILY']   = $parse_smart($smartInfo, "Model Family");
-    $disk['MODEL']    = $parse_smart($smartInfo, "Device Model");
-
-    if ($disk['FAMILY'] == "n/a" && $disk['MODEL'] == "n/a" )
-    {
-      $vendor         = $parse_smart($smartInfo, "Vendor");
-      $product        = $parse_smart($smartInfo, "Product");
-      $revision       = $parse_smart($smartInfo, "Revision");
-      $disk['FAMILY'] = "{$vendor} {$product}";
-      $disk['MODEL']  = "{$vendor} {$product} - Rev. {$revision}";
-    }
-
-    $disk['FIRMWARE'] = $parse_smart($smartInfo, "Firmware Version");
-    $disk['SIZE']     = intval(trim(shell_exec("blockdev --getsize64 ${device} 2>/dev/null")));
-    save_ini_file($state_file, $state);
-    return $state[$device];
-  }
-}
-
-
-function get_disk_info($device, $reload=FALSE)
-{
-  $disk = array();
-  $attrs = benchmark("get_info", $device);
-  $disk['serial_short'] = isset($attrs["ID_SCSI_SERIAL"]) ? $attrs["ID_SCSI_SERIAL"] : $attrs['ID_SERIAL_SHORT'];
-  $disk['serial']       = trim("{$attrs[ID_MODEL]}_{$disk[serial_short]}");
-  $disk['device']       = realpath($device);
-  $disk['family']       = $attrs['FAMILY'];
-  $disk['model']        = $attrs['MODEL'];
-  $disk['firmware']     = $attrs['FIRMWARE'];
-  $disk['size']         = sprintf("%s %s", my_scale($attrs['SIZE'] , $unit), $unit);
-  $disk['temperature']  = benchmark("get_temp", $device);
-  return $disk;
-}
-
-
-function is_disk_running($dev)
-{
-  global $plugin;
-  $file      = "/var/state/{$plugin}/hdd_state.json";
-  $stats     = is_file($file) ? json_decode(file_get_contents($file),TRUE) : array();
-  $timestamp = isset($stats[$dev]['timestamp']) ? $stats[$dev]['timestamp'] : time();
-  $running   = isset($stats[$dev]['running']) ? $stats[$dev]['running'] : NULL;
-
-  if ( $running === NULL || (time() - $timestamp) > 300 )
-  {
-    $timestamp = time();
-    $running   = trim(shell_exec("hdparm -C $dev 2>/dev/null| grep -c standby"));
-  }
-
-  $stats[$dev] = array('timestamp' => $timestamp,
-                       'running'   => $running);
-
-  file_put_contents($file, json_encode($stats));
-
-  return ($running == 0) ? TRUE : FALSE;
-}
-
-
-function get_temp($dev)
-{
-  global $plugin;
-  $tc        = "/var/state/{$plugin}/hdd_temp.json";
-  $stats     = is_file($tc) ? json_decode(file_get_contents($tc),TRUE) : array();
-  $all_types = [ "-d scsi", "-d ata", "-d auto", "-d sat,auto", "-d sat,12", "-d usbjmicron", "-d usbjmicron,0", "-d usbjmicron,1" ]; 
-  $all_types = array_merge($all_types, [ "-x -d usbjmicron,x,0", "-x -d usbjmicron,x,1", "-d usbsunplus", "-d usbcypress", "-d sat -T permissive" ]);
-  $timestamp = isset($stats[$dev]['timestamp']) ? $stats[$dev]['timestamp'] : time();
-  $smart     = isset($stats[$dev]['smart']) ? $stats[$dev]['smart'] : null;
-  $temp      = isset($stats[$dev]['temp']) ? $stats[$dev]['temp'] : null;
-
-  if ( ! $smart )
-  {
-    debug("SMART parameters for drive [{$dev}] not found, probing...", "DEBUG");
-    $smart = "none";
-    foreach ($all_types as $type)
-    {
-      $res = shell_exec("smartctl --attributes {$type} '{$dev}' 2>/dev/null| grep -c 'Temperature_Celsius'");
-      if ( $res > 0 )
-      {
-        debug("SMART parameters for disk [{$dev}] ($smart) found.", "DEBUG");
-        $smart = $type;
-        break;
-      }
-    }
-  }
-
-  if ( (time() - $timestamp > 900) || ! $temp )
-  {
-    if ( $smart != "none" && is_disk_running($dev) )
-    {
-      debug("Temperature probing of disk '{$dev}'", "DEBUG");
-      $temp = trim(shell_exec("smartctl -A {$type} $dev 2>/dev/null| grep -m 1 -i Temperature_Celsius | awk '{print $10}'"));
-      $temp = (is_numeric($temp)) ? $temp : null; 
-      $timestamp = time();
-    }
-
-    else
-    {
-      $temp = null;
-    }
-  }
-
-  $stats[$dev] = array('timestamp' => $timestamp,
-                       'temp'      => $temp,
-                       'smart'     => $smart);
-
-  file_put_contents($tc, json_encode($stats));
-
-  return $temp ? $temp : "*";
-
-}
-
-
-function benchmark()
-{
-  $params   = func_get_args();
-  $function = $params[0];
-  array_shift($params);
-  $time     = -microtime(true); 
-  $out      = call_user_func_array($function, $params);
-  $time    += microtime(true); 
-  debug("benchmark: $function(".implode(",", $params).") took ".sprintf('%f', $time)."s.", "DEBUG");
-  return $out;
-}
-
-
 $start_time = time();
 switch ($_POST['action'])
 {
 
   case 'get_content':
     debug("Starting get_content: ".(time() - $start_time),'DEBUG');
-    $disks = benchmark("get_all_disks_info");
+    $disks = Misc::get_json($diskinfo);
     $all_status = array();
 
     if ( count($disks) )
     {
       $odd="odd";
-      
       foreach ($disks as $disk)
       {
-        $disk_name = basename($disk['device']);
-        $disk_icon = benchmark("is_disk_running", "${disk['device']}") ? "green-on.png" : "green-blink.png";
-        $serial    = $disk['serial'];
-        $temp      = my_temp($disk['temperature']);
-        $mounted   = array_reduce($disk['partitions'], function ($found, $partition) { return $found || is_mounted(realpath($partition)); }, false);
+        $disk_name = $disk['NAME'];
+        $disk_icon = ($disk['RUNNING']) ? "green-on.png" : "green-blink.png";
+        $serial    = $disk['SERIAL'];
+        $temp      = my_temp($disk['TEMP']);
+        $mounted   = $disk["MOUNTED"];
         $reports   = is_dir("/boot/preclear_reports") ? listDir("/boot/preclear_reports") : [];
         $reports   = array_filter($reports, function ($report) use ($disk)
                                   {
-                                    return preg_match("|".$disk["serial_short"]."|", $report) && ( preg_match("|_report_|", $report) || preg_match("|_rpt_|", $report) ); 
+                                    return preg_match("|".$disk["SERIAL_SHORT"]."|", $report) && ( preg_match("|_report_|", $report) || preg_match("|_rpt_|", $report) ); 
                                   });
 
         if (count($reports))
         {
-          $title  = "<span title='Click to view reports.' class='exec toggle-reports' hdd='{$disk_name}'>
+          $title  = "<span title='Click to view reports.' class='exec toggle-reports' style='margin-left:0px;' hdd='{$disk_name}'>
                       <i class='glyphicon glyphicon-hdd hdd'></i>
                       <i class='glyphicon glyphicon-plus-sign glyphicon-append'></i>
-                      ${disk['serial']}
+                      ${disk['SERIAL']}
                     </span>";
           
           $report_files = "<div class='toggle-${disk_name}' style='display:none;'>";
@@ -451,13 +147,13 @@ switch ($_POST['action'])
         else
         {
           $report_files="";
-          $title  = "<span class='toggle-reports' hdd='{$disk_name}'><i class='glyphicon glyphicon-hdd hdd'></i><span style='margin:8px;'></span>{$serial}";
+          $title  = "<span class='toggle-reports' hdd='{$disk_name}' style='margin-left:0px;'><i class='glyphicon glyphicon-hdd hdd'></i><span style='margin:8px;'></span>{$serial}";
         }
 
         if ($Preclear->isRunning($disk_name))
         {
-          $status  = $Preclear->Status($disk_name, $serial);
-          $all_status[$disk['serial_short']] = $status;
+          $status  = $Preclear->Status($disk_name, $disk["SERIAL_SHORT"]);
+          $all_status[$disk['SERIAL_SHORT']] = $status;
         }
         else
         {

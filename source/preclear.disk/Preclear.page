@@ -5,7 +5,7 @@ Icon="preclear.disk.png"
 <?
 $plugin = "preclear.disk";
 require_once("plugins/${plugin}/Preclear.php");
-$numdisks = count(get_unasigned_disks())-1;
+$numdisks = count(Misc::get_json($diskinfo))-1;
 $Preclear = new Preclear;
 $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAME'])), $plugin, date('Ymd-Hi') );
 ?>
@@ -52,7 +52,7 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
 
 </script>
 <style>
-  table.preclear {padding:0px;margin:-21px 0px 22px 0px;border-collapse:collapse;white-space:nowrap;}
+  table.preclear {padding:0px;border-collapse:collapse;white-space:nowrap;}
   table.preclear thead tr>td{text-align:left;vertical-align:top;width:8%;padding-left:12px;}
   table.preclear thead tr>td+td{text-align:left;width:auto;padding-left:12px;}
   table.preclear tr>td{vertical-align:top;text-align:left;width:8%;padding-left:12px;padding-right:0;white-space:nowrap;}
@@ -70,7 +70,7 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
 
 </style>
 <?=$Preclear->html();?>
-<table class='preclear custom_head'>
+<table class='disk_status preclear custom_head'>
   <thead>
     <tr>
       <td>Device</td>
@@ -99,8 +99,8 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
   <?if (isset($_GET['disk']) && ! $Preclear->isRunning($_GET['disk']) ) echo "startDisk = '{$_GET[disk]}';";?>
 
   $(function(){
-    addButtonTab('<a class="tooltip" style="cursor:pointer" onclick="getlog(this)" title="Download Log"><i class="fa fa-download"></i></a>', "Preclear Disk", true, true);
-    addButtonTab('<a class="tooltip" style="cursor:pointer" onclick="openWindow(\'/webGui/scripts/tail_log&arg1=preclear.disk.log\',\'Log Information\',600,900);"title="Show Log"><i class="fa fa-file-text-o"></i></a>', "Preclear Disk", true, true);
+    addButtonTab('<a class="tooltip-toggle" style="cursor:pointer" onclick="getlog(this)" title="Download Log"><i class="fa fa-download"></i></a>', "Preclear Disk", true, true);
+    addButtonTab('<a class="tooltip-toggle" style="cursor:pointer" onclick="openWindow(\'/webGui/scripts/tail_log&arg1=preclear.disk.log\',\'Log Information\',600,900);"title="Show Log"><i class="fa fa-file-text-o"></i></a>', "Preclear Disk", true, true);
   });
 
 

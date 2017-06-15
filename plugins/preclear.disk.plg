@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2017.03.31">
+<!ENTITY version   "2017.06.14">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,12 @@
 
 <CHANGES>
 ##&name;
+
+
+###2017.06.14
+- Fix: gather information in the background avoiding webgui to freeze
+- Fix: script version 0.8.6 - add timeout to 'smartctl' commands
+- Fix: Azure theme compatibility
 
 ###2017.03.23
 - Fix: mismatch short serial numbers - bug introduced in the last version 
@@ -330,6 +336,11 @@ chmod 644 $(awk '/\.(htm|php|js|page|css|png|plg|gif|cfg|md)$/ {print "/"$0}' /v
 chmod -R 755 /usr/local/emhttp/plugins/&name;/script/
 ln -sf /usr/local/emhttp/plugins/&name;/script/preclear.sh /usr/local/bin/preclear
 
+# Install diskinfo service
+mv /usr/local/emhttp/plugins/preclear.disk/rc.diskinfo /etc/rc.d/rc.diskinfo
+chmod +x /etc/rc.d/rc.diskinfo
+/etc/rc.d/rc.diskinfo --daemon
+
 # Cleaning old source files
 find /boot/config/plugins/&name;/ -type f -iname "&name;*.txz" ! -iname "*&version;*" -delete
 find /boot/config/plugins/&name;/ -type f -iname "&name;*.md5" ! -iname "*&version;*" -delete
@@ -339,7 +350,7 @@ echo ""
 echo "-----------------------------------------------------------"
 echo " &name; has been installed."
 echo " This plugin requires Dynamix webGui to operate"
-echo " Copyright 2015-2016, gfjardim"
+echo " Copyright 2015-2017, gfjardim"
 echo " Version: &version;"
 echo "-----------------------------------------------------------"
 echo ""
@@ -357,6 +368,16 @@ rm -rf /boot/config/plugins/&name; \
        /var/state/&name; \
        /boot/.preclear/
 find /var/log/packages -type f -iname "&name;-*" -delete
+
+echo ""
+echo "-----------------------------------------------------------"
+echo " &name; has been uninstalled."
+echo " Please reboot your server to complete uninstall this plugin."
+echo " Copyright 2015-2017, gfjardim"
+echo " Version: &version;"
+echo "-----------------------------------------------------------"
+echo ""
+
 exit 0
 </INLINE>
 </FILE>

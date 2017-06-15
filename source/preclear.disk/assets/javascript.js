@@ -6,15 +6,20 @@ if (! $.prototype.tooltipsters)
   $("<script type='text/javascript' src='/plugins/"+plugin+"/assets/tooltipster.bundle.min.js'>").appendTo("head");
 }
 
-$('body').on('mouseenter', '.tooltip:not(.tooltipstered)', function()
+$('body').on('mouseenter', '.tooltip:not(.tooltipstered), .tooltip-toggle:not(.tooltipstered)', function()
 {
+  onClose = {click:true, scroll:true, mouseleave:true, tap:true};
+  if ( $(this).hasClass("tooltip-toggle") )
+  {
+    onClose.click = false;
+  }
   $(this).tooltipster(
   {
     delay:100,
     zIndex:100,
     trigger:'custom',
-    triggerOpen:{mouseenter: true},
-    triggerClose:{click:false, scroll:true, mouseleave:true}
+    triggerOpen:{mouseenter:true, touchstart:true},
+    triggerClose:onClose,
   }).tooltipster('open');
 });
 
@@ -103,11 +108,11 @@ function startPreclear(serial)
   }
 
   var title = 'Start Preclear';
-  $( "#preclear-dialog" ).html("<dl><dt>Model Family:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(serial, 'family')+"</span></dd></dl>");
-  $( "#preclear-dialog" ).append("<dl><dt>Device Model:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(serial, 'model')+"</span></dd></dl>");
-  $( "#preclear-dialog" ).append("<dl><dt>Serial Number:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(serial, 'serial_short')+"</span></dd></dl>");
-  $( "#preclear-dialog" ).append("<dl><dt>Firmware Version:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(serial, 'firmware')+"</span></dd></dl>");
-  $( "#preclear-dialog" ).append("<dl><dt>Size:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(serial, 'size')+"</span></dd></dl><hr style='margin-left:12px;'>");
+  $( "#preclear-dialog" ).html("<dl><dt>Model Family:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(serial, 'FAMILY')+"</span></dd></dl>");
+  $( "#preclear-dialog" ).append("<dl><dt>Device Model:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(serial, 'MODEL')+"</span></dd></dl>");
+  $( "#preclear-dialog" ).append("<dl><dt>Serial Number:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(serial, 'SERIAL_SHORT')+"</span></dd></dl>");
+  $( "#preclear-dialog" ).append("<dl><dt>Firmware Version:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(serial, 'FIRMWARE')+"</span></dd></dl>");
+  $( "#preclear-dialog" ).append("<dl><dt>Size:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(serial, 'SIZE_H')+"</span></dd></dl><hr style='margin-left:12px;'>");
 
   if (typeof(scripts) !== 'undefined')
   {
@@ -144,7 +149,7 @@ function startPreclear(serial)
         $(e.target).attr('disabled', true);
         var opts       = new Object();
         opts["action"] = "start_preclear";
-        opts["device"] = getDiskInfo(serial, 'device');
+        opts["device"] = getDiskInfo(serial, 'DEVICE');
         opts["op"]     = getVal(this, "op");
         opts["scope"]  = scope;
 
@@ -198,7 +203,7 @@ function stopPreclear(serial, ask)
 {
   var title = 'Stop Preclear';
   var exec  = '$.post(PreclearURL,{action:"stop_preclear",serial:"'+serial+'"}).always(function(){window.location=window.location.pathname+window.location.hash});'
-  var model = getDiskInfo(serial,"serial");
+  var model = getDiskInfo(serial,"SERIAL");
 
   if (ask != "ask")
   {
@@ -321,9 +326,12 @@ function toggleNotification(el) {
 
 
 function getDiskInfo(serial, info){
-  for (var i = disksInfo.length - 1; i >= 0; i--) {
-    if (disksInfo[i]['serial_short'].indexOf(serial) > -1 ){
-      return disksInfo[i][info];
+  for(key in disksInfo)
+  {
+    disk = disksInfo[key];
+    if(disk.hasOwnProperty('SERIAL_SHORT') && disk['SERIAL_SHORT'] == serial)
+    {
+      return disk[info];
     }
   }
 }
@@ -418,7 +426,7 @@ function addButtonTab(Button, Name, autoHide, Append)
 
   var Target    = get_tab_title_by_name(Name);
   var elementId = 'event-' + new Date().getTime() * Math.floor(Math.random()*100000);
-  var element   = $("<span id='"+elementId+"' class='status'>"+Button+"</span>");
+  var element   = $("<span id='"+elementId+"' class='status' style='padding-left:5px;'>"+Button+"</span>");
   
   if (element.find("input[type='button']").length)
   {

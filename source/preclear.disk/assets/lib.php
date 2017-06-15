@@ -6,9 +6,9 @@ if (!isset($var)) {
   $var = @parse_ini_file("$docroot/state/var.ini");
 }
 
-$state_file   = "/var/state/{$plugin}/state.ini";
-$log_file     = "/var/log/{$plugin}.log";
-
+$state_file = "/var/state/{$plugin}/state.ini";
+$log_file   = "/var/log/{$plugin}.log";
+$diskinfo   = "/var/local/emhttp/plugins/diskinfo/diskinfo.json";
 
 class TMUX
 {
@@ -57,6 +57,40 @@ class TMUX
 
 }
 
+class Misc
+{
+
+  public function save_json($file, $content)
+  {
+    file_put_contents($file, json_encode($content, JSON_PRETTY_PRINT ));
+  }
+
+
+  public function get_json($file)
+  {
+    return file_exists($file) ? json_decode(file_get_contents($file), true) : [];
+  }
+
+
+  public function disk_device($disk)
+  {
+    $name = Misc::disk_name($disk);
+    return (file_exists($disk)) ? $disk : "/dev/${name}";
+  }
+
+
+  public function disk_name($disk)
+  {
+    return (file_exists($disk)) ? basename($disk) : $disk;
+  }
+
+
+  public function array_first_element($arr)
+  {
+    return (is_array($arr) && count($arr)) ? $arr[0] : $arr;
+  }
+}
+
 
 class Preclear
   {
@@ -65,34 +99,22 @@ class Preclear
 
   function __construct()
   {
-    $this->allDisks = [];
-    exec("/bin/lsblk -nbP -o name,type,size 2>/dev/null", $blocks);
-    foreach ($blocks as $b)
-    {
-      $block = parse_ini_string(preg_replace('$"\s+(\w+=)$', '"'.PHP_EOL.'\1', $b)) ?: [];
-      $device = "/dev/${block['NAME']}";
-      if ($block['TYPE'] == "disk" && file_exists($device))
-      {
-        $attrs = parse_ini_string(shell_exec("udevadm info --query=property --name ${device} 2>/dev/null"));
-        $block['SERIAL'] = isset($attrs["ID_SCSI_SERIAL"]) ? $attrs["ID_SCSI_SERIAL"] : $attrs['ID_SERIAL_SHORT'];
-        $this->allDisks[$block['NAME']] = $block;
-      }
-    }
+    global $diskinfo;
+    $this->allDisks = Misc::get_json($diskinfo);
   }
 
 
   public function diskSerial($disk)
   {
-    $disk  = basename(trim($disk));
-    $disks = array_filter($this->allDisks, function($k) use ($disk) {return $k == $disk;}, ARRAY_FILTER_USE_KEY);
-    return count($disks) ? $disks[$disk]["SERIAL"] : NULL;
+    $disk  = Misc::disk_name($disk);
+    return count($this->allDisks) ? $this->allDisks[$disk]["SERIAL_SHORT"] : NULL;
   }
 
   
   public function serialDisk($serial)
   {
-    $disks = array_values(array_filter($this->allDisks, function($v) use ($serial) {return $v["SERIAL"] == $serial;}));
-    return count($disks) ? "/dev/{$disks[0]['NAME']}" : NULL;
+    $disks = array_values(array_filter($this->allDisks, function($v) use ($serial) {return $v["SERIAL_SHORT"] == $serial;}));
+    return count($disks) ? $disks[0]['DEVICE'] : NULL;
   }
 
 
@@ -173,7 +195,6 @@ class Preclear
 
   public function isRunning($disk)
   {
-    $disk   = basename($disk);
     $serial = $this->diskSerial($disk);
     if ( TMUX::hasSession("preclear_disk_{$serial}") )
     {
@@ -188,6 +209,7 @@ class Preclear
 
   public function Status($disk, $serial)
   {
+    $disk    = Misc::disk_name($disk);
     $status  = "";
     $file    = "/tmp/preclear_stat_{$disk}";
     $serial  = $this->diskSerial($disk);

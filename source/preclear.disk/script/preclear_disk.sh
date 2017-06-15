@@ -2,8 +2,10 @@
 LC_CTYPE=C
 export LC_CTYPE
 
+ionice -c3 -p$BASHPID
+
 # Version
-version="0.8.5-beta"
+version="0.8.6-beta"
 
 # PID
 script_pid=$BASHPID
@@ -335,7 +337,7 @@ write_disk(){
   local cycle=$cycle
   local cycles=$cycles
   local current_speed
-  local dd_flags="conv=fdatasync,noerror oflag=direct"
+  local dd_flags="conv=noerror oflag=direct"
   local dd_pid
   local dd_output=${all_files[dd_out]}
   local disk=${disk_properties[device]}
@@ -382,6 +384,8 @@ write_disk(){
   # Empty the MBR partition table
   dd if=$device bs=512 count=4096 of=$disk >/dev/null 2>&1
   blockdev --rereadpt $disk
+
+  dd_cmd="ionice -c3 ${dd_cmd}"
 
   debug "${write_type_s}: $dd_cmd"
   eval "$dd_cmd 2>$dd_output &"
@@ -1020,7 +1024,7 @@ save_smart_info() {
         echo $line >> $smart_file
       fi
     fi
-  done < <(smartctl --all $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" | \
+  done < <(timeout 30 smartctl --all $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" | \
            grep -v "ATTRIBUTE_NAME" | grep -v "^$" | awk '{ print $1 "|" $2 "|" $10}')
 }
 
@@ -1060,7 +1064,7 @@ output_smart() {
   nfinal="${final}_$(( $RANDOM * 19318203981230 + 40 ))"
   cp -f "$final" "$nfinal"
   sed -i " 1 s/$/|STATUS/" $nfinal
-  status=$(smartctl --attributes $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" | \
+  status=$(timeout 30 smartctl --attributes $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" | \
            grep -v "ATTRIBUTE_NAME" | grep -v "^$" | awk '{print $1 "-" $2 "|" $9 }')
   while read line; do
     attr=$(echo $line | cut -d'|' -f1)
@@ -1084,7 +1088,7 @@ output_smart() {
     sed -i "/^$attr/ s/$/|${msg}/" $nfinal
   done < <(cat $nfinal | tail -n +2)
   cat $nfinal | column -t -s '|' -o '  '> $output
-  smartctl --health $type $device | sed -n '/SMART DATA SECTION/,/^$/p'| tail -n +2 | head -n 1 >> $output
+  timeout 30 smartctl --health $type $device | sed -n '/SMART DATA SECTION/,/^$/p'| tail -n +2 | head -n 1 >> $output
 }
 
 get_disk_temp() {
@@ -1103,7 +1107,7 @@ get_disk_temp() {
       echo "$(echo $line | cut -d'|' -f3) C"
       return 0
     fi
-  done < <(smartctl --attributes $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" | \
+  done < <(timeout 30 smartctl --attributes $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" | \
            grep -v "ATTRIBUTE_NAME" | grep -v "^$" | awk '{ print $1 "|" $2 "|" $10}')
   echo "n/a"
 }
@@ -1308,7 +1312,7 @@ for type in "" scsi ata auto sat,auto sat,12 usbsunplus usbcypress usbjmicron us
   if [ -n "$type" ]; then
     type="-d $type"
   fi
-  smartInfo=$(smartctl --all $type "$theDisk" 2>/dev/null)
+  smartInfo=$(timeout 30 smartctl --all $type "$theDisk" 2>/dev/null)
   if [[ $smartInfo == *"START OF INFORMATION SECTION"* ]]; then
 
     smart_type=$type
