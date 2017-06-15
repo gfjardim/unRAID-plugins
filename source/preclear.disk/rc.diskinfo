@@ -269,10 +269,10 @@ class Disks
 
   public function unassigned_disks_info()
   {
-    $disks = $this->unassigned;
-    foreach ($disks as $key => $disk)
+    $disks = [];
+    foreach ($this->unassigned as $key => $disk)
     {
-      $disk = array_merge($disk, $this->get_info($disk["NAME"]));
+      $disk = $this->get_info($disk["NAME"]);
       $disks[$key] = $disk;
     }
 
@@ -309,8 +309,6 @@ class Disks
       $reload = false;
     }
 
-    $disk["NAME"] = $name;
-
     if (! isset($disk) || $reload)
     {
       debug("Probing disk ${device} info");
@@ -340,6 +338,7 @@ class Disks
       $disk['FIRMWARE'] = $parse_smart($smartInfo, "Firmware Version");
       $disk['SIZE']     = intval(trim(shell_exec("timeout ". $this->exec_time ." blockdev --getsize64 ${device} 2>/dev/null")));
       $disk['SIZE_H']   = trim(shell_exec("numfmt --to=si --suffix=B --format='%1.f' --round=nearest ${disk['SIZE']} 2>/dev/null"));
+      $disk['SIZE_H']   = preg_replace("/(^\d+)(.*)/", "$1 $2", $disk['SIZE_H']);
       $disk["DEVICE"]   = $device;
       $smartInfo = implode(PHP_EOL, $smartInfo);
     }
@@ -374,8 +373,9 @@ class Disks
         }
       }
       $disk["TIMESTAMP"] = time();
-      $disk["RUNNING"] = preg_match("/Device is in STANDBY mode/", $smartInfo) ? false : true;
-      $disk["TEMP"]    = trim(shell_exec("echo -e \"$smartInfo\" | grep -m 1 -i Temperature_Celsius | awk '{print $10}'"));
+      $disk["RUNNING"]   = preg_match("/Device is in STANDBY mode/", $smartInfo) ? false : true;
+      $disk["TEMP"]      = trim(shell_exec("echo -e \"$smartInfo\" | grep -m 1 -i Temperature_Celsius | awk '{print $10}'"));
+      $disk["NAME"]      = $name;
     }
 
     Misc::save_json($this->cache, $cache);

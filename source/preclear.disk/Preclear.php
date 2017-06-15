@@ -164,7 +164,7 @@ switch ($_POST['action'])
                       <td><img src='/webGui/images/${disk_icon}'><a href='/Tools/New?name=$disk_name'> $disk_name</a></td>
                       <td>${title}${report_files}</td>
                       <td>{$temp}</td>
-                      <td><span>${disk['size']}</span></td>
+                      <td><span>${disk['SIZE_H']}</span></td>
                       <td>{$status}</td>
                     </tr>";
         $disks_o .= $report_files;

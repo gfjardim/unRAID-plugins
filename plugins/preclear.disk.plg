@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2017.06.14">
+<!ENTITY version   "2017.06.15">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -15,6 +15,8 @@
 <CHANGES>
 ##&name;
 
+###2017.06.15
+- Fix: small bug in diskinfo daemon
 
 ###2017.06.14
 - Fix: gather information in the background avoiding webgui to freeze
