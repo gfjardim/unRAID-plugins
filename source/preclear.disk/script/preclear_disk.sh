@@ -337,7 +337,7 @@ write_disk(){
   local cycle=$cycle
   local cycles=$cycles
   local current_speed
-  local dd_flags="conv=noerror oflag=direct"
+  local dd_flags="conv=noerror,notrunc oflag=direct"
   local dd_pid
   local dd_output=${all_files[dd_out]}
   local disk=${disk_properties[device]}
@@ -385,7 +385,7 @@ write_disk(){
   dd if=$device bs=512 count=4096 of=$disk >/dev/null 2>&1
   blockdev --rereadpt $disk
 
-  dd_cmd="ionice -c3 ${dd_cmd}"
+  dd_cmd="ionice -c 3 ${dd_cmd}"
 
   debug "${write_type_s}: $dd_cmd"
   eval "$dd_cmd 2>$dd_output &"
@@ -421,7 +421,7 @@ write_disk(){
   fi
 
   while kill -0 $dd_pid &>/dev/null; do
-    sleep 3 && kill -USR1 $dd_pid 2>/dev/null && sleep 2
+    sleep 5 && kill -USR1 $dd_pid 2>/dev/null && sleep 2
     # ensure bytes_wrote is a number
     bytes_dd=$(awk 'END{print $1}' $dd_output|xargs)
     if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
@@ -489,11 +489,7 @@ write_disk(){
   done
 
   # Exit if dd failed
-  if [ "$dd_exit" -eq 0 ]; then
-    debug "${write_type_s}: $dd_exit"
-  else
-    debug "${write_type_s}: $dd_exit"
-  fi
+  debug "${write_type_s}: $dd_exit"
 
   # Send final notification
   if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 3 ] ; then
@@ -551,7 +547,7 @@ read_entire_disk() {
   local cycle=$cycle
   local cycles=$cycles
   local display_pid=0
-  local dd_flags="iflag=direct"
+  local dd_flags="conv=notrunc,noerror iflag=direct"
   local dd_output=${all_files[dd_out]}
   local disk=${disk_properties[device]}
   local disk_name=${disk_properties[name]}
@@ -693,7 +689,7 @@ read_entire_disk() {
     fi
 
     # Refresh dd status
-    sleep 3 && kill -USR1 $dd_pid 2>/dev/null && sleep 2
+    sleep 5 && kill -USR1 $dd_pid 2>/dev/null && sleep 2
 
     # Calculate the current status
     bytes_dd=$(awk 'END{print $1}' $dd_output|xargs)
@@ -1370,7 +1366,7 @@ append all_files 'smart_out'     "${all_files[dir]}/smart_out"
 append all_files 'form_out'      "${all_files[dir]}/form_out"
 
 mkdir -p "${all_files[dir]}"
-trap "rm -rf ${all_files[dir]}" EXIT;
+# trap "rm -rf ${all_files[dir]}" EXIT;
 
 # Set terminal variables
 if [ "$format_html" == "y" ]; then
@@ -1749,6 +1745,10 @@ if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 1 ]; then
   report_out+="\\n\\n"
   send_mail "${op_title}: PASS! Preclearing Disk ${disk_properties[name]} Finished!!!" "${op_title}: PASS! Preclearing Disk ${disk_properties[name]} Finished!!! Cycle ${cycle} of ${cycles}" "${report_out}"
 fi
+
+# debug
+debug "dd_out:\n ${all_files[dd_out]}"
+debug "dd_out:\n ${all_files[cmp_out]}"
 
 save_report "Yes" "$preread_speed" "$postread_speed" "$write_speed"
 
