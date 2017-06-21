@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2017.06.21">
+<!ENTITY version   "2017.06.21a">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -351,9 +351,9 @@ ln -sf /usr/local/emhttp/plugins/&name;/script/preclear.sh /usr/local/bin/precle
 # Install diskinfo service
 mv /usr/local/emhttp/plugins/preclear.disk/rc.diskinfo /etc/rc.d/rc.diskinfo
 chmod +x /etc/rc.d/rc.diskinfo
-/usr/local/emhttp/plugins/preclear.disk/rc.diskinfo --restart
+/etc/rc.d/rc.diskinfo --restart
 if [ $? -gt 0 ]; then
-  /usr/local/emhttp/plugins/preclear.disk/rc.diskinfo --daemon
+  /etc/rc.d/rc.diskinfo --daemon
 fi
 
 # Cleaning old source files

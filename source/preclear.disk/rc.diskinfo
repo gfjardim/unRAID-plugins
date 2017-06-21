@@ -56,7 +56,7 @@ if (array_key_exists('help', $args)) {
 }
 
 if (array_key_exists('version', $args)) {
-    echo "${prog_name} - ${version}";
+    echo "${prog_name} - ${version}".PHP_EOL;
     exit(0);
 }
 
