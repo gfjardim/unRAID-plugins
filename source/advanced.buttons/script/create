@@ -196,7 +196,7 @@ foreach ($arguments as $key => $Name) {
 
   if (! $template)
   {
-    saveStatus($StatusFile, "Template not found, aborting...");
+    saveStatus($StatusFile, $title, $message, "${Name} template not found, aborting...");
     sleep(3);
     unlink($Files['DockerStat']);
     continue;

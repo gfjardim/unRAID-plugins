@@ -18,9 +18,12 @@ $plugin = "advanced.buttons";
     height: 600px;
     overflow-y: scroll;
   }
+  .restore{color:#F39C12;}
+  .save{color:#2DB3B8;}
 </style>
 <script type="text/javascript" src="/plugins/<?=$plugin;?>/assets/arrive.min.js"></script>
 <script type="text/javascript">
+  var dashboard = $.inArray( $("body").prop("class") , ["page_dashboard"]) !== -1;
   var AdvancedButtons        = new Object;
   AdvancedButtons.Startable  = [];
   AdvancedButtons.Stoppable  = [];
@@ -38,25 +41,19 @@ $plugin = "advanced.buttons";
   AdvancedButtons.PluginUpdating = null;
   AdvancedButtons.Target     = null;
   AdvancedButtons.Url        = "/plugins/<?=$plugin;?>/AdvancedButtons.php";
-  var buttonOutput  = "";
 
+  var buttonOutput  = "";
+  var icon_target = dashboard ? "Apps" : "Docker Containers";
+  var icon_on = "<a class='tooltip-advanced-toggle {class}' style='cursor:pointer;margin-right:6px;' onclick='{cmd};' title='{title}'><i class='fa {icon}'></i></a>";
+  var icon_off = "<a class='tooltip-advanced-toggle' style='color:"+$("body").css("color")+";margin-right:6px;'><i class='fa {icon}'></i></a>";
 
   $(function()
   {
     getABDockerStatus("Docker");
     getABPluginStatus("Plugin");
 
-    var target1 = $("#docker_containers").siblings("input[value='Check for Updates']");
-    var target2 = $("div[id='apps_icons'] > div[class~='Panel']:last").next();
-    if (target1.length)
-    {
-      AdvancedButtons.Target = target1;
-    }
-    else
-    {
-      AdvancedButtons.Target = target2;
-      dashboard = true;
-    }
+    AdvancedButtons.Target = dashboard ? $("div[id='apps_icons'] > div[class~='Panel']:last").next() : 
+                                         $("#docker_containers").siblings("input[value='Check for Updates']");
 
     if (AdvancedButtons.Target.length)
     {
@@ -66,31 +63,49 @@ $plugin = "advanced.buttons";
         {
           AdvancedButtons[k] = v;
         });
+        var ntop = $("span.status").offset().top;
 
         disable = (Object.keys(AdvancedButtons.Startable).length && ! AdvancedButtons.DockerRunning) ? "started" : "disabled";
         buttonOutput += "<button class='AdvancedButtons' onclick='dockerButtonCommand(\"start\");' "+disable+">";
         buttonOutput += "<i class='fa fa-play "+disable+"'>&nbsp;&nbsp;</i>Start All Containers</button>";
+        icon = (disable == "started") ? icon_on.formatUnicorn({class:"started", cmd:"dockerButtonCommand(\"start\");", title:"Start All Containers", icon:"fa-play"}) : 
+                                        icon_off.formatUnicorn({icon:"fa-play"}) ;
+        $("#" + addButtonTab(icon, icon_target, true, true)).css("margin-right","150px").offset({top:ntop});
 
         disable = (Object.keys(AdvancedButtons.Stoppable).length && ! AdvancedButtons.DockerRunning) ? "stopped" : "disabled";
         buttonOutput += "<button class='AdvancedButtons' onclick='dockerButtonCommand(\"stop\");' "+disable+">";
         buttonOutput += "<i class='fa fa-square "+disable+"'>&nbsp;&nbsp;</i>Stop All Containers</button>";
+        icon = (disable == "stopped") ? icon_on.formatUnicorn({class:"stopped", cmd:"dockerButtonCommand(\"stop\");", title:"Stop All Containers", icon:"fa-square"}) : 
+                                        icon_off.formatUnicorn({icon:"fa-square"}) ;
+        $("#" + addButtonTab(icon, icon_target, true, true)).offset({top:ntop});
 
         disable = (Object.keys(AdvancedButtons.Updatable).length && ! AdvancedButtons.DockerRunning) ? "dupdate" : "disabled";
         buttonOutput += "<button class='AdvancedButtons' onclick='dockerButtonCommand(\"update\");' "+disable+">";
         buttonOutput += "<i class='fa fa-cloud-download "+disable+"'>&nbsp;&nbsp;</i>Install All Updates</button>";
+        icon = (disable == "dupdate") ? icon_on.formatUnicorn({class:"dupdate", cmd:"dockerButtonCommand(\"update\");", title:"Install All Updates", icon:"fa-cloud-download"}) : 
+                                        icon_off.formatUnicorn({icon:"fa-cloud-download"}) ;
+        $("#" + addButtonTab(icon, icon_target, true, true)).offset({top:ntop});
 
-        if (typeof(dashboard) === 'undefined')
+        if (! dashboard)
         {
           advanced = $.cookie("docker_listview_mode") == "advanced" ? "inline-block" : "none";
 
-          diff = $(AdvancedButtons.Saved).not(AdvancedButtons.ForceAll).get();
-          disable = (Object.keys(AdvancedButtons.Saved).length && ! AdvancedButtons.DockerRunning && diff.length) ? "started" : "disabled";
-          buttonOutput += "<button class='AdvancedButtons RestoreContainerState advanced' style='display:"+advanced+";' onclick='dockerButtonCommand(\"restore_containers\");' "+disable+">";
-          buttonOutput += "<i class='fa fa-undo  "+disable+"'>&nbsp;&nbsp;</i>Restore Previous Containers</button>";
+          diff_old = $(AdvancedButtons.Saved).not(AdvancedButtons.ForceAll).get();
+          diff_new = diff_old.concat($(AdvancedButtons.ForceAll).not(AdvancedButtons.Saved).get());
 
-          disable = (Object.keys(AdvancedButtons.ForceAll).length && ! AdvancedButtons.DockerRunning) ? "started" : "disabled";
+          disable = (Object.keys(AdvancedButtons.Saved).length && ! AdvancedButtons.DockerRunning && diff_old.length) ? "restore" : "disabled";
+          buttonOutput += "<button class='AdvancedButtons RestoreContainerState advanced' style='display:"+advanced+";' onclick='dockerButtonCommand(\"restore_containers\");' "+disable+">";
+          buttonOutput += "<i class='fa fa-undo "+disable+"'>&nbsp;&nbsp;</i>Restore Previous Containers</button>";
+          icon = (disable == "restore") ? icon_on.formatUnicorn({class:"restore", cmd:"dockerButtonCommand(\"restore_containers\");", title:"Restore Removed Containers", icon:"fa-undo"}) : 
+                                          icon_off.formatUnicorn({icon:"fa-undo"}) ;
+          $("#" + addButtonTab(icon, icon_target, true, true)).offset({top:ntop});
+
+          disable = (Object.keys(AdvancedButtons.ForceAll).length && ! AdvancedButtons.DockerRunning && diff_new.length) ? "save" : "disabled";
           buttonOutput += "<button class='AdvancedButtons SaveContainerState advanced' style='display:"+advanced+";' onclick='dockerButtonSave(this);' "+disable+">";
           buttonOutput += "<i class='fa fa-floppy-o "+disable+"'>&nbsp;&nbsp;</i>Save Current Containers</button>";
+          icon = (disable == "save") ? icon_on.formatUnicorn({class:"save", cmd:"dockerButtonSave(this);", title:"Save Container&#39;s List", icon:"fa-floppy-o"}) : 
+                                          icon_off.formatUnicorn({icon:"fa-floppy-o"}) ;
+          $("#" + addButtonTab(icon, icon_target, true, true)).offset({top:ntop});
 
           disable = (Object.keys(AdvancedButtons.Unnamed).length && ! AdvancedButtons.DockerRunning) ? "stopped" : "disabled";
           buttonOutput += "<button class='AdvancedButtons advanced' style='display:"+advanced+";' onclick='dockerButtonCommand(\"remove_unnamed\");' "+disable+">";
@@ -551,4 +566,115 @@ $plugin = "advanced.buttons";
       getABPluginStatus();
     });
   }
+
+function get_tab_title_by_name(name) {
+  var tab    = $("input[name$=tabs] + label").filter(function(){return $(this).text() === name;}).prev();
+  var title  = $("div#title > span.left"    ).filter(function(){return $(this).text() === name;}).parent();
+  if (tab.length) {
+    return tab
+  } else if (title.length) {
+    return title
+  } else {
+    return $(document)
+  }
+}
+
+
+function addButtonTab(Button, Name, autoHide, Append)
+{
+  if (typeof(autoHide) == "undefined") autoHide = true;
+  if (typeof(Append)   == "undefined") Append   = true;
+
+  var Target    = get_tab_title_by_name(Name);
+  var elementId = 'event-' + new Date().getTime() * Math.floor(Math.random()*100000);
+  var element   = $("<span id='"+elementId+"' class='status' style='padding-left:5px;'>"+Button+"</span>");
+  
+  if (element.find("input[type='button']").length)
+  {
+    element.addClass("vhshift");
+    element.find("input[type='button']").prop("style","padding-top: 5px; padding-bottom: 5px;");
+  }
+
+  if (Target.prop('nodeName') === "DIV")
+  {
+    if (Append)
+    {
+      Target.append(element);
+    }
+    else
+    {
+      Target.prepend(element);
+    }
+    return elementId;
+  }
+  else if (Target.prop('nodeName') === "INPUT")
+  {
+    element.css("display","none");
+
+    if (Append)
+    {
+      $('.tabs').append(element);
+    }
+    else
+    {
+      $('.tabs').prepend(element);
+    }
+
+    Target.bind({click:function(){$('#'+elementId).fadeIn('slow');}});
+
+    if (Target.is(':checked') || ! autoHide) {
+      $('#'+elementId).fadeIn('slow');
+    }
+
+    $("input[name$=tabs]").each(function()
+    {
+      if (! $(this).is(Target) && autoHide )
+      {
+        $(this).bind({click:function(){$('#'+elementId).fadeOut('slow');}});
+      }
+    });
+    return elementId;
+  }
+  else
+  {
+    return false;
+  }
+}
+
+String.prototype.formatUnicorn = String.prototype.formatUnicorn ||
+function () {
+    "use strict";
+    var str = this.toString();
+    if (arguments.length) {
+        var t = typeof arguments[0];
+        var key;
+        var args = ("string" === t || "number" === t) ?
+            Array.prototype.slice.call(arguments)
+            : arguments[0];
+
+        for (key in args) {
+            str = str.replace(new RegExp("\\{" + key + "\\}", "gi"), args[key]);
+        }
+    }
+
+    return str;
+};
+
+$('body').on('mouseenter', '.tooltip-advanced:not(.tooltipstered), .tooltip-advanced-toggle:not(.tooltipstered)', function()
+{
+  onClose = {click:true, scroll:true, mouseleave:true, tap:true};
+  if ( $(this).hasClass("tooltip-advanced-toggle") )
+  {
+    onClose.click = false;
+  }
+  $(this).tooltipster(
+  {
+    delay:100,
+    zIndex:100,
+    trigger:'custom',
+    triggerOpen:{mouseenter:true, touchstart:true},
+    triggerClose:onClose,
+  }).tooltipster('open');
+});
+
 </script>

@@ -21,7 +21,7 @@ function isDockerRunning()
   $file = $Files['DockerStat'];
   if (is_file($file))
   {
-    $json = @json_decode(@file_get_contents($file),true) ?: [];
+    $json = Misc::get_json_file($file);
     if ( array_key_exists("pid", $json) && ( $json["pid"] == 0 || posix_kill($json["pid"],0) ) )
     {
       return true;
@@ -167,11 +167,10 @@ switch ($action) {
   case 'get_docker_status':
     if (is_file($Files['DockerStat']))
     {
-      $status = @file_get_contents($Files["DockerStat"]) ?: "[]";
-      $status = json_decode($status, true);
+      $status = Misc::get_json_file($Files["DockerStat"]);
       if (!isDockerRunning())
       {
-        $status["type"] = ($status["type"] == "reload") ? "reload" :  "stopped";
+        $status["type"] = (isset($status["type"]) && $status["type"] == "reload") ? "reload" :  "stopped";
       }
       echo json_encode($status);
     }
