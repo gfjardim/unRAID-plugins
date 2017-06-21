@@ -12,14 +12,14 @@ set_exception_handler( "log_exception" );
 ######  DEAMON SECTION  ######
 ##############################
 $debug = FALSE;
-$version = "0.0.2";
+$version = "0.0.3";
 
 $prog      = pathinfo(__FILE__, PATHINFO_BASENAME);
 $prog_name = "Disk Info Daemon";
 $lockfile  = "/var/run/${prog}.pid";
 $log_file  = '/var/log/diskinfo.log';
 $service   = __FILE__;
-openlog($prog, LOG_PID | LOG_PERROR, LOG_LOCAL0);
+openlog("$prog", LOG_PID | LOG_PERROR, LOG_LOCAL0);
 
 $usage = <<<EOF
 
@@ -32,19 +32,21 @@ Usage: $prog [options]
       --debug      turn on debugging
       --help       display this help and exit
   -q  --quit       stop daemon if running
+  -r  --restart    restart daemon
       --version    output version information and exit
 
 
 EOF;
 
-$shortopts = 'dfqv';
+$shortopts = 'dfqvr';
 $longopts = [
     'daemon',
     'debug',
     'help',
     'quit',
     'verbose',
-    'version'
+    'version',
+    'restart'
 ];
 $args = getopt($shortopts, $longopts);
 
@@ -60,8 +62,9 @@ if (array_key_exists('version', $args)) {
 
 $verbose = (array_key_exists('v', $args) || array_key_exists('verbose', $args));
 $debug   = (array_key_exists('debug', $args));
-$daemon  = (array_key_exists('d', $args) || array_key_exists('daemon', $args));
-$quit    = (array_key_exists('q', $args) || array_key_exists('quit', $args));
+$daemon  = (array_key_exists('d', $args) || array_key_exists('daemon',  $args));
+$quit    = (array_key_exists('q', $args) || array_key_exists('quit',    $args));
+$restart = (array_key_exists('r', $args) || array_key_exists('restart', $args));
 
 if (file_exists($lockfile))
 {
@@ -77,19 +80,43 @@ if (file_exists($lockfile))
       unlink($lockfile);
       exit(0);
     }
+    else if ($restart)
+    {
+      debug("Restarting ${prog_name}"); 
+      syslog(LOG_INFO, "killing daemon with PID [$lock_pid]");
+      exec("kill $lock_pid");
+      unlink($lockfile);
+      exec("php $service 1>/dev/null ".($debug ? "--debug":"2>&1 ")."&");
+      while (true)
+      {
+        if (is_file($lockfile))
+        {
+          if (is_numeric(file_get_contents($lockfile)))
+          {
+            $new_pid = file_get_contents($lockfile);
+            break;
+          }
+        }
+        sleep(0.3);
+      }
+      closelog();
+      openlog("${prog}[${new_pid}]", LOG_PERROR, LOG_LOCAL0);
+      syslog(LOG_INFO, "process started. To terminate it, type: $prog --quit");
+      exit(0);
+    }
     else
     {
       echo "$prog is already running [$lock_pid]".PHP_EOL;
-      exit(0);
+      exit(1);
     }
   }
   else
   {
-    if ($quit)
+    if ($quit || $restart)
     {
       echo "$lock_pid is not currently running".PHP_EOL;
       unlink($lockfile);
-      exit(0);
+      exit(1);
     }
     else
     {
@@ -99,10 +126,10 @@ if (file_exists($lockfile))
 }
 else
 {
-  if ($quit)
+  if ($quit ||  $restart)
   {
     echo "$prog not currently running".PHP_EOL;
-    exit(0);
+    exit(1);
   }
   else
   {
@@ -149,12 +176,12 @@ function log_error($errno, $errstr, $errfile, $errline)
     case E_RECOVERABLE_ERROR:   $error = "Recoverable Error";              break;
     default:                    $error = "Unknown error ($errno)"; return; break;
   }
-  debug("PHP {$error}: $errstr in {$errfile} on line {$errline}");
+  debug("PHP {$error}: $errstr in {$errfile} on line {$errline}", "ERROR");
 }
 
 function log_exception( $e )
 {
-  debug("PHP Exception: {$e->getMessage()} in {$e->getFile()} on line {$e->getLine()}");
+  debug("PHP Exception: {$e->getMessage()} in {$e->getFile()} on line {$e->getLine()}", "ERROR");
 }
 
 function debug($msg, $type = "NOTICE")
@@ -165,14 +192,18 @@ function debug($msg, $type = "NOTICE")
     return NULL;
   }
   
-  $msg = "\n".date("D M j G:i:s T Y").": ".print_r($msg,true);
+  $msg_date = "\n".date("D M j G:i:s T Y").": ".print_r($msg,true);
 
-  file_put_contents($GLOBALS["log_file"], $msg, FILE_APPEND);
+  file_put_contents($GLOBALS["log_file"], $msg_date, FILE_APPEND);
   if ($debug)
   {
     $STDERR = fopen('php://stderr', 'w+');
     fwrite($STDERR, $msg);
     fclose($STDERR);
+  }
+  if ($type == "ERROR")
+  {
+    syslog(LOG_ERR, $msg);
   }
 }
 
