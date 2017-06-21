@@ -48,7 +48,6 @@ function getPreclearContent()
     if ( $('#preclear-table-body').length )
     {
       var target = $( '#preclear-table-body' );
-      var opened = [];
       currentScroll  = $(window).scrollTop();
       currentToggled = getToggledReports();
       target.html( data.disks );
@@ -60,9 +59,7 @@ function getPreclearContent()
       $.each(data.status, function(i,v)
       {
         var target = $("#preclear_"+i);
-        var opened = [];
-        target.find(".tooltip:hover").each(function(){ opened.push($(this).attr("id")); });
-        $("#preclear_"+i).html("<i class='glyphicon glyphicon-dashboard hdd'></i><span style='margin:6px;'></span>"+v);
+        $("#preclear_"+i).html("<i class='glyphicon glyphicon-dashboard hdd'></i><span style='margin-left: 0px;'></span>"+v);
       });
     }
     $.each(hovered, function(k,v){ if(v.length) { $("#"+v).trigger("mouseenter");} });

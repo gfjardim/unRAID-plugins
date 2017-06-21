@@ -214,9 +214,9 @@ class Preclear
     $file    = "/tmp/preclear_stat_{$disk}";
     $serial  = $this->diskSerial($disk);
     $session = TMUX::hasSession("preclear_disk_{$serial}");
-    $rm      = "<a id='preclear_rm' class='exec tooltip' style='color:#CC0000;font-weight:bold;margin-left:5px;' title='%s' onclick='stopPreclear(\"{$serial}\",\"%s\");'>";
+    $rm      = "<a id='preclear_rm_{$disk}' class='exec tooltip' style='color:#CC0000;font-weight:bold;margin-left:5px;' title='%s' onclick='stopPreclear(\"{$serial}\",\"%s\");'>";
     $rm     .= "<i class='glyphicon glyphicon-remove hdd'></i></a>";
-    $preview = "<a id='preclear_open' class='exec tooltip' style='margin-left:5px;' onclick='openPreclear(\"{$serial}\");' title='Preview'><i class='glyphicon glyphicon-eye-open hdd'></i></a>";
+    $preview = "<a id='preclear_open_{$disk}' class='exec tooltip' style='margin-left:5px;' onclick='openPreclear(\"{$serial}\");' title='Preview'><i class='glyphicon glyphicon-eye-open hdd'></i></a>";
     
     if (is_file($file))
     {

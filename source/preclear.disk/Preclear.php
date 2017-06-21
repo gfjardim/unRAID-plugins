@@ -112,7 +112,7 @@ switch ($_POST['action'])
         $disk_name = $disk['NAME'];
         $disk_icon = ($disk['RUNNING']) ? "green-on.png" : "green-blink.png";
         $serial    = $disk['SERIAL'];
-        $temp      = my_temp($disk['TEMP']);
+        $temp      = $disk['TEMP'] ? my_temp($disk['TEMP']) : "*";
         $mounted   = $disk["MOUNTED"];
         $reports   = is_dir("/boot/preclear_reports") ? listDir("/boot/preclear_reports") : [];
         $reports   = array_filter($reports, function ($report) use ($disk)

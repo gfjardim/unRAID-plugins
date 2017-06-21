@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="0.8.6-beta"
+version="0.8.7-beta"
 
 # PID
 script_pid=$BASHPID
@@ -345,6 +345,7 @@ write_disk(){
   local disk_blocks=${disk_properties[blocks]}
   local pause=${all_files[pause]}
   local percent_wrote
+  local percent_pause=0
   local short_test=$short_test
   local stat_file=${all_files[stat]}
   local tb_formatted
@@ -458,6 +459,15 @@ write_disk(){
         sleep 1
       done
       kill -CONT $dd_pid
+    fi
+
+    if [ "$(($percent_pause + 1 ))" -lt "$percent_wrote" ]; then
+      debug "Pausing for 15 seconds (${percent_wrote}% wrote)..."
+      kill -TSTP $dd_pid
+      sleep 15
+      debug "Restored."
+      kill -CONT $dd_pid
+      percent_pause=$percent_wrote
     fi
 
     # Send mid notification
@@ -1020,7 +1030,7 @@ save_smart_info() {
         echo $line >> $smart_file
       fi
     fi
-  done < <(timeout 30 smartctl --all $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" | \
+  done < <(timeout -s 9 30 smartctl --all $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" | \
            grep -v "ATTRIBUTE_NAME" | grep -v "^$" | awk '{ print $1 "|" $2 "|" $10}')
 }
 
@@ -1060,7 +1070,7 @@ output_smart() {
   nfinal="${final}_$(( $RANDOM * 19318203981230 + 40 ))"
   cp -f "$final" "$nfinal"
   sed -i " 1 s/$/|STATUS/" $nfinal
-  status=$(timeout 30 smartctl --attributes $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" | \
+  status=$(timeout -s 9 30 smartctl --attributes $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" | \
            grep -v "ATTRIBUTE_NAME" | grep -v "^$" | awk '{print $1 "-" $2 "|" $9 }')
   while read line; do
     attr=$(echo $line | cut -d'|' -f1)
@@ -1084,7 +1094,7 @@ output_smart() {
     sed -i "/^$attr/ s/$/|${msg}/" $nfinal
   done < <(cat $nfinal | tail -n +2)
   cat $nfinal | column -t -s '|' -o '  '> $output
-  timeout 30 smartctl --health $type $device | sed -n '/SMART DATA SECTION/,/^$/p'| tail -n +2 | head -n 1 >> $output
+  timeout -s 9 30 smartctl --health $type $device | sed -n '/SMART DATA SECTION/,/^$/p'| tail -n +2 | head -n 1 >> $output
 }
 
 get_disk_temp() {
@@ -1103,7 +1113,7 @@ get_disk_temp() {
       echo "$(echo $line | cut -d'|' -f3) C"
       return 0
     fi
-  done < <(timeout 30 smartctl --attributes $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" | \
+  done < <(timeout -s 9 30 smartctl --attributes $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" | \
            grep -v "ATTRIBUTE_NAME" | grep -v "^$" | awk '{ print $1 "|" $2 "|" $10}')
   echo "n/a"
 }
@@ -1308,7 +1318,7 @@ for type in "" scsi ata auto sat,auto sat,12 usbsunplus usbcypress usbjmicron us
   if [ -n "$type" ]; then
     type="-d $type"
   fi
-  smartInfo=$(timeout 30 smartctl --all $type "$theDisk" 2>/dev/null)
+  smartInfo=$(timeout -s 9 30 smartctl --all $type "$theDisk" 2>/dev/null)
   if [[ $smartInfo == *"START OF INFORMATION SECTION"* ]]; then
 
     smart_type=$type
@@ -1747,8 +1757,8 @@ if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 1 ]; then
 fi
 
 # debug
-debug "dd_out:\n ${all_files[dd_out]}"
-debug "dd_out:\n ${all_files[cmp_out]}"
+debug "dd_out:\n $(cat ${all_files[dd_out]})"
+debug "dd_out:\n $(cat ${all_files[cmp_out]})"
 
 save_report "Yes" "$preread_speed" "$postread_speed" "$write_speed"
 

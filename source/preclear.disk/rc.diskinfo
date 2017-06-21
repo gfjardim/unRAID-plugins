@@ -12,7 +12,7 @@ set_exception_handler( "log_exception" );
 ######  DEAMON SECTION  ######
 ##############################
 $debug = FALSE;
-$version = "0.0.1";
+$version = "0.0.2";
 
 $prog      = pathinfo(__FILE__, PATHINFO_BASENAME);
 $prog_name = "Disk Info Daemon";
@@ -23,7 +23,7 @@ openlog($prog, LOG_PID | LOG_PERROR, LOG_LOCAL0);
 
 $usage = <<<EOF
 
-Disk Info Daemon.
+${prog_name}:
 
 Usage: $prog [options]
 
@@ -63,40 +63,58 @@ $debug   = (array_key_exists('debug', $args));
 $daemon  = (array_key_exists('d', $args) || array_key_exists('daemon', $args));
 $quit    = (array_key_exists('q', $args) || array_key_exists('quit', $args));
 
-if(file_exists($lockfile)){
-    $lock_pid = file($lockfile, FILE_IGNORE_NEW_LINES)[0];
-    $pid_running = preg_replace("/\s+/", "", shell_exec("ps -p $lock_pid | grep $lock_pid"));
-    if($pid_running){
-        if($quit){
-            debug("Stopping ${prog_name}"); 
-            syslog(LOG_INFO, "killing daemon with PID [$lock_pid]");
-            exec("kill $lock_pid");
-            unlink($lockfile);
-            exit(0);
-        }else{
-            echo "$prog is already running [$lock_pid]".PHP_EOL;
-            exit(0);
-        }
-    }else{
-        if($quit){
-            echo "$lock_pid is not currently running".PHP_EOL;
-            unlink($lockfile);
-            exit(0);
-        }else
-            file_put_contents($lockfile, getmypid());
+if (file_exists($lockfile))
+{
+  $lock_pid    = file($lockfile, FILE_IGNORE_NEW_LINES)[0];
+  $pid_running = preg_replace("/\s+/", "", shell_exec("ps -p $lock_pid | grep $lock_pid"));
+  if ($pid_running)
+  {
+    if ($quit)
+    {
+      debug("Stopping ${prog_name}"); 
+      syslog(LOG_INFO, "killing daemon with PID [$lock_pid]");
+      exec("kill $lock_pid");
+      unlink($lockfile);
+      exit(0);
     }
-}else{
-    if($quit){
-        echo "$prog not currently running".PHP_EOL;
-        exit(0);
-    }else
-        file_put_contents($lockfile, getmypid());
+    else
+    {
+      echo "$prog is already running [$lock_pid]".PHP_EOL;
+      exit(0);
+    }
+  }
+  else
+  {
+    if ($quit)
+    {
+      echo "$lock_pid is not currently running".PHP_EOL;
+      unlink($lockfile);
+      exit(0);
+    }
+    else
+    {
+      file_put_contents($lockfile, getmypid());
+    }
+  }
+}
+else
+{
+  if ($quit)
+  {
+    echo "$prog not currently running".PHP_EOL;
+    exit(0);
+  }
+  else
+  {
+    file_put_contents($lockfile, getmypid());
+  }
 }
 
-if($daemon){
-    exec("php $service  1>/dev/null ".($debug ? "":"2>&1 ")."&");
-    syslog(LOG_INFO, "process started. To terminate it, type: $prog --quit");
-    exit(0);
+if ($daemon)
+{
+  exec("php $service  1>/dev/null ".($debug ? "":"2>&1 ")."&");
+  syslog(LOG_INFO, "process started. To terminate it, type: $prog --quit");
+  exit(0);
 }
 
 ##############################
@@ -104,10 +122,13 @@ if($daemon){
 ##############################
 
 /* logger*/
-function logger($msg, $quiet = false) {
-    syslog(LOG_INFO, $msg);
-    if (!$quiet)
-        echo PHP_EOL.$msg.PHP_EOL;
+function logger($msg, $quiet = false)
+{
+  syslog(LOG_INFO, $msg);
+  if (!$quiet)
+  {
+    echo PHP_EOL.$msg.PHP_EOL;
+  }
 }
 
 function log_error($errno, $errstr, $errfile, $errline)
@@ -139,15 +160,18 @@ function log_exception( $e )
 function debug($msg, $type = "NOTICE")
 {
   global $prog, $debug;
-  if ( $type == "DEBUG" && ! $GLOBALS["VERBOSE"] )
+  if ( $type == "DEBUG" && ! $GLOBALS["debug"] )
   {
     return NULL;
   }
+  
   $msg = "\n".date("D M j G:i:s T Y").": ".print_r($msg,true);
+
   file_put_contents($GLOBALS["log_file"], $msg, FILE_APPEND);
-  if($debug){
+  if ($debug)
+  {
     $STDERR = fopen('php://stderr', 'w+');
-    fwrite($STDERR, $msg.PHP_EOL);
+    fwrite($STDERR, $msg);
     fclose($STDERR);
   }
 }
@@ -197,8 +221,8 @@ class Disks
     $this->unassigned = [];
     $this->smartdir   = "/var/local/emhttp/smart";
     $this->cache      = "/var/local/emhttp/plugins/diskinfo/diskinfo.json";
-    $this->interval   = 1200; // Refresh interval in seconds
-    $this->exec_time  = 20; // Max execution time in seconds
+    $this->interval   = 900; // Refresh interval in seconds
+    $this->exec_time  = 60; // Max execution time in seconds
 
     // Make sure paths exist
     if (! is_dir(dirname($this->cache)))
@@ -216,8 +240,8 @@ class Disks
 
     $disks = array_diff(glob("/dev/disk/by-id/*"), glob("/dev/disk/by-id/{wwn-*,*-part*}", GLOB_BRACE));
     
-    exec("timeout ". $this->exec_time ." /usr/bin/strings /boot/config/super.dat 2>/dev/null|grep -Po '.{10,}'", $serials);
-    exec("timeout ". $this->exec_time ." udevadm info --query=property --name /dev/disk/by-label/UNRAID 2>/dev/null|grep -Po 'ID_SERIAL=\K.*'", $flash_serial);
+    exec("timeout -s 9 ". $this->exec_time ." /usr/bin/strings /boot/config/super.dat 2>/dev/null|grep -Po '.{10,}'", $serials);
+    exec("timeout -s 9 ". $this->exec_time ." udevadm info --query=property --name /dev/disk/by-label/UNRAID 2>/dev/null|grep -Po 'ID_SERIAL=\K.*'", $flash_serial);
     
     $disks_cfg = is_file("/boot/config/disk.cfg") ? parse_ini_file("/boot/config/disk.cfg") : [];
     $cache_serial = array_flip(preg_grep("#cacheId#i", array_flip($disks_cfg)));
@@ -232,7 +256,7 @@ class Disks
     $unraidDisks = array_combine( array_values($unraidDisks), $unraidDisks );
 
     // Get all disks and define those which are unassigned
-    exec("timeout ". $this->exec_time ." /bin/lsblk -nbP -o name,type,size,mountpoint,fstype 2>/dev/null", $blocks);
+    exec("timeout -s 9 ". $this->exec_time ." /bin/lsblk -nbP -o name,type,size,mountpoint,fstype 2>/dev/null", $blocks);
 
     foreach ($blocks as $b)
     {
@@ -240,7 +264,7 @@ class Disks
       $device = "/dev/${block['NAME']}";
       if ($block['TYPE'] == "disk" && file_exists($device))
       {
-        $attrs = @parse_ini_string(shell_exec("timeout ". $this->exec_time ." udevadm info --query=property --name ${device} 2>/dev/null")) ?: [];
+        $attrs = @parse_ini_string(shell_exec("timeout -s 9 ". $this->exec_time ." udevadm info --query=property --name ${device} 2>/dev/null")) ?: [];
         $block['SERIAL'] = isset($attrs["ID_SCSI_SERIAL"]) ? $attrs["ID_SCSI_SERIAL"] : $attrs['ID_SERIAL_SHORT'];
 
         $this->all[$block['NAME']] = $block;
@@ -289,20 +313,23 @@ class Disks
     $device     = Misc::disk_device($device);
     $name       = Misc::disk_name($device);
     $smart_file = $this->smartdir . "/${name}";
+    $whitelist  = array("ID_MODEL", "ID_SCSI_SERIAL", "ID_SERIAL_SHORT");
 
+    // SMART parser function
     $parse_smart = function($smart, $property) 
     {
       $value = trim(explode(":", array_values(preg_grep("#$property#", $smart))[0])[1]);
       return ($value) ? $value : "n/a";
     };
 
-    $whitelist = array("ID_MODEL", "ID_SCSI_SERIAL", "ID_SERIAL_SHORT");
+    // Get cached info from file
     $cache = Misc::get_json($this->cache);
-
     $disk = &$cache[$name];
 
+    // Get current info
     $current = $this->all[$name];
 
+    // Trigger reload if current and cached serials mismatch
     if (count($current) && isset($disk["SERIAL_SHORT"]))
     {
       $reload = ( strpos(trim($current["SERIAL"]), trim($disk["SERIAL_SHORT"])) !== -1 ) ? false : true;
@@ -312,20 +339,24 @@ class Disks
       $reload = false;
     }
 
+    // Probe persistent disk data if data isn't cached or reload triggered
     if (! isset($disk) || $reload)
     {
-      debug("Probing disk ${device} info");
-      $udev = trim($this->benchmark("shell_exec", "timeout ". $this->exec_time ." udevadm info --query=property --name ${device} 2>/dev/null"));
+      debug("Probing disk ${device} info...", "DEBUG");
+
+      // Get info using UDEV subsystem
+      $udev = trim($this->benchmark("shell_exec", "timeout -s 9 ". $this->exec_time ." udevadm info --query=property --name ${device} 2>/dev/null"));
       $udev = parse_ini_string($udev);
       $disk = array_intersect_key($udev, array_flip($whitelist));
 
       $disk['SERIAL_SHORT'] = isset($disk["ID_SCSI_SERIAL"]) ? $disk["ID_SCSI_SERIAL"] : $disk['ID_SERIAL_SHORT'];
       $disk['SERIAL']       = trim("{$disk[ID_MODEL]}_{$disk[SERIAL_SHORT]}");
 
+      // Get SMART device type from cached info or get it using get_smart_type function
       $disk["SMART"] = $disk["SMART"] ? $disk["SMART"] : $this->get_smart_type($device);
 
-      // Probe SMART data if necessary
-      $smartInfo = explode(PHP_EOL, $this->benchmark("shell_exec", "timeout ". $this->exec_time ." smartctl --info --attributes ${disk['SMART']} ${device} 2>/dev/null"));
+      // Probe SMART data
+      $smartInfo = explode(PHP_EOL, $this->benchmark("shell_exec", "timeout -s 9 ". $this->exec_time ." smartctl --info --attributes ${disk['SMART']} '${device}' 2>/dev/null"));
       $disk['FAMILY']   = $parse_smart($smartInfo, "Model Family");
       $disk['MODEL']    = $parse_smart($smartInfo, "Device Model");
 
@@ -339,11 +370,12 @@ class Disks
       }
 
       $disk['FIRMWARE'] = $parse_smart($smartInfo, "Firmware Version");
-      $disk['SIZE']     = intval(trim(shell_exec("timeout ". $this->exec_time ." blockdev --getsize64 ${device} 2>/dev/null")));
+      $disk['SIZE']     = intval(trim(shell_exec("timeout -s 9 ". $this->exec_time ." blockdev --getsize64 ${device} 2>/dev/null")));
       $disk['SIZE_H']   = trim(shell_exec("numfmt --to=si --suffix=B --format='%1.f' --round=nearest ${disk['SIZE']} 2>/dev/null"));
       $disk['SIZE_H']   = preg_replace("/(^\d+)(.*)/", "$1 $2", $disk['SIZE_H']);
       $disk["DEVICE"]   = $device;
       $smartInfo = implode(PHP_EOL, $smartInfo);
+      file_put_contents($smart_file, $smartInfo);
     }
 
     // Refreshing partition info 
@@ -366,17 +398,17 @@ class Disks
       {
         if ($use_file)
         {
-          debug("Using existing smart file.");
+          debug("Using existing smart file.", "DEBUG");
           $smartInfo = file_get_contents($smart_file);
         }
         else
         {
-          $smartInfo = trim($this->benchmark("shell_exec", "timeout ". $this->exec_time ." smartctl --nocheck=standby --attributes ${disk['SMART']} ${device} 2>/dev/null"));
+          $smartInfo = trim($this->benchmark("shell_exec", "timeout -s 9 ". $this->exec_time ." smartctl --nocheck=standby --attributes ${disk['SMART']} ${device} 2>/dev/null"));
           file_put_contents($smart_file, $smartInfo);
         }
       }
-      $disk["TIMESTAMP"] = time();
       $disk["RUNNING"]   = preg_match("/Device is in STANDBY mode/", $smartInfo) ? false : true;
+      $disk["TIMESTAMP"] = $disk["RUNNING"] ? time() : 0;
       $disk["TEMP"]      = trim(shell_exec("echo -e \"$smartInfo\" | grep -m 1 -i Temperature_Celsius | awk '{print $10}'"));
       $disk["NAME"]      = $name;
     }
@@ -388,9 +420,9 @@ class Disks
 
   public function get_smart_type($device)
   {
-    $device = Misc::disk_device($device);
-    $cache   = is_file($this->cache) ? json_decode(file_get_contents($this->cache), TRUE) : [];
-    $types_1 = [ "-d scsi", "-d ata", "-d auto", "-d sat,auto", "-d sat,12", "-d usbjmicron", "-d usbjmicron,0", "-d usbjmicron,1" ]; 
+    $device  = Misc::disk_device($device);
+    $cache   = Misc::get_json($this->cache);
+    $types_1 = [ "-d auto", "-d sat,auto", "-d scsi", "-d ata", "-d sat,12", "-d usbjmicron", "-d usbjmicron,0", "-d usbjmicron,1" ]; 
     $types_2 = [ "-x -d usbjmicron,x,0", "-x -d usbjmicron,x,1", "-d usbsunplus", "-d usbcypress", "-d sat -T permissive" ];
     $smart   = isset($cache[$device]['SMART']) ? $cache[$device]['SMART'] : null;
 
@@ -400,13 +432,24 @@ class Disks
       $smart = "none";
       foreach (array_merge($types_1, $types_2) as $type)
       {
-        debug("Trying SMART parameter '$type'...", "NOTICE");
-        $res = trim(shell_exec("timeout ". $this->exec_time ." smartctl --info {$type} '{$device}' 2>/dev/null| grep -c 'START OF INFORMATION SECTION'"));
-        if ( $res > 0 )
+        debug("Trying SMART parameter ($type) for disk [{$device}]...", "NOTICE");
+        $out  = $this->benchmark("shell_exec", "timeout -s 9 ". $this->exec_time ." smartctl --info --attributes {$type} '{$device}' 2>/dev/null");
+        $info = trim(shell_exec("echo -e \"${out}\" | grep -v '\[No Information Found\]' | grep -c -e 'Vendor:' -e 'Product:' -e 'Serial Number:' -e 'Device Model:'"));
+        $attr = trim(shell_exec("echo -e \"${out}\" | grep -c 'ATTRIBUTE_NAME'"));
+
+        // SMART info and attributes present
+        if ( intval($info) > 0 && intval($attr) > 0 )
         {
           $smart = $type;
           debug("SMART parameter for disk [{$device}] ($smart) found.", "NOTICE");
           break;
+        }
+
+        // SMART info only
+        else if ( $info > 0 )
+        {
+          $smart = $type;
+          debug("Partial SMART parameter for disk [{$device}] ($smart) found.", "NOTICE");
         }
       }
       $cache[$device]['SMART'] = $smart;
@@ -424,11 +467,12 @@ class Disks
     $time     = -microtime(true); 
     $out      = call_user_func_array($function, $params);
     $time    += microtime(true); 
-    $type     = ($time > 2) ? "INFO" : "DEBUG";
+    $type     = ($time > 10) ? "INFO" : "DEBUG";
     debug("benchmark: $function(".implode(",", $params).") took ".sprintf('%f', $time)."s.", $type);
     return $out;
   }
 }
+
 
 ##############################
 #####  PROGRAM SECTION  ######
