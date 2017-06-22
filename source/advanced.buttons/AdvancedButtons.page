@@ -148,7 +148,7 @@ $plugin = "advanced.buttons";
       plugin_table.arrive("tr",{onceOnly:false},function()
       {
         tr = $(this);
-        id = tr.find("td > input[type='button'][value='update']").prop("id");
+        id = tr.find("td > input[type='button'][value$='pdate']").prop("id");
         if ( id )
         {
           plg = id.slice(0, -6) + ".plg";
@@ -164,10 +164,16 @@ $plugin = "advanced.buttons";
           }
         }
 
-        update = tr.find("input[type='button'][value='update']");
-        update.prop("onclick",null).on("click", function(){disableElement(this); pluginsUpdate('update', $(this).prop("id").slice(0, -6) + ".plg" );});
-        remove = tr.find("input[type='button'][value='remove']");
-        remove.prop("onclick",null).on("click", function(){disableElement(this); pluginsUpdate('remove', $(this).prop("id").slice(0, -6) + ".plg" );});
+        update = tr.find("input[type='button'][value$='pdate']");
+        if (update.length)
+        {
+          update.attr("onclick", "disableElement(this); pluginsUpdate('update', '" + update.prop("id").slice(0, -6) + ".plg');" );
+        }
+        remove = tr.find("input[type='button'][value$='emove']");
+        if (remove.length)
+        {
+          remove.attr("onclick", "disableElement(this); pluginsUpdate('remove', '" + remove.prop("id").slice(0, -6) + ".plg');" );
+        }
 
       });
     };

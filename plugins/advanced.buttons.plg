@@ -4,7 +4,7 @@
 <!ENTITY name      "advanced.buttons">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2017.06.22">
+<!ENTITY version   "2017.06.22a">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
 ]>
@@ -13,6 +13,9 @@
 
 <CHANGES>
 ##&name;
+
+###2017.06.22a
+- Fix: 6.4.0-rc5 compatibility
 
 ###2017.06.22
 - Fix: resize plugin icon
