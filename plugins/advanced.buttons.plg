@@ -4,7 +4,7 @@
 <!ENTITY name      "advanced.buttons">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2017.06.21">
+<!ENTITY version   "2017.06.22">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
 ]>
@@ -13,6 +13,9 @@
 
 <CHANGES>
 ##&name;
+
+###2017.06.22
+- Fix: resize plugin icon
 
 ###2017.06.21
 - Add: icons to Docker and Dashboard on top of the page
