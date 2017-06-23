@@ -339,8 +339,8 @@ maxExecTime() {
   while read line; do
     pid=$( echo $line | awk '{print $1}')
     pid_time=$(find /proc/${pid} -maxdepth 0 -type d -printf "%a\n" 2>/dev/null)
-    # pid_child=$(ps -h --ppid ${pid} 2>/dev/null | wc -l)
-    pid_child=0
+    pid_child=$(ps -h --ppid ${pid} 2>/dev/null | wc -l)
+    # pid_child=0
     if [ -n "$pid_time" -a "$pid_child" -eq 0 ]; then
       let "pid_time=$(date +%s) - $(date +%s -d "$pid_time")"
       if [ "$pid_time" -gt "$exec_time" ]; then
@@ -352,7 +352,7 @@ maxExecTime() {
         kill -9 $pid &>/dev/null
       fi
     fi
-  done < <(ps -ef -o pid,cmd | awk '/'$prog_name'.*\/dev\/'${disk_name}'/{print $1}' )
+  done < <(ps ax -o pid,cmd | awk '/'$prog_name'.*\/dev\/'${disk_name}'/{print $1}' )
   echo $exec_time
 }
 

@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2017.06.23a">
+<!ENTITY version   "2017.06.23b">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -281,7 +281,7 @@ The 'plugin' package MD5 hash.
 </FILE>
 
 <!--
-The 'post-install' script.
+The 'packages-install' script.
 -->
 <FILE Run="/bin/bash">
 <INLINE>
@@ -302,7 +302,6 @@ download_install() {
   fi
 }
 
-
 # Verify and install plugin package
 sum1=$(/usr/bin/md5sum /boot/config/plugins/&name;/&name;-&version;.txz)
 sum2=$(/usr/bin/cat /boot/config/plugins/&name;/&name;-&version;.md5)
@@ -316,7 +315,7 @@ else
 fi
 
 gcc_version=$(cat /proc/version|grep -Po 'gcc version \K[\d.]*')
-if [ "$gcc_version" == "7.1.0" ]; then
+if [ "$gcc_version" = "7.1.0" ]; then
   download_install ncurses-6.0-x86_64-3.txz c04358fd7d7cb0b5ca67f215871f3692
   download_install libevent-2.1.8-x86_64-1.txz 9ba9d61dcd90d45719d27b9e7a111913
   download_install tmux-2.4-x86_64-2.txz aff2a5d3d49b835ea3bb582f5effbbbb
@@ -332,7 +331,14 @@ else
   download_install ncurses-5.9-x86_64-2.txz 9134fa31097ee352a1f1662e3f6bcb3f
   download_install utempter-1.1.5-x86_64-1.txz dbbe884ebb29b830e4032cc41c3f679a
 fi
+</INLINE>
+</FILE>
 
+<!--
+The 'post-install' script.
+-->
+<FILE Run="/bin/bash">
+<INLINE>
 # Create a symlink to /root/mdcmd
 if [[ ! -e /root/mdcmd ]]; then
   ln -sf /usr/local/sbin/mdcmd /root/mdcmd
