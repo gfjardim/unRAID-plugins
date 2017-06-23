@@ -1,0 +1,3 @@
+ACTION=="add",    KERNEL=="sd*", ENV{DEVTYPE}=="disk" RUN+="/etc/rc.d/rc.diskinfo --refresh &>/dev/null"
+ACTION=="change", KERNEL=="sd*", ENV{DEVTYPE}=="disk" RUN+="/etc/rc.d/rc.diskinfo --refresh &>/dev/null"
+ACTION=="remove", KERNEL=="sd*", ENV{ID_TYPE}=="disk" RUN+="/etc/rc.d/rc.diskinfo --refresh &>/dev/null"

@@ -1,5 +1,6 @@
 #!/usr/bin/php
 <?php
+declare(ticks = 1);
 set_time_limit(0);
 
 ##############################
@@ -12,7 +13,7 @@ set_exception_handler( "log_exception" );
 ######  DEAMON SECTION  ######
 ##############################
 $debug = FALSE;
-$version = "0.0.3";
+$version = "0.0.4";
 
 $prog      = pathinfo(__FILE__, PATHINFO_BASENAME);
 $prog_name = "Disk Info Daemon";
@@ -20,6 +21,8 @@ $lockfile  = "/var/run/${prog}.pid";
 $log_file  = '/var/log/diskinfo.log';
 $service   = __FILE__;
 openlog("$prog", LOG_PID | LOG_PERROR, LOG_LOCAL0);
+pcntl_signal(SIGHUP, "force_reload");
+
 
 $usage = <<<EOF
 
@@ -32,18 +35,20 @@ Usage: $prog [options]
       --debug      turn on debugging
       --help       display this help and exit
   -q  --quit       stop daemon if running
+  -l  --refresh    refresh disk info
   -r  --restart    restart daemon
       --version    output version information and exit
 
 
 EOF;
 
-$shortopts = 'dfqvr';
+$shortopts = 'dfqlvr';
 $longopts = [
     'daemon',
     'debug',
     'help',
     'quit',
+    'refresh',
     'verbose',
     'version',
     'restart'
@@ -64,6 +69,7 @@ $verbose = (array_key_exists('v', $args) || array_key_exists('verbose', $args));
 $debug   = (array_key_exists('debug', $args));
 $daemon  = (array_key_exists('d', $args) || array_key_exists('daemon',  $args));
 $quit    = (array_key_exists('q', $args) || array_key_exists('quit',    $args));
+$refresh = (array_key_exists('l', $args) || array_key_exists('refresh', $args));
 $restart = (array_key_exists('r', $args) || array_key_exists('restart', $args));
 
 if (file_exists($lockfile))
@@ -104,6 +110,11 @@ if (file_exists($lockfile))
       syslog(LOG_INFO, "process started. To terminate it, type: $prog --quit");
       exit(0);
     }
+    else if($refresh)
+    {
+      posix_kill($lock_pid, SIGHUP);
+      exit(0);
+    }
     else
     {
       echo "$prog is already running [$lock_pid]".PHP_EOL;
@@ -117,6 +128,28 @@ if (file_exists($lockfile))
       echo "$lock_pid is not currently running".PHP_EOL;
       unlink($lockfile);
       exit(1);
+    }
+    else if ($refresh)
+    {
+      syslog(LOG_INFO, "process stopped, restarting");
+      exec("php $service  1>/dev/null ".($debug ? "":"2>&1 ")."&");
+      while (true)
+      {
+        if (is_file($lockfile))
+        {
+          if (is_numeric(file_get_contents($lockfile)))
+          {
+            $new_pid = file_get_contents($lockfile);
+            break;
+          }
+        }
+        sleep(0.3);
+      }
+      closelog();
+      openlog("${prog}[${new_pid}]", LOG_PERROR, LOG_LOCAL0);
+      syslog(LOG_INFO, "process started. To terminate it, type: $prog --quit");
+      posix_kill($new_pid, SIGHUP);
+      exit(0);
     }
     else
     {
@@ -198,7 +231,7 @@ function debug($msg, $type = "NOTICE")
   if ($debug)
   {
     $STDERR = fopen('php://stderr', 'w+');
-    fwrite($STDERR, $msg);
+    fwrite($STDERR, $msg.PHP_EOL);
     fclose($STDERR);
   }
   if ($type == "ERROR")
@@ -319,12 +352,16 @@ class Disks
   }
 
 
-  public function unassigned_disks_info()
+  public function unassigned_disks_info($force)
   {
     $disks = [];
+    if ($force)
+    {
+      $GLOBALS["reload_force"] = false;
+    }
     foreach ($this->unassigned as $key => $disk)
     {
-      $disk = $this->get_info($disk["NAME"]);
+      $disk = $this->get_info($disk["NAME"], $force);
       $disks[$key] = $disk;
     }
 
@@ -334,12 +371,13 @@ class Disks
     }
     Misc::save_json($this->cache, $cache);
 
+
     usort($disks, create_function('$a, $b','$key="device";if ($a[$key] == $b[$key]) return 0; return ($a[$key] < $b[$key]) ? -1 : 1;'));
     return $disks;
   }
 
 
-  public function get_info($device)
+  public function get_info($device, $force)
   {
     $device     = Misc::disk_device($device);
     $name       = Misc::disk_name($device);
@@ -371,7 +409,7 @@ class Disks
     }
 
     // Probe persistent disk data if data isn't cached or reload triggered
-    if (! isset($disk) || $reload)
+    if (! isset($disk) || $reload || $force)
     {
       debug("Probing disk ${device} info...", "DEBUG");
 
@@ -401,7 +439,7 @@ class Disks
       }
 
       $disk['FIRMWARE'] = $parse_smart($smartInfo, "Firmware Version");
-      $disk['SIZE']     = intval(trim(shell_exec("timeout -s 9 ". $this->exec_time ." blockdev --getsize64 ${device} 2>/dev/null")));
+      $disk['SIZE']     = $current["SIZE"];
       $disk['SIZE_H']   = trim(shell_exec("numfmt --to=si --suffix=B --format='%1.f' --round=nearest ${disk['SIZE']} 2>/dev/null"));
       $disk['SIZE_H']   = preg_replace("/(^\d+)(.*)/", "$1 $2", $disk['SIZE_H']);
       $disk["DEVICE"]   = $device;
@@ -442,6 +480,16 @@ class Disks
       $disk["TIMESTAMP"] = $disk["RUNNING"] ? time() : 0;
       $disk["TEMP"]      = trim(shell_exec("echo -e \"$smartInfo\" | grep -m 1 -i Temperature_Celsius | awk '{print $10}'"));
       $disk["NAME"]      = $name;
+
+    }
+    // Detect precleared disk
+    if (! count($disk["PARTS"]) && $disk["RUNNING"] && ! isset($disk["PRECLEAR"]) )
+    {
+      $disk["PRECLEAR"] = $this->verify_precleared($device);
+    }
+    else if ( count($disk["PARTS"]) )
+    {
+      $disk["PRECLEAR"] = false;
     }
 
     Misc::save_json($this->cache, $cache);
@@ -502,6 +550,82 @@ class Disks
     debug("benchmark: $function(".implode(",", $params).") took ".sprintf('%f', $time)."s.", $type);
     return $out;
   }
+
+
+  public function verify_precleared($dev) {
+    $dev            = Misc::disk_device($dev);
+    $cleared        = TRUE;
+    $disk_blocks    = intval(trim(shell_exec("/sbin/blockdev --getsz $dev  | /bin/awk '{ print $1 }'")));
+    $max_mbr_blocks = hexdec("0xFFFFFFFF");
+    $over_mbr_size  = ( $disk_blocks >= $max_mbr_blocks ) ? TRUE : FALSE;
+    $pattern        = $over_mbr_size ? array("00000", "00000", "00002", "00000", "00000", "00255", "00255", "00255") : 
+                       array("00000", "00000", "00000", "00000", "00000", "00000", "00000", "00000");
+
+    $b["mbr1"] = trim(shell_exec("/usr/bin/dd bs=446 count=1 if=$dev 2>/dev/null        |sum|/bin/awk '{print $1}'"));
+    $b["mbr2"] = trim(shell_exec("/usr/bin/dd bs=1 count=48 skip=462 if=$dev 2>/dev/null|sum|/bin/awk '{print $1}'"));
+    $b["mbr3"] = trim(shell_exec("/usr/bin/dd bs=1 count=1  skip=450 if=$dev 2>/dev/null|sum|/bin/awk '{print $1}'"));
+    $b["mbr4"] = trim(shell_exec("/usr/bin/dd bs=1 count=1  skip=511 if=$dev 2>/dev/null|sum|/bin/awk '{print $1}'"));
+    $b["mbr5"] = trim(shell_exec("/usr/bin/dd bs=1 count=1  skip=510 if=$dev 2>/dev/null|sum|/bin/awk '{print $1}'"));
+
+    foreach (range(0,15) as $n) {
+      $b["byte{$n}"] = trim(shell_exec("/usr/bin/dd bs=1 count=1 skip=".(446+$n)." if=$dev 2>/dev/null|sum|/bin/awk '{print $1}'"));
+      $b["byte{$n}h"] = sprintf("%02x",$b["byte{$n}"]);
+    }
+
+    debug("Verifying '$dev' for preclear signature.", "DEBUG");
+
+    if ( $b["mbr1"] != "00000" || $b["mbr2"] != "00000" || $b["mbr3"] != "00000" || $b["mbr4"] != "00170" || $b["mbr5"] != "00085" ) {
+      debug("Failed test 1: MBR signature not valid.", "DEBUG"); 
+      $cleared = FALSE;
+    }
+    # verify signature
+    foreach ($pattern as $key => $value) {
+      if ($b["byte{$key}"] != $value) {
+        debug("Failed test 2: signature pattern $key ['$value'] != '".$b["byte{$key}"]."'", "DEBUG");
+        $cleared = FALSE;
+      }
+    }
+    $sc = hexdec("0x{$b[byte11h]}{$b[byte10h]}{$b[byte9h]}{$b[byte8h]}");
+    $sl = hexdec("0x{$b[byte15h]}{$b[byte14h]}{$b[byte13h]}{$b[byte12h]}");
+    switch ($sc) {
+      case 63:
+      case 64:
+        $partition_size = $disk_blocks - $sc;
+        break;
+      case 1:
+        if ( ! $over_mbr_size) {
+          debug("Failed test 3: start sector ($sc) is invalid.", "DEBUG");
+          $cleared = FALSE;
+        }
+        $partition_size = $max_mbr_blocks;
+        break;
+      default:
+        debug("Failed test 4: start sector ($sc) is invalid.", "DEBUG");
+        $cleared = FALSE;
+        break;
+    }
+    if ( $partition_size != $sl ) {
+      debug("Failed test 5: disk size doesn't match.", "DEBUG");
+      $cleared = FALSE;
+    }
+    return $cleared;
+  }
+}
+
+
+
+function force_reload($sig, $signum)
+{
+  if (! $GLOBALS["reload_force"])
+  {
+    syslog(LOG_INFO, "SIGHUP received, forcing refresh of disks info.");
+    $GLOBALS["reload_force"] = true;
+  }
+  else
+  {
+    syslog(LOG_INFO, "SIGHUP ignored - already refreshing disk info.");
+    $GLOBALS["reload_force"] = true; 
+  }
 }
 
 
@@ -509,13 +633,14 @@ class Disks
 #####  PROGRAM SECTION  ######
 ##############################
 $Disks = new Disks;
+$reload_force = false;
 
 while(TRUE)
 {
   while(TRUE)
   { ####  DO YOUR STUFF HERE  ####
     $Disks->__construct();
-    $Disks->unassigned_disks_info();
+    $Disks->unassigned_disks_info($reload_force);
     sleep(5);
 
     ######  END OF SECTION  ######

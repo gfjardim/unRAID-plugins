@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2017.06.21a">
+<!ENTITY version   "2017.06.23">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,12 @@
 
 <CHANGES>
 ##&name;
+
+###2017.06.23
+- Add: diskinfo 0.0.4 -  refreshes disk info based on UDEV events
+- Add: diskinfo 0.0.4 -  detect precleared disks
+- Add: preclear_disk 0.8.8 - pause on hdparm/smartctl/sync processes running
+- Add: packages to unRAID 6.4
 
 ###2017.06.21
 - Fix: diskinfo 0.0.3 - suport restart
@@ -310,16 +316,21 @@ else
 fi
 
 gcc_version=$(cat /proc/version|grep -Po 'gcc version \K[\d.]*')
-if [ "$gcc_version" = "5.3.0" -o "$gcc_version" = "5.4.0" ]; then
-  download_install libevent-2.0.22-x86_64-1.txz 7a755ece3e378f244a3c327369e7f2ac
-  download_install tmux-2.2-x86_64-2.txz a268019858c88d5f2f702d9fc182a37c
-  download_install ncurses-5.9-x86_64-4.txz c2d2b01f021dc2f4752c4fff02f65fd5
+if [ "$gcc_version" == "7.1.0" ]; then
+  download_install ncurses-6.0-x86_64-3.txz    c04358fd7d7cb0b5ca67f215871f3692
+  download_install libevent-2.1.8-x86_64-1.txz 9ba9d61dcd90d45719d27b9e7a111913
+  download_install tmux-2.4-x86_64-2.txz       aff2a5d3d49b835ea3bb582f5effbbbb
   download_install utempter-1.1.6-x86_64-2.txz aed1f39d4a5acddb225b542145e0eeaf
+else if [ "$gcc_version" = "5.3.0" -o "$gcc_version" = "5.4.0" ]; then
+  download_install libevent-2.0.22-x86_64-1.txz 7a755ece3e378f244a3c327369e7f2ac
+  download_install tmux-2.2-x86_64-2.txz        a268019858c88d5f2f702d9fc182a37c
+  download_install ncurses-5.9-x86_64-4.txz     c2d2b01f021dc2f4752c4fff02f65fd5
+  download_install utempter-1.1.6-x86_64-2.txz  aed1f39d4a5acddb225b542145e0eeaf
 else
   download_install libevent-2.0.22-x86_64-1_slack14.1.txz bc5d1dff8d2f3758b0feddf00d2c6229
-  download_install tmux-1.8-x86_64-1.txz 2a36cb120c8cdd584262442ed3f18f34
-  download_install ncurses-5.9-x86_64-2.txz 9134fa31097ee352a1f1662e3f6bcb3f
-  download_install utempter-1.1.5-x86_64-1.txz dbbe884ebb29b830e4032cc41c3f679a
+  download_install tmux-1.8-x86_64-1.txz                  2a36cb120c8cdd584262442ed3f18f34
+  download_install ncurses-5.9-x86_64-2.txz               9134fa31097ee352a1f1662e3f6bcb3f
+  download_install utempter-1.1.5-x86_64-1.txz            dbbe884ebb29b830e4032cc41c3f679a
 fi
 
 # Create a symlink to /root/mdcmd
@@ -344,17 +355,22 @@ sed -e "s#@PLUGIN@#Preclear Disks#g" "/boot/config/plugins/&name;/StatsInstall" 
 touch /var/log/preclear.disk.log
 
 # Update file access mode
-chmod 644 $(awk '/\.(htm|php|js|page|css|png|plg|gif|cfg|md)$/ {print "/"$0}' /var/log/packages/&name;-&version;)
+chmod 644 $(awk '/\.(htm|php|js|page|css|png|plg|gif|cfg|md)$/ {print "/"$0}' /var/log/packages/&name;-&version;) 
 chmod -R 755 /usr/local/emhttp/plugins/&name;/script/
 ln -sf /usr/local/emhttp/plugins/&name;/script/preclear.sh /usr/local/bin/preclear
 
 # Install diskinfo service
-mv /usr/local/emhttp/plugins/preclear.disk/rc.diskinfo /etc/rc.d/rc.diskinfo
+mv /usr/local/emhttp/plugins/&name;/rc.diskinfo /etc/rc.d/rc.diskinfo
 chmod +x /etc/rc.d/rc.diskinfo
 /etc/rc.d/rc.diskinfo --restart
 if [ $? -gt 0 ]; then
   /etc/rc.d/rc.diskinfo --daemon
 fi
+
+# Add UDEV rule
+mv /usr/local/emhttp/plugins/&name;/99_diskinfo.rules /etc/udev/rules.d/99_diskinfo.rules
+chmod 644 /etc/udev/rules.d/99_diskinfo.rules
+udevadm control --reload-rules
 
 # Cleaning old source files
 find /boot/config/plugins/&name;/ -type f -iname "&name;*.txz" ! -iname "*&version;*" -delete

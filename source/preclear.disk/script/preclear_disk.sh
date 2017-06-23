@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="0.8.7-beta"
+version="0.8.8-beta"
 
 # PID
 script_pid=$BASHPID
@@ -329,6 +329,33 @@ write_signature() {
   printf $sig| dd seek=446 bs=1 count=16 of=$disk >/dev/null 2>&1
 }
 
+maxExecTime() {
+  # maxExecTime prog_name disk_name max_exec_time
+  exec_time=0
+  prog_name=$1
+  disk_name=$(basename $2)
+  max_exec_time=$3
+
+  while read line; do
+    pid=$( echo $line | awk '{print $1}')
+    pid_time=$(find /proc/${pid} -maxdepth 0 -type d -printf "%a\n" 2>/dev/null)
+    # pid_child=$(ps -h --ppid ${pid} 2>/dev/null | wc -l)
+    pid_child=0
+    if [ -n "$pid_time" -a "$pid_child" -eq 0 ]; then
+      let "pid_time=$(date +%s) - $(date +%s -d "$pid_time")"
+      if [ "$pid_time" -gt "$exec_time" ]; then
+        exec_time=$pid_time
+        debug "${prog_name} exec_time: ${exec_time}s"
+      fi
+      if [ "$pid_time" -gt $max_exec_time ]; then
+        debug "killing ${prog_name} with pid ${pid} - probably stalled..." 
+        kill -9 $pid &>/dev/null
+      fi
+    fi
+  done < <(ps -ef -o pid,cmd | awk '/'$prog_name'.*\/dev\/'${disk_name}'/{print $1}' )
+  echo $exec_time
+}
+
 
 write_disk(){
   # called write_disk
@@ -344,6 +371,8 @@ write_disk(){
   local disk_name=${disk_properties[name]}
   local disk_blocks=${disk_properties[blocks]}
   local pause=${all_files[pause]}
+  local paused_smart=n
+  local paused_sync=n
   local percent_wrote
   local percent_pause=0
   local short_test=$short_test
@@ -461,13 +490,40 @@ write_disk(){
       kill -CONT $dd_pid
     fi
 
-    if [ "$(($percent_pause + 1 ))" -lt "$percent_wrote" ]; then
-      debug "Pausing for 15 seconds (${percent_wrote}% wrote)..."
+    # Pause if a 'smartctl' command is taking too much time to complete
+    maxSmartTime=$(maxExecTime "smartctl" "$disk_name" "60")
+    if [ "$maxSmartTime" -gt 30 -a "$paused_smart" != "y" ]; then
+      debug "dd[${dd_pid}]: Pausing (smartctl exec time: ${maxSmartTime}s)"
       kill -TSTP $dd_pid
-      sleep 15
-      debug "Restored."
+      paused_smart=y
+    elif [ "$maxSmartTime" -lt 30 -a "$paused_smart" == "y" ]; then
+      debug "dd[${dd_pid}]: resumed"
       kill -CONT $dd_pid
-      percent_pause=$percent_wrote
+      paused_smart=n
+    fi
+
+    # Pause if a 'hdparm' command is taking too much time to complete
+    maxHdparmTime=$(maxExecTime "hdparm" "$disk_name" "60")
+    if [ "$maxHdparmTime" -gt 30 -a "$paused_hdparm" != "y" ]; then
+      debug "dd[${dd_pid}]: Pausing (hdparm exec time: ${maxHdparmTime}s)"
+      kill -TSTP $dd_pid
+      paused_hdparm=y
+    elif [ "$maxHdparmTime" -lt 30 -a "$paused_hdparm" == "y" ]; then
+      debug "dd[${dd_pid}]: resumed"
+      kill -CONT $dd_pid
+      paused_hdparm=n
+    fi
+
+    # Pause if a sync command were issued
+    isSync=$(ps -e -o pid,command | grep -Po "\d+ [s]ync$" | wc -l)
+    if [ "$isSync" -gt 0 -a "$paused_sync" != "y" ]; then
+      debug "dd[${dd_pid}]: Pausing (sync command issued)"
+      kill -TSTP $dd_pid
+      paused_sync=y
+    elif [ "$isSync" -eq 0 -a "$paused_sync" == "y" ]; then
+      debug "dd[${dd_pid}]: resumed"
+      kill -CONT $dd_pid
+      paused_sync=n
     fi
 
     # Send mid notification
@@ -565,6 +621,8 @@ read_entire_disk() {
   local output=$3
   local output_speed=$4
   local pause=${all_files[pause]}
+  local paused_smart=n
+  local paused_sync=n
   local percent_read=0
   local read_stress=$read_stress
   local read_type=$2
@@ -756,6 +814,43 @@ read_entire_disk() {
       # Restore dd
       kill -CONT $dd_pid
     fi
+    
+    # Pause if a 'smartctl' command is taking too much time to complete
+    maxSmartTime=$(maxExecTime "smartctl" "$disk_name" "60")
+    if [ "$maxSmartTime" -gt 30 -a "$paused_smart" != "y" ]; then
+      debug "dd[${dd_pid}]: pausing (smartctl exec time: ${maxSmartTime}s)"
+      kill -TSTP $dd_pid
+      paused_smart=y
+    elif [ "$maxSmartTime" -lt 30 -a "$paused_smart" == "y" ]; then
+      debug "dd[${dd_pid}]: resumed"
+      kill -CONT $dd_pid
+      paused_smart=n
+    fi
+
+    # Pause if a 'hdparm' command is taking too much time to complete
+    maxHdparmTime=$(maxExecTime "hdparm" "$disk_name" "60")
+    if [ "$maxHdparmTime" -gt 30 -a "$paused_hdparm" != "y" ]; then
+      debug "dd[${dd_pid}]: pausing (hdparm exec time: ${maxHdparmTime}s)"
+      kill -TSTP $dd_pid
+      paused_hdparm=y
+    elif [ "$maxHdparmTime" -lt 30 -a "$paused_hdparm" == "y" ]; then
+      debug "dd[${dd_pid}]: resumed"
+      kill -CONT $dd_pid
+      paused_hdparm=n
+    fi
+
+    # Pause if a sync command were issued
+    isSync=$(ps -e -o pid,command | grep -Po "\d+ [s]ync$" | wc -l)
+    if [ "$isSync" -gt 0 -a "$paused_sync" != "y" ]; then
+      debug "dd[${dd_pid}]: pausing (sync command issued)"
+      kill -TSTP $dd_pid
+      paused_sync=y
+    elif [ "$isSync" -eq 0 -a "$paused_sync" == "y" ]; then
+      debug "dd[${dd_pid}]: resumed"
+      kill -CONT $dd_pid
+      paused_sync=n
+    fi
+
   done
 
   wait $dd_pid;
