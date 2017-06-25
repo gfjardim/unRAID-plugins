@@ -101,6 +101,7 @@ switch ($_POST['action'])
 
   case 'get_content':
     debug("Starting get_content: ".(time() - $start_time),'DEBUG');
+    shell_exec("/etc/rc.d/rc.diskinfo --daemon &>/dev/null");
     $disks = Misc::get_json($diskinfo);
     $all_status = array();
 
@@ -153,7 +154,11 @@ switch ($_POST['action'])
         if ($Preclear->isRunning($disk_name))
         {
           $status  = $Preclear->Status($disk_name, $disk["SERIAL_SHORT"]);
-          $all_status[$disk['SERIAL_SHORT']] = $status;
+          $footer = base64_encode("<span>${disk['SERIAL']} - ${disk['SIZE_H']} (${disk['NAME']})</span><br><span style='float:right;'>$status</span>");
+          $footer = "<a class='tooltip-toggle-html exec' id='preclear_footer_${disk['SERIAL_SHORT']}' title=' ' data='${footer}'><img src='/plugins/preclear.disk/icons/precleardisk.png'></a>";
+          $all_status[$disk['SERIAL_SHORT']]["footer"] = $footer;
+          $all_status[$disk['SERIAL_SHORT']]["footer"] = "<span>${disk['SERIAL']} - ${disk['SIZE_H']} (${disk['NAME']})</span><br><span style='float:right;'>$status</span>";
+          $all_status[$disk['SERIAL_SHORT']]["status"] = $status;
         }
         else
         {

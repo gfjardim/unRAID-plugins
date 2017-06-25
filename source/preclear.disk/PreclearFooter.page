@@ -1,0 +1,68 @@
+Menu="Buttons:100"
+Link="nav-user"
+---
+<?
+$plugin="preclear.disk";
+require_once("plugins/${plugin}/assets/lib.php");
+$Preclear = new Preclear;
+;?>
+<link type="text/css" rel="stylesheet" href="/webGui/styles/jquery.ui.css">
+<link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/glyphicons.css">
+<link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/style-<?=$display['theme'];?>.css">
+<?=$Preclear->html();?>
+<script type="text/javascript">
+  var display = <?=json_encode($display);?>;
+
+  <?=$Preclear->Script();?>
+
+  function getPreclearFooter()
+  {
+    $.post(PreclearURL,{action:'get_content', display:display},function(data)
+    {
+      var hovered = $(".tooltipster-box").find(".tooltipstered:hover").map(function(){return this.id;}).get();
+
+      $.each(data.status, function(i,v)
+      {
+        var icon = "#preclear_footer_" + i;
+
+        if (! $(icon).length)
+        {
+          el  = "<a class='exec' title='' id='"+icon.substring(1)+"'><img src='/plugins/"+plugin+"/icons/precleardisk.png'></a>";
+          el  = $(el).prependTo("#preclear-footer").css("margin-right", "6px");
+          el.tooltipster(
+          {
+            delay:100,
+            zIndex:100,
+            trigger:'custom',
+            triggerOpen:{mouseenter:true, touchstart:true},
+            triggerClose:{click:false, scroll:true, mouseleave:true, tap:true},
+            contentAsHTML: true,
+            interactive: true,
+            updateAnimation: false,
+            functionBefore: function(instance, helper)
+            {
+              instance.content($(helper.origin).attr("data"));
+            }
+          });
+        }
+        content = $("<div>").append(v.footer);
+        content.find("a[id^='preclear_rm_']").attr("id", "preclear_footer_rm_" + i);
+        content.find("a[id^='preclear_open_']").attr("id", "preclear_footer_open_" + i);
+        $(icon).tooltipster('content', content.html());
+      });
+
+      $.each(hovered, function(k,v){ if(v.length) { $(".tooltipster-box").find("#"+v).trigger("mouseenter");} });
+
+    }, "json").always(function(data)
+    {
+      setTimeout("getPreclearFooter()", 5000);
+    });
+  }
+
+  $(function()
+  {
+    footer = $("<span id='preclear-footer'></span>").insertAfter("div#footer > span#copyright").css("float","right").css("margin-right", "6px");
+    getPreclearFooter();
+  });
+
+</script>

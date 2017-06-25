@@ -23,7 +23,6 @@ $service   = __FILE__;
 openlog("$prog", LOG_PID | LOG_PERROR, LOG_LOCAL0);
 pcntl_signal(SIGHUP, "force_reload");
 
-
 $usage = <<<EOF
 
 ${prog_name}:
@@ -37,12 +36,13 @@ Usage: $prog [options]
   -q  --quit       stop daemon if running
   -l  --refresh    refresh disk info
   -r  --restart    restart daemon
+  -s  --status     status of the daemon
       --version    output version information and exit
 
 
 EOF;
 
-$shortopts = 'dfqlvr';
+$shortopts = 'dfqlvrs';
 $longopts = [
     'daemon',
     'debug',
@@ -51,7 +51,8 @@ $longopts = [
     'refresh',
     'verbose',
     'version',
-    'restart'
+    'restart',
+    'status'
 ];
 $args = getopt($shortopts, $longopts);
 
@@ -71,6 +72,7 @@ $daemon  = (array_key_exists('d', $args) || array_key_exists('daemon',  $args));
 $quit    = (array_key_exists('q', $args) || array_key_exists('quit',    $args));
 $refresh = (array_key_exists('l', $args) || array_key_exists('refresh', $args));
 $restart = (array_key_exists('r', $args) || array_key_exists('restart', $args));
+$status  = (array_key_exists('r', $args) || array_key_exists('status' , $args));
 
 if (file_exists($lockfile))
 {
@@ -115,6 +117,11 @@ if (file_exists($lockfile))
       posix_kill($lock_pid, SIGHUP);
       exit(0);
     }
+    else if($status)
+    {
+      echo "running".PHP_EOL;
+      exit(0);
+    }
     else
     {
       echo "$prog is already running [$lock_pid]".PHP_EOL;
@@ -151,6 +158,11 @@ if (file_exists($lockfile))
       posix_kill($new_pid, SIGHUP);
       exit(0);
     }
+    else if($status)
+    {
+      echo "stopped".PHP_EOL;
+      exit(0);
+    }
     else
     {
       file_put_contents($lockfile, getmypid());
@@ -163,6 +175,11 @@ else
   {
     echo "$prog not currently running".PHP_EOL;
     exit(1);
+  }
+  else if($status)
+  {
+    echo "stopped".PHP_EOL;
+    exit(0);
   }
   else
   {

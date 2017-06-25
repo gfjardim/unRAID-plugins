@@ -59,7 +59,7 @@ function getPreclearContent()
       $.each(data.status, function(i,v)
       {
         var target = $("#preclear_"+i);
-        $("#preclear_"+i).html("<i class='glyphicon glyphicon-dashboard hdd'></i><span style='margin-left: 0px;'></span>"+v);
+        $("#preclear_"+i).html("<i class='glyphicon glyphicon-dashboard hdd'></i><span style='margin-left: 0px;'></span>"+v.status);
       });
     }
     $.each(hovered, function(k,v){ if(v.length) { $("#"+v).trigger("mouseenter");} });

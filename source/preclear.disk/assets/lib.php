@@ -150,9 +150,9 @@ class Preclear
   {
     $o["version"]       = (is_file($file)) ? trim(shell_exec("$file -v 2>/dev/null|cut -d: -f2")) : NULL;
     $o["file"]          = $file;
-    $o["fast_postread"] = $o["version"] ? (strpos(file_get_contents($file), "fast_postread") ? TRUE : FALSE ) : FALSE;
+    $o["fast_postread"] = $o["version"] ? (strpos(file_get_contents($file), "fast_postread")   ? TRUE : FALSE ) : FALSE;
     $o["notifications"] = $o["version"] ? (strpos(file_get_contents($file), "notify_channels") ? TRUE : FALSE ) : FALSE;
-    $o["noprompt"]      = $o["version"] ? (strpos(file_get_contents($file), "noprompt") ? TRUE : FALSE ) : FALSE;
+    $o["noprompt"]      = $o["version"] ? (strpos(file_get_contents($file), "noprompt")        ? TRUE : FALSE ) : FALSE;
     return $o;
   }
 

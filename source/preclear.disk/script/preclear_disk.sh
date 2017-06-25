@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="0.8.8-beta"
+version="0.8.9-beta"
 
 # PID
 script_pid=$BASHPID
@@ -814,14 +814,16 @@ read_entire_disk() {
       # Restore dd
       kill -CONT $dd_pid
     fi
+
+    maxTimeout=15
     
     # Pause if a 'smartctl' command is taking too much time to complete
     maxSmartTime=$(maxExecTime "smartctl" "$disk_name" "60")
-    if [ "$maxSmartTime" -gt 30 -a "$paused_smart" != "y" ]; then
+    if [ "$maxSmartTime" -gt "$maxTimeout" -a "$paused_smart" != "y" ]; then
       debug "dd[${dd_pid}]: pausing (smartctl exec time: ${maxSmartTime}s)"
       kill -TSTP $dd_pid
       paused_smart=y
-    elif [ "$maxSmartTime" -lt 30 -a "$paused_smart" == "y" ]; then
+    elif [ "$maxSmartTime" -lt "$maxTimeout" -a "$paused_smart" == "y" ]; then
       debug "dd[${dd_pid}]: resumed"
       kill -CONT $dd_pid
       paused_smart=n
@@ -829,11 +831,11 @@ read_entire_disk() {
 
     # Pause if a 'hdparm' command is taking too much time to complete
     maxHdparmTime=$(maxExecTime "hdparm" "$disk_name" "60")
-    if [ "$maxHdparmTime" -gt 30 -a "$paused_hdparm" != "y" ]; then
+    if [ "$maxHdparmTime" -gt "$maxTimeout" -a "$paused_hdparm" != "y" ]; then
       debug "dd[${dd_pid}]: pausing (hdparm exec time: ${maxHdparmTime}s)"
       kill -TSTP $dd_pid
       paused_hdparm=y
-    elif [ "$maxHdparmTime" -lt 30 -a "$paused_hdparm" == "y" ]; then
+    elif [ "$maxHdparmTime" -lt "$maxTimeout" -a "$paused_hdparm" == "y" ]; then
       debug "dd[${dd_pid}]: resumed"
       kill -CONT $dd_pid
       paused_hdparm=n
