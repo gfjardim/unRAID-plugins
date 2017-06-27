@@ -13,7 +13,7 @@ set_exception_handler( "log_exception" );
 ######  DEAMON SECTION  ######
 ##############################
 $debug = FALSE;
-$version = "0.0.4";
+$version = "0.0.5";
 
 $prog      = pathinfo(__FILE__, PATHINFO_BASENAME);
 $prog_name = "Disk Info Daemon";
@@ -293,13 +293,14 @@ class Misc
 
 class Disks
 {
-  function __construct()
+  function init()
   {
     global $VERBOSE;
     $this->verbose    = $VERBOSE;
     $this->all        = [];
     $this->assigned   = [];
     $this->unassigned = [];
+    $this->partitions = [];
     $this->smartdir   = "/var/local/emhttp/smart";
     $this->cache      = "/var/local/emhttp/plugins/diskinfo/diskinfo.json";
     $this->interval   = 900; // Refresh interval in seconds
@@ -337,11 +338,11 @@ class Disks
     $unraidDisks = array_combine( array_values($unraidDisks), $unraidDisks );
 
     // Get all disks and define those which are unassigned
-    exec("timeout -s 9 ". $this->exec_time ." /bin/lsblk -nbP -o name,type,size,mountpoint,fstype 2>/dev/null", $blocks);
+    exec("timeout -s 9 ". $this->exec_time ." /bin/lsblk -nbP -o name,type,size,mountpoint,fstype,label 2>/dev/null", $blocks);
 
     foreach ($blocks as $b)
     {
-      $block  = parse_ini_string(preg_replace('$"\s+(\w+=)$', '"'.PHP_EOL.'\1', $b)) ?: [];
+      $block  = parse_ini_string(preg_replace('$"\s(\w+[=])$', '"'.PHP_EOL.'${1}', $b)) ?: [];
       $device = "/dev/${block['NAME']}";
       if ($block['TYPE'] == "disk" && file_exists($device))
       {
@@ -350,7 +351,7 @@ class Disks
 
         $this->all[$block['NAME']] = $block;
 
-        if ( in_array($block['NAME'], $unraidDisks))
+        if ( array_key_exists($block['NAME'], $unraidDisks))
         {
           $this->assigned[$block['NAME']] = $block;
         }
@@ -363,7 +364,7 @@ class Disks
       elseif ($block['TYPE'] == "part") 
       {
         $disk = preg_replace("#\d+#", "", $block['NAME']);
-        $this->allParts[$disk][$block['NAME']] = $block;
+        $this->partitions[$disk][$block['NAME']] = $block;
       }
     }
   }
@@ -376,30 +377,33 @@ class Disks
     {
       $GLOBALS["reload_force"] = false;
     }
+
+    // Get cached info from file
+    $cache = Misc::get_json($this->cache);
+
     foreach ($this->unassigned as $key => $disk)
     {
-      $disk = $this->get_info($disk["NAME"], $force);
+      $disk = $this->get_info($disk["NAME"], $force, $cache);
       $disks[$key] = $disk;
     }
 
-    $cache = Misc::get_json($this->cache);
     foreach ($this->assigned as $disk) {
       unset($cache[$disk["NAME"]]);
     }
-    Misc::save_json($this->cache, $cache);
 
+    Misc::save_json($this->cache, $cache);
 
     usort($disks, create_function('$a, $b','$key="device";if ($a[$key] == $b[$key]) return 0; return ($a[$key] < $b[$key]) ? -1 : 1;'));
     return $disks;
   }
 
 
-  public function get_info($device, $force)
+  public function get_info($device, $force, &$cache)
   {
     $device     = Misc::disk_device($device);
     $name       = Misc::disk_name($device);
     $smart_file = $this->smartdir . "/${name}";
-    $whitelist  = array("ID_MODEL", "ID_SCSI_SERIAL", "ID_SERIAL_SHORT");
+    $whitelist  = array("ID_MODEL", "DEVPATH", "ID_SCSI_SERIAL", "ID_SERIAL_SHORT", "ID_FS_LABEL", "ID_VENDOR", "ID_MODEL");
 
     // SMART parser function
     $parse_smart = function($smart, $property) 
@@ -408,8 +412,6 @@ class Disks
       return ($value) ? $value : "n/a";
     };
 
-    // Get cached info from file
-    $cache = Misc::get_json($this->cache);
     $disk = &$cache[$name];
 
     // Get current info
@@ -438,6 +440,10 @@ class Disks
       $disk['SERIAL_SHORT'] = isset($disk["ID_SCSI_SERIAL"]) ? $disk["ID_SCSI_SERIAL"] : $disk['ID_SERIAL_SHORT'];
       $disk['SERIAL']       = trim("{$disk[ID_MODEL]}_{$disk[SERIAL_SHORT]}");
 
+      // Get device BUS
+      $disk["BUS"] = (stripos($disk["DEVPATH"], "usb") !== -1) ? "usb" : "ata";
+      unset($disk["DEVPATH"]);
+
       // Get SMART device type from cached info or get it using get_smart_type function
       $disk["SMART"] = $disk["SMART"] ? $disk["SMART"] : $this->get_smart_type($device);
 
@@ -465,7 +471,24 @@ class Disks
     }
 
     // Refreshing partition info 
-    $disk["PARTS"] = is_array($this->allParts[$name]) ? $this->allParts[$name] : [];
+    $disk["PARTS"] = is_array($this->partitions[$name]) ? $this->partitions[$name] : [];
+
+    // 
+    foreach ($disk["PARTS"] as $key => $value)
+    {
+      $part = &$disk["PARTS"][$key];
+      $part["DEVICE"] = "/dev/${part['NAME']}";
+      if (strlen($part['MOUNTPOINT']))
+      {
+        $part['USED'] = intval(trim($this->benchmark("shell_exec", "df --exclude-type=devtmpfs --block-size=1 --output=used,source ${part['DEVICE']} 2>/dev/null|tail -n +2|awk '{print $1}'")));
+        $part['OPENFILES'] = trim($this->benchmark("shell_exec", "lsof +L -Fk '${part['MOUNTPOINT']}' | wc -l"));
+      }
+      else
+      {
+        $part['USED'] = 0;
+        $part['OPENFILES'] = 0;
+      }
+    }
 
     // Is it mounted?
     $disk['MOUNTED'] = array_reduce($disk['PARTS'], function ($found, $partition) { return $found || strlen($partition['MOUNTPOINT']) > 0; }, false);
@@ -500,16 +523,15 @@ class Disks
 
     }
     // Detect precleared disk
-    if (! count($disk["PARTS"]) && $disk["RUNNING"] && ! isset($disk["PRECLEAR"]) )
+    if (count($disk["PARTS"]) && $disk["RUNNING"] && ! isset($disk["PRECLEAR"]) )
     {
       $disk["PRECLEAR"] = $this->verify_precleared($device);
     }
-    else if ( count($disk["PARTS"]) )
+    else if (! isset($disk["PRECLEAR"]))
     {
       $disk["PRECLEAR"] = false;
     }
 
-    Misc::save_json($this->cache, $cache);
     return $disk;
   }
 
@@ -549,7 +571,6 @@ class Disks
         }
       }
       $cache[$device]['SMART'] = $smart;
-      Misc::save_json($this->cache, $cache);
     }
     return $smart;
   }
@@ -656,7 +677,7 @@ while(TRUE)
 {
   while(TRUE)
   { ####  DO YOUR STUFF HERE  ####
-    $Disks->__construct();
+    $Disks->init();
     $Disks->unassigned_disks_info($reload_force);
     sleep(5);
 

@@ -344,44 +344,55 @@ switch ($_GET['action']) {
     $serial = urldecode($_GET['serial']);
     ?>
     <html>
-    <body>
-    <div id="data_content"></div>
+      <body>
+        <table style="width: 100%;float: center;" >
+          <tbody>
+            <tr>
+              <td style="width: auto;">&nbsp;</td>
+              <td style="width: 968px;"><div id="data_content"></div></td>
+              <td style="width: auto;">&nbsp;</td>
+            </tr>
+            <tr>
+              <td></td>
+              <td><div style="text-align: center;"><button class="btn" data-clipboard-target="#data_content">Copy to clipboard</button></div></td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+        <?if (is_file("webGui/scripts/dynamix.js")):?>
+        <script type='text/javascript' src='/webGui/scripts/dynamix.js'></script>
+        <?else:?>
+        <script type='text/javascript' src='/webGui/javascript/dynamix.js'></script>
+        <?endif;?>
+        <script src="/plugins/<?=$plugin;?>/assets/clipboard.min.js"></script>
+        <script>
+          var timers = {};
+          var URL = "/plugins/<?=$plugin;?>/Preclear.php";
+          var serial = "<?=$serial;?>";
 
-    <?if (is_file("webGui/scripts/dynamix.js")):?>
-    <script type='text/javascript' src='/webGui/scripts/dynamix.js'></script>
-    <?else:?>
-    <script type='text/javascript' src='/webGui/javascript/dynamix.js'></script>
-    <?endif;?>
-    <script src="/plugins/<?=$plugin;?>/assets/clipboard.min.js"></script>
-    <script>
-      var timers = {};
-      var URL = "/plugins/<?=$plugin;?>/Preclear.php";
-      var serial = "<?=$serial;?>";
-
-      function get_preclear()
-      {
-        clearTimeout(timers.preclear);
-        $.post(URL,{action:"get_preclear",serial:serial,csrf_token:"<?=$var['csrf_token'];?>"},function(data) {
-          if (data.content)
+          function get_preclear()
           {
-            $("#data_content").html(data.content);
+            clearTimeout(timers.preclear);
+            $.post(URL,{action:"get_preclear",serial:serial,csrf_token:"<?=$var['csrf_token'];?>"},function(data) {
+              if (data.content)
+              {
+                $("#data_content").html(data.content);
+              }
+            },"json").always(function() {
+              timers.preclear=setTimeout('get_preclear()',1000);
+            });
           }
-        },"json").always(function() {
-          timers.preclear=setTimeout('get_preclear()',1000);
-        });
-      }
-      function hit_yes(serial)
-      {
-        $.post(URL,{action:"hit_yes",serial:serial,csrf_token:"<?=$var['csrf_token'];?>"});
-      }
-      $(function() {
-        document.title='Preclear for disk <?=$serial;?> ';
-        get_preclear();
-        new Clipboard('.btn');
-      });
-    </script>
-    <div style="text-align: center;"><button class="btn" data-clipboard-target="#data_content">Copy to clipboard</button></div>
-    </body>
+          function hit_yes(serial)
+          {
+            $.post(URL,{action:"hit_yes",serial:serial,csrf_token:"<?=$var['csrf_token'];?>"});
+          }
+          $(function() {
+            document.title='Preclear for disk <?=$serial;?> ';
+            get_preclear();
+            new Clipboard('.btn');
+          });
+        </script>
+      </body>
     </html>
     <?
     break;
