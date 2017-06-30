@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2017.06.30">
+<!ENTITY version   "2017.06.30a">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,9 @@
 
 <CHANGES>
 ##&name;
+
+###2017.06.30a
+- Fix: README typo.
 
 ###2017.06.30
 - Fix: diskinfo 0.0.6 - reload unRAID config every 30 secondsinstead of every 5 seconds;
