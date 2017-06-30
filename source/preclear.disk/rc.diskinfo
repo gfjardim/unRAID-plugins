@@ -13,7 +13,7 @@ set_exception_handler( "log_exception" );
 ######  DEAMON SECTION  ######
 ##############################
 $debug = FALSE;
-$version = "0.0.5";
+$version = "0.0.6";
 
 $prog      = pathinfo(__FILE__, PATHINFO_BASENAME);
 $prog_name = "Disk Info Daemon";
@@ -293,11 +293,12 @@ class Misc
 
 class Disks
 {
-  function init()
+  function __construct()
   {
     global $VERBOSE;
     $this->verbose    = $VERBOSE;
     $this->all        = [];
+    $this->unraid     = [];
     $this->assigned   = [];
     $this->unassigned = [];
     $this->partitions = [];
@@ -305,6 +306,13 @@ class Disks
     $this->cache      = "/var/local/emhttp/plugins/diskinfo/diskinfo.json";
     $this->interval   = 900; // Refresh interval in seconds
     $this->exec_time  = 60; // Max execution time in seconds
+
+    $this->get_unraid_config();
+    $this->get_disks();
+  }
+
+  public function get_unraid_config()
+  {
 
     // Make sure paths exist
     if (! is_dir(dirname($this->cache)))
@@ -317,7 +325,7 @@ class Disks
     if (is_file("/var/local/emhttp/disks.ini"))
     {
       $disksIni = parse_ini_file("/var/local/emhttp/disks.ini", true);
-      $unraidDisks = array_filter(array_map(function($disk){return $disk['device'];}, $disksIni));
+      $unraidDisks = array_values(array_filter(array_map(function($disk){return $disk['device'];}, $disksIni)));
     }
 
     $disks = array_diff(glob("/dev/disk/by-id/*"), glob("/dev/disk/by-id/{wwn-*,*-part*}", GLOB_BRACE));
@@ -330,13 +338,15 @@ class Disks
 
     foreach( array_merge($serials,$cache_serial,$flash_serial) as $serial )
     {
-      $unraidDisks = array_merge($unraidDisks, preg_grep("#-".preg_quote($serial, "#")."#", $disks));
+      $unraidDisks = array_merge($unraidDisks, array_values(preg_grep("#-".preg_quote($serial, "#")."#", $disks)));
     }
 
-    $unraidDisks = array_map(function($p){return basename(realpath($p));}, $unraidDisks);
+    $this->unraid = array_filter(array_map(function($p){return basename(realpath($p));}, $unraidDisks));
+  }
 
-    $unraidDisks = array_combine( array_values($unraidDisks), $unraidDisks );
 
+  public function get_disks()
+  {
     // Get all disks and define those which are unassigned
     exec("timeout -s 9 ". $this->exec_time ." /bin/lsblk -nbP -o name,type,size,mountpoint,fstype,label 2>/dev/null", $blocks);
 
@@ -351,7 +361,7 @@ class Disks
 
         $this->all[$block['NAME']] = $block;
 
-        if ( array_key_exists($block['NAME'], $unraidDisks))
+        if ( in_array($block['NAME'], $this->unraid))
         {
           $this->assigned[$block['NAME']] = $block;
         }
@@ -383,7 +393,7 @@ class Disks
 
     foreach ($this->unassigned as $key => $disk)
     {
-      $disk = $this->get_info($disk["NAME"], $force, $cache);
+      $disk = $this->get_info($disk["NAME"], $cache, $force);
       $disks[$key] = $disk;
     }
 
@@ -391,14 +401,17 @@ class Disks
       unset($cache[$disk["NAME"]]);
     }
 
-    Misc::save_json($this->cache, $cache);
+    if (! $GLOBALS["reload_force"])
+    {
+      Misc::save_json($this->cache, $disks);
+    }
 
     usort($disks, create_function('$a, $b','$key="device";if ($a[$key] == $b[$key]) return 0; return ($a[$key] < $b[$key]) ? -1 : 1;'));
     return $disks;
   }
 
 
-  public function get_info($device, $force, &$cache)
+  public function get_info($device, &$cache, $force)
   {
     $device     = Misc::disk_device($device);
     $name       = Misc::disk_name($device);
@@ -666,20 +679,39 @@ function force_reload($sig, $signum)
   }
 }
 
+function isTimeout(&$counter, $timeout)
+{
+  $current = time();
+  $counter = $counter ? $counter : time();
+  if ( ($current - $counter) >= $timeout  )
+  {
+    $counter = null;
+    return true;
+  }
+  return false;
+}
+
 
 ##############################
 #####  PROGRAM SECTION  ######
 ##############################
-$Disks = new Disks;
+$Disks        = new Disks;
 $reload_force = false;
+$counter      = 0;
 
 while(TRUE)
 {
   while(TRUE)
   { ####  DO YOUR STUFF HERE  ####
-    $Disks->init();
+
+    if (isTimeout($counter, 30))
+    {
+      $Disks->get_unraid_config();
+    }
+
+    $Disks->get_disks();
     $Disks->unassigned_disks_info($reload_force);
-    sleep(5);
+    sleep(1);
 
     ######  END OF SECTION  ######
   };

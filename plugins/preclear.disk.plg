@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2017.06.27">
+<!ENTITY version   "2017.06.30">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,10 @@
 
 <CHANGES>
 ##&name;
+
+###2017.06.30
+- Fix: diskinfo 0.0.6 - reload unRAID config every 30 secondsinstead of every 5 seconds;
+- Fix: Non-static method should not be called statically (PHP 5.4 error)
 
 ###2017.06.27
 - Fix: diskinfo 0.0.5 - add compatibility to future Unassigned Devices adoption

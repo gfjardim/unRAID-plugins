@@ -13,20 +13,20 @@ $diskinfo   = "/var/local/emhttp/plugins/diskinfo/diskinfo.json";
 class TMUX
 {
 
-  public function isExecutable()
+  public static function isExecutable()
   {
     return is_file("/usr/bin/tmux") ? (is_executable("/usr/bin/tmux") ? TRUE : FALSE) : FALSE;
   }
 
 
-  public function hasSession($name)
+  public static function hasSession($name)
   {
     exec('/usr/bin/tmux ls 2>/dev/null|cut -d: -f1', $screens);
     return in_array($name, $screens);
   }
 
 
-  public function NewSession($name)
+  public static function NewSession($name)
   {
     if (! TMUX::hasSession($name))
     {
@@ -35,19 +35,19 @@ class TMUX
   }
 
 
-  public function getSession($name)
+  public static function getSession($name)
   {
     return (TMUX::hasSession($name)) ? shell_exec("/usr/bin/tmux capture-pane -t '${name}' 2>/dev/null;/usr/bin/tmux show-buffer 2>&1") : NULL;
   }
 
 
-  public function sendCommand($name, $cmd)
+  public static function sendCommand($name, $cmd)
   {
     exec("/usr/bin/tmux send -t '$name' '$cmd' ENTER 2>/dev/null");
   }
 
 
-  public function killSession($name)
+  public static function killSession($name)
   {
     if (TMUX::hasSession($name))
     {
@@ -60,32 +60,32 @@ class TMUX
 class Misc
 {
 
-  public function save_json($file, $content)
+  public static function save_json($file, $content)
   {
     file_put_contents($file, json_encode($content, JSON_PRETTY_PRINT ));
   }
 
 
-  public function get_json($file)
+  public static function get_json($file)
   {
     return file_exists($file) ? json_decode(file_get_contents($file), true) : [];
   }
 
 
-  public function disk_device($disk)
+  public static function disk_device($disk)
   {
     $name = Misc::disk_name($disk);
     return (file_exists($disk)) ? $disk : "/dev/${name}";
   }
 
 
-  public function disk_name($disk)
+  public static function disk_name($disk)
   {
     return (file_exists($disk)) ? basename($disk) : $disk;
   }
 
 
-  public function array_first_element($arr)
+  public static function array_first_element($arr)
   {
     return (is_array($arr) && count($arr)) ? $arr[0] : $arr;
   }
