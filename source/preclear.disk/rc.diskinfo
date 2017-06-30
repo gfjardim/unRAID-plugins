@@ -373,7 +373,6 @@ class Disks
       }
       elseif ($block['TYPE'] == "part") 
       {
-        $disk = preg_replace("#\d+#", "", $block['NAME']);
         $this->partitions[$disk][$block['NAME']] = $block;
       }
     }
