@@ -373,6 +373,7 @@ class Disks
       }
       elseif ($block['TYPE'] == "part") 
       {
+        $disk = (is_bool(strpos($block['NAME'], "nvme"))) ? preg_replace("#\d+$#", "", $block['NAME']) : preg_replace("#p\d+$#", "", $block['NAME']);
         $this->partitions[$disk][$block['NAME']] = $block;
       }
     }
