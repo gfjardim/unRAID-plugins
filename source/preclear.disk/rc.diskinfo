@@ -13,7 +13,7 @@ set_exception_handler( "log_exception" );
 ######  DEAMON SECTION  ######
 ##############################
 $debug = FALSE;
-$version = "0.0.6";
+$version = "0.0.7";
 
 $prog      = pathinfo(__FILE__, PATHINFO_BASENAME);
 $prog_name = "Disk Info Daemon";
@@ -260,31 +260,32 @@ function debug($msg, $type = "NOTICE")
 class Misc
 {
 
-  public function save_json($file, $content)
+  public static function save_json($file, $content)
   {
     file_put_contents($file, json_encode($content, JSON_PRETTY_PRINT ));
   }
 
 
-  public function get_json($file)
+  public static function get_json($file)
   {
     return file_exists($file) ? @json_decode(file_get_contents($file), true) : [];
   }
 
 
-  public function disk_device($disk)
+  public static function disk_device($disk)
   {
-    return (file_exists($disk)) ? $disk : "/dev/${disk}";
+    $disk = (file_exists($disk)) ? $disk : "/dev/${disk}";
+    return file_exists($disk) ? $disk : null;
   }
 
 
-  public function disk_name($disk)
+  public static function disk_name($disk)
   {
-    return (file_exists($disk)) ? basename($disk) : $disk;
+    return basename($disk);
   }
 
 
-  public function array_first_element($arr)
+  public static function array_first_element($arr)
   {
     return (is_array($arr) && count($arr)) ? $arr[0] : $arr;
   }
@@ -297,11 +298,6 @@ class Disks
   {
     global $VERBOSE;
     $this->verbose    = $VERBOSE;
-    $this->all        = [];
-    $this->unraid     = [];
-    $this->assigned   = [];
-    $this->unassigned = [];
-    $this->partitions = [];
     $this->smartdir   = "/var/local/emhttp/smart";
     $this->cache      = "/var/local/emhttp/plugins/diskinfo/diskinfo.json";
     $this->interval   = 900; // Refresh interval in seconds
@@ -313,6 +309,7 @@ class Disks
 
   public function get_unraid_config()
   {
+    $this->unraid = [];
 
     // Make sure paths exist
     if (! is_dir(dirname($this->cache)))
@@ -347,6 +344,11 @@ class Disks
 
   public function get_disks()
   {
+    $this->all        = [];
+    $this->assigned   = [];
+    $this->unassigned = [];
+    $this->partitions = [];
+
     // Get all disks and define those which are unassigned
     exec("timeout -s 9 ". $this->exec_time ." /bin/lsblk -nbP -o name,type,size,mountpoint,fstype,label 2>/dev/null", $blocks);
 
@@ -383,13 +385,15 @@ class Disks
   public function unassigned_disks_info($force)
   {
     $disks = [];
-    if ($force)
-    {
-      $GLOBALS["reload_force"] = false;
-    }
 
     // Get cached info from file
     $cache = Misc::get_json($this->cache);
+
+    if ($force)
+    {
+      $GLOBALS["reload_force"] = false;
+      $cache = [];
+    }
 
     foreach ($this->unassigned as $key => $disk)
     {
@@ -397,8 +401,9 @@ class Disks
       $disks[$key] = $disk;
     }
 
-    foreach ($this->assigned as $disk) {
-      unset($cache[$disk["NAME"]]);
+    foreach ($this->assigned as $disk)
+    {
+      unset($disks[$disk["NAME"]]);
     }
 
     if (! $GLOBALS["reload_force"])
@@ -406,14 +411,17 @@ class Disks
       Misc::save_json($this->cache, $disks);
     }
 
-    usort($disks, create_function('$a, $b','$key="device";if ($a[$key] == $b[$key]) return 0; return ($a[$key] < $b[$key]) ? -1 : 1;'));
     return $disks;
   }
 
 
   public function get_info($device, &$cache, $force)
   {
-    $device     = Misc::disk_device($device);
+    $device = Misc::disk_device($device);
+    if (! $device)
+    {
+      return [];
+    }
     $name       = Misc::disk_name($device);
     $smart_file = $this->smartdir . "/${name}";
     $whitelist  = array("ID_MODEL", "DEVPATH", "ID_SCSI_SERIAL", "ID_SERIAL_SHORT", "ID_FS_LABEL", "ID_VENDOR", "ID_MODEL");
@@ -425,10 +433,10 @@ class Disks
       return ($value) ? $value : "n/a";
     };
 
-    $disk = &$cache[$name];
-
     // Get current info
     $current = $this->all[$name];
+
+    $disk = isset($cache[$name]) ? $cache[$name] : $current;
 
     // Trigger reload if current and cached serials mismatch
     if (count($current) && isset($disk["SERIAL_SHORT"]))
@@ -494,7 +502,7 @@ class Disks
       if (strlen($part['MOUNTPOINT']))
       {
         $part['USED'] = intval(trim($this->benchmark("shell_exec", "df --exclude-type=devtmpfs --block-size=1 --output=used,source ${part['DEVICE']} 2>/dev/null|tail -n +2|awk '{print $1}'")));
-        $part['OPENFILES'] = trim($this->benchmark("shell_exec", "lsof +L -Fk '${part['MOUNTPOINT']}' | wc -l"));
+        $part['OPENFILES'] = trim($this->benchmark("shell_exec", "lsof +L -Fk '${part['MOUNTPOINT']}' 2>/dev/null | wc -l"));
       }
       else
       {

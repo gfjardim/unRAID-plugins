@@ -101,7 +101,7 @@ switch ($_POST['action'])
 
   case 'get_content':
     debug("Starting get_content: ".(time() - $start_time),'DEBUG');
-    shell_exec("/etc/rc.d/rc.diskinfo --daemon &>/dev/null");
+    // shell_exec("/etc/rc.d/rc.diskinfo --daemon &>/dev/null");
     $disks = Misc::get_json($diskinfo);
     $all_status = array();
 
