@@ -335,6 +335,20 @@ switch ($_POST['action'])
       echo "true";
     }
     break;
+
+  case 'download':
+    $dir  = "/preclear";
+    $file = $_POST["file"];
+    @mkdir($dir);
+    exec("cat $log_file 2>/dev/null | todos >".escapeshellarg("$dir/preclear_disk_log.txt"));
+    exec("cat /var/log/diskinfo.log 2>/dev/null | todos >".escapeshellarg("$dir/diskinfo_log.txt"));
+    exec("cat /var/local/emhttp/plugins/diskinfo/diskinfo.json 2>/dev/null | todos >".escapeshellarg("$dir/diskinfo_json.txt"));
+    exec("/etc/rc.d/rc.diskinfo --version  2>/dev/null | todos >".escapeshellarg("$dir/diskinfo_status.txt"));
+    exec("/etc/rc.d/rc.diskinfo --status  2>/dev/null | todos >>".escapeshellarg("$dir/diskinfo_status.txt"));
+    exec("zip -qmr ".escapeshellarg($file)." ".escapeshellarg($dir));
+    echo "/$file";
+  break;
+
 }
 
 

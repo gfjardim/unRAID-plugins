@@ -37,7 +37,7 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
   function getlog()
   {
     $('input[value="Download"]').val('Downloading...').prop('disabled',true);
-    $.post('/webGui/include/Download.php',{cmd:'save',source:'/var/log/<?=$plugin;?>.log',file:'<?=$zipFile;?>'},function(zip)
+    $.post('/plugins/<?=$plugin;?>/Preclear.php',{action:'download',file:'<?=$zipFile;?>'},function(zip)
     {
       location = zip;
       setTimeout(cleanUp,4000);
