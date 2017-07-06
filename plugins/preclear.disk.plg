@@ -391,12 +391,14 @@ chmod -R 755 /usr/local/emhttp/plugins/&name;/script/
 ln -sf /usr/local/emhttp/plugins/&name;/script/preclear.sh /usr/local/bin/preclear
 
 # Install diskinfo service
+if [ -f "/etc/rc.d/rc.diskinfo" ]; then
+  /etc/rc.d/rc.diskinfo --quit
+  sleep 1
+  rm /var/local/emhttp/plugins/diskinfo/diskinfo.json
+fi
 mv /usr/local/emhttp/plugins/&name;/rc.diskinfo /etc/rc.d/rc.diskinfo
 chmod +x /etc/rc.d/rc.diskinfo
-/etc/rc.d/rc.diskinfo --restart
-if [ $? -gt 0 ]; then
-  /etc/rc.d/rc.diskinfo --daemon
-fi
+/etc/rc.d/rc.diskinfo --daemon
 
 # Add UDEV rule
 mv /usr/local/emhttp/plugins/&name;/99_diskinfo.rules /etc/udev/rules.d/99_diskinfo.rules
