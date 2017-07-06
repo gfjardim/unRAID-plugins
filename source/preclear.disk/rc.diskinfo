@@ -13,7 +13,7 @@ set_exception_handler( "log_exception" );
 ######  DEAMON SECTION  ######
 ##############################
 $debug = FALSE;
-$version = "0.0.8";
+$version = "0.0.9";
 
 $prog      = pathinfo(__FILE__, PATHINFO_BASENAME);
 $prog_name = "Disk Info Daemon";
@@ -540,9 +540,13 @@ class Disks
       $disk["RUNNING"]   = preg_match("/Device is in STANDBY mode/", $smartInfo) ? false : true;
       $disk["TIMESTAMP"] = $disk["RUNNING"] ? time() : 0;
       $disk["TEMP"]      = trim(shell_exec("echo -e \"$smartInfo\" | grep -m 1 -i Temperature_Celsius | awk '{print $10}'"));
+      if (! is_numeric($disk["TEMP"]))
+      {
+        $disk["TEMP"]    = trim(shell_exec("echo -e \"$smartInfo\" | grep -m 1 -i Airflow_Temperature | awk '{print $10}'"));
+      }
       $disk["NAME"]      = $name;
-
     }
+
     // Detect precleared disk
     if (count($disk["PARTS"]) && $disk["RUNNING"] && ! isset($disk["PRECLEAR"]) )
     {

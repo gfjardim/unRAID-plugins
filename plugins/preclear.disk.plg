@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2017.07.05b">
+<!ENTITY version   "2017.07.05c">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,9 @@
 
 <CHANGES>
 ##&name;
+
+###2017.07.05c
+- Fix: diskinfo 0.0.9 - not showing SSD temperature
 
 ###2017.07.05b
 - Fix: diskinfo 0.0.8 - not properly detect the absent of cached info
@@ -432,6 +435,10 @@ rm -rf /boot/config/plugins/&name; \
        /var/state/&name; \
        /boot/.preclear/
 find /var/log/packages -type f -iname "&name;-*" -delete
+
+/etc/rc.d/rc.diskinfo --quit
+sleep 1
+rm /var/local/emhttp/plugins/diskinfo/diskinfo.json /etc/rc.d/rc.diskinfo
 
 echo ""
 echo "-----------------------------------------------------------"
