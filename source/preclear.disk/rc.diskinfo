@@ -13,7 +13,7 @@ set_exception_handler( "log_exception" );
 ######  DEAMON SECTION  ######
 ##############################
 $debug = FALSE;
-$version = "0.0.7";
+$version = "0.0.8";
 
 $prog      = pathinfo(__FILE__, PATHINFO_BASENAME);
 $prog_name = "Disk Info Daemon";
@@ -449,7 +449,7 @@ class Disks
     }
 
     // Probe persistent disk data if data isn't cached or reload triggered
-    if (! isset($disk) || $reload || $force)
+    if (! isset($cache[$name]) || $reload || $force)
     {
       debug("Probing disk ${device} info...", "DEBUG");
 
