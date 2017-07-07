@@ -4,7 +4,7 @@
 <!ENTITY name      "advanced.buttons">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2017.06.22a">
+<!ENTITY version   "2017.07.07">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
 ]>
@@ -13,6 +13,9 @@
 
 <CHANGES>
 ##&name;
+
+###2017.07.07
+- Fix: containers with a dash in the name not updating
 
 ###2017.06.22a
 - Fix: 6.4.0-rc5 compatibility

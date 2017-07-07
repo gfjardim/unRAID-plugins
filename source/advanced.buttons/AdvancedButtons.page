@@ -70,7 +70,7 @@ $plugin = "advanced.buttons";
         buttonOutput += "<i class='fa fa-play "+disable+"'>&nbsp;&nbsp;</i>Start All Containers</button>";
         icon = (disable == "started") ? icon_on.formatUnicorn({class:"started", cmd:"dockerButtonCommand(\"start\");", title:"Start All Containers", icon:"fa-play"}) : 
                                         icon_off.formatUnicorn({icon:"fa-play"}) ;
-        $("#" + addButtonTab(icon, icon_target, true, true)).css("margin-right","150px").offset({top:ntop});
+        $("#" + addButtonTab(icon, icon_target, true, true)).css("margin-right", (dashboard ? "115px" : "150px") ).offset({top:ntop});
 
         disable = (Object.keys(AdvancedButtons.Stoppable).length && ! AdvancedButtons.DockerRunning) ? "stopped" : "disabled";
         buttonOutput += "<button class='AdvancedButtons' onclick='dockerButtonCommand(\"stop\");' "+disable+">";
@@ -205,7 +205,7 @@ $plugin = "advanced.buttons";
     // Bind Update link in Docker
     $("td.updatecolumn > a.exec").add("td.updatecolumn > div.advanced > a.exec").each(function()
     {
-      fnUplink = function(){dockerButtonCommand('update', $(this).closest("tr").find("td > div[id^='context-']").prop("id").split("-")[1])};
+      fnUplink = function(){dockerButtonCommand('update', $(this).closest("tr").find("td > div[id^='context-']").prop("id").replace("context-", ""));};
       $(this).prop("onclick",null).off().on("click",fnUplink);
     });
 
@@ -233,20 +233,6 @@ $plugin = "advanced.buttons";
     {
       $(this).prop("onclick",null).on("click", function(){disableElement(this);pluginsUpdate('check',AdvancedButtons["PluginsAll"])});
     });
-
-
-    // // Add Clear All Cookies to Tools
-    // if (document.location.pathname == "/Tools" )
-    // {
-    //   titlebar = $("div#title > span.left"    ).filter(function(){return $(this).text() === "WebGUI";}).parent();
-    //   if (titlebar.prop("nodeName") == "DIV")
-    //   {
-    //     element  = '<div class="Panel"><a style="cursor:pointer" onclick="eraseAllCookies()"><img class="PanelImg" src="/webGui/images/default.png">'
-    //     element += '<br><div class="PanelText">Clear All Cookies</div></a></div>';
-    //     titlebar.nextUntil( "div#title" ).last().after(element);
-    //   }
-    // }
-
 
   });
 

@@ -20,6 +20,20 @@ if (! is_dir($Files['ConfigFile']))
   @mkdir(dirname($Files['ConfigFile']));
 }
 
+class DockerClientEx extends DockerClient
+{
+  public function killContainer($id) {
+    $this->getDockerJSON("/containers/${id}/kill", "POST", $code);
+    $this->allContainersCache = null; // flush cache
+    $codes = [
+      "204" => true, // No error
+      "404" => "No such container",
+      "500" => "Server error"
+    ];
+    return (array_key_exists($code, $codes)) ? $codes[$code] : 'Error code '.$code;
+  }
+}
+
 class Misc
 {
 

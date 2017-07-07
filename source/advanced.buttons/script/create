@@ -4,8 +4,10 @@ $plugin = "advanced.buttons";
 require_once("/usr/local/emhttp/plugins/${plugin}/assets/common.php");
 require_once("${docroot}/webGui/include/Helpers.php");
 $display = @parse_ini_file("/boot/config/plugins/dynamix/dynamix.cfg", true)["display"] ?: [];
+openlog("$prog", LOG_PID | LOG_PERROR, LOG_LOCAL0);
 
-$DockerClient    = new DockerClient();
+
+$DockerClient    = new DockerClientEx();
 $DockerTemplates = new DockerTemplates();
 $DockerUpdate    = new DockerUpdate();
 $RestoreConfig   = json_decode(@file_get_contents($Files['ConfigFile']) ?: "[]", true);
@@ -252,10 +254,21 @@ foreach ($arguments as $key => $Name) {
     $Cmd = str_replace('docker create ', 'docker run -d ', $Cmd);
 
     // attempt graceful stop of container first
-    $DockerClient->stopContainer($Name);
+    $ok = $DockerClient->stopContainer($Name);
+
+    // force kill container if still running after 10 seconds
+    if ($ok !== true)
+    {
+      saveStatus($StatusFile, $title, $message, "Error stopping '${Name}': ${ok}");
+      $ok =  $DockerClient->killContainer($Name);
+      if ($ok !== true) 
+      {
+        saveStatus($StatusFile, $title, $message, "Error killing '${Name}': ${ok}");
+        exit(1);
+      }
+    }
   }
 
-  // force kill container if still running after 10 seconds
   $DockerClient->removeContainer($Name);
 
   $descriptorspec = [
@@ -272,6 +285,11 @@ foreach ($arguments as $key => $Name) {
   $retval = proc_close($proc);
 
   saveStatus($StatusFile, $title, $message, $retval ?  "The command failed. Error: $msg" : "The command finished successfully!");
+
+  if ($retval)
+  {
+    syslog(LOG_INFO,  "The command failed. Error: $msg");
+  }
 
   // Clean info
   $DockerClient->flushCaches();
