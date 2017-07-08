@@ -13,7 +13,7 @@ set_exception_handler( "log_exception" );
 ######  DEAMON SECTION  ######
 ##############################
 $debug = FALSE;
-$version = "0.0.9";
+$version = "0.1.0";
 
 $prog      = pathinfo(__FILE__, PATHINFO_BASENAME);
 $prog_name = "Disk Info Daemon";
@@ -318,27 +318,31 @@ class Disks
     }
 
     // Get array disks
-    $unraidDisks = [];
     if (is_file("/var/local/emhttp/disks.ini"))
     {
       $disksIni = parse_ini_file("/var/local/emhttp/disks.ini", true);
-      $unraidDisks = array_values(array_filter(array_map(function($disk){return $disk['device'];}, $disksIni)));
+      $this->unraid = array_values(array_filter(array_map(function($disk){return $disk['device'];}, $disksIni)));
     }
 
-    $disks = array_diff(glob("/dev/disk/by-id/*"), glob("/dev/disk/by-id/{wwn-*,*-part*}", GLOB_BRACE));
-    
-    exec("timeout -s 9 ". $this->exec_time ." /usr/bin/strings /boot/config/super.dat 2>/dev/null|grep -Po '.{10,}'", $serials);
+    exec("timeout -s 9 ". $this->exec_time ." /usr/bin/strings /boot/config/super.dat 2>/dev/null|grep -Po '.{6,}'", $serials);
     exec("timeout -s 9 ". $this->exec_time ." udevadm info --query=property --name /dev/disk/by-label/UNRAID 2>/dev/null|grep -Po 'ID_SERIAL=\K.*'", $flash_serial);
     
     $disks_cfg = is_file("/boot/config/disk.cfg") ? parse_ini_file("/boot/config/disk.cfg") : [];
     $cache_serial = array_flip(preg_grep("#cacheId#i", array_flip($disks_cfg)));
 
+    exec("timeout -s 9 ". $this->exec_time ." /bin/lsblk -nbP -o name,type,serial 2>/dev/null", $blocks);
     foreach( array_merge($serials,$cache_serial,$flash_serial) as $serial )
     {
-      $unraidDisks = array_merge($unraidDisks, array_values(preg_grep("#-".preg_quote($serial, "#")."#", $disks)));
+      foreach ($blocks as $block)
+      {
+        $block  = parse_ini_string(preg_replace('$"\s$', '"'.PHP_EOL, $block)) ?: [];
+        if ( $block['TYPE'] == "disk" && ! is_bool(strpos($serial, $block['SERIAL'])) )
+        {
+          $this->unraid[] = $block['NAME'];
+        }
+      }
     }
-
-    $this->unraid = array_filter(array_map(function($p){return basename(realpath($p));}, $unraidDisks));
+    $this->unraid = array_unique($this->unraid);
   }
 
 

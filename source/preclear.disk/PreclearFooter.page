@@ -64,5 +64,43 @@ $Preclear = new Preclear;
     footer = $("<span id='preclear-footer'></span>").insertAfter("div#footer > span#copyright").css("float","right").css("margin-right", "6px");
     getPreclearFooter();
   });
-
 </script>
+
+<?
+$is_installed = is_file(glob("/boot/config/plugins/statistics.sender/statistics.sender*.txz")[0]);
+$dismissed = [ "/boot/config/plugins/statistics.sender/dismissed", "/tmp/.statistics_dismissed" ];
+
+$is_dismissed = array_reduce($dismissed, function ($result, $item) { return $result || is_file($item); }, false);
+$plugin_file  = "https://raw.githubusercontent.com/gfjardim/unRAID-plugins/master/plugins/statistics.sender.plg";
+if (! $is_installed && ! $is_dismissed):
+?>
+<script type="text/javascript">
+  var original_plugin = "Preclear Disks<br>";
+  swal(
+  {
+    title: original_plugin + "Install Statistics Plugin",
+    text: "This plugin is used to send statistics anonymously using Google Forms and TOR. <br>Don't worry, you will be asked before sending every report.",
+    type: "info",
+    confirmButtonText: "Install",
+    allowOutsideClick: false,
+    showCancelButton: true,
+    cancelButtonText: "Dismiss",
+    closeOnConfirm: true,
+    showLoaderOnConfirm: false,
+    html: true
+  },
+  function(isConfirm)
+  {
+    if(isConfirm)
+    {
+      openBox('/plugins/dynamix.plugin.manager/scripts/plugin&arg1=install&arg2=<?=$plugin_file;?>','Install Plugin',600,900,true);
+    }
+    else
+    {
+      <?php foreach ($dismissed as $file): ?>
+        $.post("/update.php",{"#file":"<?=$file;?>"});
+      <?php endforeach ?>
+    }
+  });
+</script>
+<?endif;?>

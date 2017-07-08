@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2017.07.05c">
+<!ENTITY version   "2017.07.08">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,10 @@
 
 <CHANGES>
 ##&name;
+
+###2017.07.08
+- Fix: dismiss Statistics status saved at temporary dir;
+- Fix: diskinfo 0.1.0 - better array disk detection;
 
 ###2017.07.05c
 - Fix: diskinfo 0.0.9 - not showing SSD temperature
@@ -303,11 +307,6 @@ The 'plugin' package MD5 hash.
 <URL>&gitURL;/source/packages/readvz</URL>
 </FILE>
 
-<!--The 'Statistics' install script.-->
-<FILE Name="/boot/config/plugins/&name;/StatsInstall" Mode="755">
-<URL>&gitURL;/source/statistics.sender/StatsInstall.page</URL>
-</FILE>
-
 <!--
 The 'packages-install' script.
 -->
@@ -374,9 +373,6 @@ fi
 
 # Creating some directories
 mkdir -p /tmp/.preclear/ /usr/local/bin/
-
-# Statistics Sender
-sed -e "s#@PLUGIN@#Preclear Disks#g" "/boot/config/plugins/&name;/StatsInstall" &gt; "/usr/local/emhttp/plugins/&name;/StatsInstall.page"
 
 #dismissed="/boot/config/plugins/statistics.sender/dismissed"
 #version_dismiss="/boot/config/plugins/&name;/statistics.sender.dismissed-&version;"
