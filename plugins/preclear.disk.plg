@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2017.07.08">
+<!ENTITY version   "2017.07.10">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,9 @@
 
 <CHANGES>
 ##&name;
+
+###2017.07.10
+- Add Cron keepalive
 
 ###2017.07.08
 - Fix: dismiss Statistics status saved at temporary dir;
@@ -404,6 +407,13 @@ mv /usr/local/emhttp/plugins/&name;/99_diskinfo.rules /etc/udev/rules.d/99_diski
 chmod 644 /etc/udev/rules.d/99_diskinfo.rules
 udevadm control --reload-rules
 
+# Add CRON entry to keep alive
+cat &lt;&lt;'EOT' &gt; /etc/cron.d/diskinfo
+# Diskinfo daemon keepalive
+*/1 * * * * /etc/rc.d//rc.diskinfo --daemon &amp;> /dev/null
+EOT
+chmod 600 /etc/cron.d/diskinfo
+
 # Cleaning old source files
 find /boot/config/plugins/&name;/ -type f -iname "&name;*.txz" ! -iname "*&version;*" -delete
 find /boot/config/plugins/&name;/ -type f -iname "&name;*.md5" ! -iname "*&version;*" -delete
@@ -434,7 +444,9 @@ find /var/log/packages -type f -iname "&name;-*" -delete
 
 /etc/rc.d/rc.diskinfo --quit
 sleep 1
-rm /var/local/emhttp/plugins/diskinfo/diskinfo.json /etc/rc.d/rc.diskinfo
+rm /var/local/emhttp/plugins/diskinfo/diskinfo.json \
+   /etc/rc.d/rc.diskinfo \
+   /etc/cron.d/diskinfo
 
 echo ""
 echo "-----------------------------------------------------------"

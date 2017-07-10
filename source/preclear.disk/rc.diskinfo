@@ -125,7 +125,7 @@ if (file_exists($lockfile))
     else
     {
       echo "$prog is already running [$lock_pid]".PHP_EOL;
-      exit(1);
+      exit(0);
     }
   }
   else
@@ -187,7 +187,7 @@ else
   }
 }
 
-if ($daemon)
+if ($daemon || $refresh)
 {
   exec("php $service  1>/dev/null ".($debug ? "":"2>&1 ")."&");
   syslog(LOG_INFO, "process started. To terminate it, type: $prog --quit");
