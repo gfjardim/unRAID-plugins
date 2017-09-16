@@ -519,7 +519,7 @@ class Disks
     $disk['MOUNTED'] = array_reduce($disk['PARTS'], function ($found, $partition) { return $found || strlen($partition['MOUNTPOINT']) > 0; }, false);
     
     // Probe for temperature and power state if interval timed out
-    if (file_exists($smart_file))
+    if (file_exists($smart_file) && $disk["TIMESTAMP"] > 0)
     {
       $use_file = (time() - filemtime($smart_file)) < $this->interval;
     }
@@ -528,6 +528,8 @@ class Disks
 
     if ( $timeout )
     {
+      debug("Timeout reached.", "DEBUG");
+
       if (! isset($smartInfo))
       {
         if ($use_file)
@@ -541,6 +543,7 @@ class Disks
           file_put_contents($smart_file, $smartInfo);
         }
       }
+
       $disk["RUNNING"]   = preg_match("/Device is in STANDBY mode/", $smartInfo) ? false : true;
       $disk["TIMESTAMP"] = $disk["RUNNING"] ? time() : 0;
       $disk["TEMP"]      = trim(shell_exec("echo -e \"$smartInfo\" | grep -m 1 -i Temperature_Celsius | awk '{print $10}'"));

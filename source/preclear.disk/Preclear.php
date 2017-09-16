@@ -206,7 +206,16 @@ switch ($_POST['action'])
 
     @file_put_contents("/tmp/preclear_stat_{$devname}","{$devname}|NN|Starting...");
 
-    if ($scope == "gfjardim")
+    if ( $op == "resume" && is_file("/boot/config/plugins/$plugin/${serial}.resume"))
+    {
+      $cmd = "$script --load-file '/boot/config/plugins/$plugin/${serial}.resume' ${device}";
+    }
+    else if($op == "resume" && ! is_file("/boot/config/plugins/$plugin/${serial}.resume"))
+    {
+      break;
+    }
+
+    else if ($scope == "gfjardim")
     {
       $notify    = (isset($_POST['--notify']) && $_POST['--notify'] > 0) ? " --notify ".urldecode($_POST['--notify']) : "";
       $frequency = (isset($_POST['--frequency']) && $_POST['--frequency'] > 0 && intval($_POST['--notify']) > 0) ? " --frequency ".urldecode($_POST['--frequency']) : "";
@@ -349,6 +358,15 @@ switch ($_POST['action'])
     echo "/$file";
   break;
 
+  case 'get_resumable':
+    $serial  = urldecode($_POST['serial']);
+    if (is_file("/boot/config/plugins/$plugin/${serial}.resume"))
+    {
+      echo json_encode(["resume" => true]);
+    }
+    else
+      {echo json_encode(["resume" => false]);}
+    break;
 }
 
 

@@ -66,6 +66,7 @@ $Preclear = new Preclear;
   });
 </script>
 
+<!-- Status installer -->
 <?
 $is_installed = is_file(glob("/boot/config/plugins/statistics.sender/statistics.sender*.txz")[0]);
 $dismissed = [ "/boot/config/plugins/statistics.sender/dismissed", "/tmp/.statistics_dismissed" ];

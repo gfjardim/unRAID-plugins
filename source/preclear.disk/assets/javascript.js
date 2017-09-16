@@ -474,3 +474,56 @@ function addButtonTab(Button, Name, autoHide, Append)
     return false;
   }
 }
+
+function getResumablePreclear(serial)
+{
+  $.post(PreclearURL,{action:'get_resumable', serial:serial}, function(data)
+  {
+    if (data.resume)
+    {
+      swal(
+      {
+        title: "Resume Preclear?",
+        text:  "There's a previous preclear session available for this drive.<br>Do you want to resume it instead of starting a new one?",
+        type:  "info",
+        html:  true,
+        closeOnConfirm: false,
+        showCancelButton: true,
+        confirmButtonText:"Yes",
+        cancelButtonText:"No"
+      }, function(result)
+      {
+        if (result)
+        {
+          swal.close();
+
+          var opts       = new Object();
+          opts["action"] = "start_preclear";
+          opts["serial"] = serial;
+          opts["device"] = getDiskInfo(serial, 'DEVICE');
+          opts["op"]     = "resume";
+          opts["scope"]  = "gfjardim";
+
+          $.post(PreclearURL, opts, function(data)
+                  {
+                    openPreclear(serial);
+                  }
+                ).always(function(data)
+                  {
+                    window.location=window.location.pathname+window.location.hash;
+                  }
+                );
+        }
+        else
+        {
+          swal.close();
+          setTimeout(startPreclear, 300, serial);
+        }
+      });
+    }
+    else
+    {
+      startPreclear(serial);
+    }
+  }, "json");
+}

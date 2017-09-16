@@ -187,8 +187,8 @@ class Preclear
   public function Link($disk, $type)
   {
     $serial = $this->diskSerial($disk);
-    $icon   = "<a title='Start Preclear' class='exec tooltip' onclick='startPreclear(\"{$serial}\")'><img src='/plugins/".$this->plugin."/icons/precleardisk.png'></a>";
-    $text   = "<a title='Start Preclear' class='exec' onclick='startPreclear(\"{$serial}\")'>Start Preclear</a>";
+    $icon   = "<a title='Start Preclear' class='exec tooltip' onclick='getResumablePreclear(\"{$serial}\")'><img src='/plugins/".$this->plugin."/icons/precleardisk.png'></a>";
+    $text   = "<a title='Start Preclear' class='exec' onclick='getResumablePreclear(\"{$serial}\")'>Start Preclear</a>";
     return ($type == "text") ? $text : $icon;
   }
 

@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="0.8.9-beta"
+version="0.9.0-beta"
 
 # PID
 script_pid=$BASHPID
@@ -361,16 +361,21 @@ write_disk(){
   # called write_disk
   local bytes_wrote=0
   local bytes_dd
+  local bytes_dd_current=0
   local cycle=$cycle
   local cycles=$cycles
   local current_speed
   local dd_flags="conv=noerror,notrunc oflag=direct"
+  local dd_hang=0
+  local dd_last_bytes=0
   local dd_pid
   local dd_output=${all_files[dd_out]}
   local disk=${disk_properties[device]}
   local disk_name=${disk_properties[name]}
   local disk_blocks=${disk_properties[blocks]}
+  local initial_bytes=$2
   local pause=${all_files[pause]}
+  local paused_file=n
   local paused_smart=n
   local paused_sync=n
   local percent_wrote
@@ -382,24 +387,36 @@ write_disk(){
   local write_bs=""
   local write_type=$1
   local time_start
-  local output=$2
-  local output_speed=$3
+  local output=$3
+  local output_speed=$4
   local display_pid=0
   local write_bs=2097152
 
   time_start=$(timer)
   touch $dd_output
 
+  # Seek if restored
+  do_seek=${!initial_bytes}
+  do_seek=${do_seek:-0}
+  if [ "$do_seek" -gt "$write_bs" ]; then
+    do_seek=$(($do_seek - $write_bs))
+    debug "Continuing disk write on byte $do_seek"
+    dd_flags="$dd_flags oflag=seek_bytes"
+    dd_seek="seek=$do_seek"
+  else
+    dd_seek="seek=1"
+  fi
+
   # Type of write: zero or random
   if [ "$write_type" == "zero" ]; then
     write_type_s="Zeroing"
     device="/dev/zero"
-    dd_cmd="dd if=$device of=$disk bs=$write_bs seek=1"
+    dd_cmd="dd if=$device of=$disk bs=$write_bs $dd_seek"
   else
     write_type_s="Erasing"
     device="/dev/urandom"
     pass=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 -w 0)
-    dd_cmd="openssl enc -aes-256-ctr -pass pass:'${pass}' -nosalt < /dev/zero 2>/dev/null | dd of=${disk} bs=${write_bs} seek=1 iflag=fullblock"
+    dd_cmd="openssl enc -aes-256-ctr -pass pass:'${pass}' -nosalt < /dev/zero 2>/dev/null | dd of=${disk} bs=${write_bs} $dd_seek iflag=fullblock"
   fi
 
   if [ "$short_test" == "y" ]; then
@@ -452,11 +469,33 @@ write_disk(){
 
   while kill -0 $dd_pid &>/dev/null; do
     sleep 5 && kill -USR1 $dd_pid 2>/dev/null && sleep 2
-    # ensure bytes_wrote is a number
+    # Calculate the current status
     bytes_dd=$(awk 'END{print $1}' $dd_output|xargs)
+
+    # Ensure bytes_wrote is a number
     if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
-      bytes_wrote=$bytes_dd
+      bytes_wrote=$(($bytes_dd + $do_seek))
+      bytes_dd_current=$bytes_dd
     fi
+
+    # Detect hung dd write
+    if [ "$bytes_wrote" -eq "$dd_last_bytes" -a "$is_paused" != "y" ]; then
+      let dd_hang=($dd_hang +1)
+    else
+      dd_last_bytes=$bytes_wrote
+      dd_hang=0
+    fi
+
+    # Kill dd if hung
+    if [ "$dd_hang" -gt 10 ]; then
+      eval "$initial_bytes='$bytes_wrote';"
+      kill -9 $dd_pid
+      return 2
+    fi
+
+    # Save current status
+    save_current_status "$write_type" "$bytes_wrote" "n"
+
     let percent_wrote=($bytes_wrote*100/$total_bytes)
     if [ ! -z "${bytes_wrote##*[!0-9]*}" ]; then
       let percent_wrote=($bytes_wrote*100/$total_bytes)
@@ -464,7 +503,7 @@ write_disk(){
     time_current=$(timer)
 
     current_speed=$(awk -F',' 'END{print $NF}' $dd_output|xargs)
-    average_speed=$(($bytes_wrote / ($time_current - $time_start) / 1000000 ))
+    average_speed=$(($bytes_dd_current / ($time_current - $time_start) / 1000000 ))
 
     status="Time elapsed: $(timer $time_start) | Write speed: $current_speed | Average speed: $average_speed MB/s"
     if [ "$cycles" -gt 1 ]; then
@@ -473,21 +512,15 @@ write_disk(){
 
     echo "$disk_name|NN|${write_type_s}${cycle_disp}: ${percent_wrote}% @ $current_speed ($(timer $time_start))|$$" >$stat_file
 
-    # Display refresh
-    if [ ! -e "/proc/${display_pid}/exe" ]; then
-      display_status "${write_type_s} in progress:|###(${percent_wrote}% Done)###" "** $status" &
-      display_pid=$!
-    fi
-
+    # Pause if requested
     if [ -f "$pause" ]; then
-      display_status "${write_type_s} in progress:|###(${percent_wrote}% Done)### ***PAUSED***" "** PAUSED"
-      echo "$disk_name|NN|${write_type_s}${cycle_disp}: PAUSED|$$" >$stat_file
-
-      kill -TSTP $dd_pid
-      while [[ -f $pause ]]; do
-        sleep 1
-      done
+      if [ -f "$pause" -a "$paused_file" != "y" ]; then
+        kill -TSTP $dd_pid
+        paused_file=y
+      fi
+    elif [ ! -f "$pause" -a "$paused_file" == "y" ]; then
       kill -CONT $dd_pid
+      paused_file=n
     fi
 
     # Pause if a 'smartctl' command is taking too much time to complete
@@ -524,6 +557,20 @@ write_disk(){
       debug "dd[${dd_pid}]: resumed"
       kill -CONT $dd_pid
       paused_sync=n
+    fi
+
+    if [ $"$paused_file" == "y" -o "$paused_sync" == "y" -o "$paused_hdparm" == "y" -o "$paused_smart" == "y" ]; then
+      echo "$disk_name|NN|${write_type_s}${cycle_disp}: PAUSED|$$" >$stat_file
+      display_status "${write_type_s} in progress:|###(${percent_wrote}% Done)### ***PAUSED***" "** PAUSED"
+      display_pid=$!
+      is_paused=y
+    else
+      # Display refresh
+      if [ ! -e "/proc/${display_pid}/exe" ]; then
+        display_status "${write_type_s} in progress:|###(${percent_wrote}% Done)###" "** $status" &
+        display_pid=$!
+      fi
+      is_paused=n
     fi
 
     # Send mid notification
@@ -605,22 +652,58 @@ is_numeric() {
   fi
 }
 
+save_current_status() {
+  local current_op=$1
+  local current_pos=$2
+  local dd_hang=$3
+
+  echo -e "current_op=$current_op" > ${all_files[dir]}/resume
+  echo -e "current_pos=$current_pos" >> ${all_files[dir]}/resume
+  echo -e "current_cycle=$cycle" >> ${all_files[dir]}/resume
+  echo -e "dd_hang=$dd_hang" >> ${all_files[dir]}/resume
+  echo -e "notify_freq=$notify_freq" >> ${all_files[dir]}/resume
+  echo -e "notify_channel=$notify_channel" >> ${all_files[dir]}/resume
+  echo -e "short_test=$short_test" >> ${all_files[dir]}/resume
+  echo -e "skip_preread=$skip_preread" >> ${all_files[dir]}/resume
+  echo -e "skip_postread=$skip_postread" >> ${all_files[dir]}/resume
+  echo -e "read_size=$read_size" >> ${all_files[dir]}/resume
+  echo -e "write_size=$write_size" >> ${all_files[dir]}/resume
+  echo -e "read_blocks=$read_blocks" >> ${all_files[dir]}/resume
+  echo -e "read_stress=$read_stress" >> ${all_files[dir]}/resume
+  echo -e "cycles=$cycles" >> ${all_files[dir]}/resume
+  echo -e "no_prompt=$no_prompt" >> ${all_files[dir]}/resume
+  echo -e "erase_disk=$erase_disk" >> ${all_files[dir]}/resume
+  echo -e "erase_preclear=$erase_preclear" >> ${all_files[dir]}/resume
+  echo -e "preread_average='$preread_average'" >> ${all_files[dir]}/resume
+  echo -e "preread_speed='$preread_speed'" >> ${all_files[dir]}/resume
+  echo -e "write_average='$write_average'" >> ${all_files[dir]}/resume
+  echo -e "write_speed='$write_speed'" >> ${all_files[dir]}/resume
+  echo -e "postread_average='$postread_average'" >> ${all_files[dir]}/resume
+  echo -e "postread_speed='$postread_speed'" >> ${all_files[dir]}/resume
+  cp ${all_files[dir]}/resume ${all_files[resume_file]}
+}
+
 read_entire_disk() { 
-  local average_speed bytes_dd current_speed count disktemp dd_cmd  report_out status tb_formatted
-  local skip_b1 skip_b2 skip_b3 skip_p1 skip_p2 skip_p3 skip_p4 skip_p5 time_start time_current read_type_s total_bytes
+  local average_speed bytes_dd current_speed count disktemp dd_cmd report_out status tb_formatted
+  local skip_b1 skip_b2 skip_b3 skip_p1 skip_p2 skip_p3 skip_p4 skip_p5 time_start time_current read_type_s read_type_t total_bytes
   local bytes_read=0
+  local bytes_dd_current=0
   local cmp_output=${all_files[cmp_out]}
   local cycle=$cycle
   local cycles=$cycles
   local display_pid=0
   local dd_flags="conv=notrunc,noerror iflag=direct"
+  local dd_hang=0
+  local dd_last_bytes=0
   local dd_output=${all_files[dd_out]}
   local disk=${disk_properties[device]}
   local disk_name=${disk_properties[name]}
   local disk_blocks=${disk_properties[blocks_512]}
-  local output=$3
-  local output_speed=$4
+  local initial_bytes=$3
+  local output=$4
+  local output_speed=$5
   local pause=${all_files[pause]}
+  local paused_file=n
   local paused_smart=n
   local paused_sync=n
   local percent_read=0
@@ -632,17 +715,40 @@ read_entire_disk() {
   local verify=$1
   local read_bs=2097152
 
+  # Seek if restored
+  do_seek=${!initial_bytes}
+  do_seek=${do_seek:-0}
+  if [ "$do_seek" -gt "$read_bs" ]; then
+    do_seek=$(($do_seek - $read_bs))
+    debug "Continuing disk read from byte $do_seek"
+  else
+    dd_seek=""
+    dd_skip="skip=1"
+  fi
+
   # Type of read: Pre-Read or Post-Read
   if [ "$read_type" == "preread" ]; then
-    read_type="Pre-read in progress:"
+    read_type_t="Pre-read in progress:"
     read_type_s="Pre-Read"
+    if [ "$do_seek" -ne 0 ]; then
+      dd_flags="$dd_flags oflag=seek_bytes"
+      dd_seek="seek=$do_seek"
+    fi
   elif [ "$read_type" == "postread" ]; then
-    read_type="Post-Read in progress:"
+    read_type_t="Post-Read in progress:"
     read_type_s="Post-Read"
+    if [ "$do_seek" -ne 0 ]; then
+      dd_flags="$dd_flags iflag=skip_bytes"
+      dd_skip="skip=$do_seek"
+    fi
   else
-    read_type="Verifying if disk is zeroed:"
+    read_type_t="Verifying if disk is zeroed:"
     read_type_s="Verify Zeroing"
     read_stress=n
+    if [ "$do_seek" -ne 0 ]; then
+      dd_flags="$dd_flags iflag=skip_bytes"
+      dd_skip="skip=$do_seek"
+    fi
   fi
 
   # start time
@@ -669,9 +775,9 @@ read_entire_disk() {
   if [ "$verify" == "verify" ]; then
 
     # Verify the beginning of the disk skipping the MBR
-    dd_cmd="dd if=$disk bs=512 count=4096 skip=1 $dd_flags"
-    debug "${read_type_s}: $dd_cmd"
-    $dd_cmd 2>$dd_output | cmp - /dev/zero &>$cmp_output 
+    dd_cmd="dd if=$disk bs=512 count=4096 skip=1 conv=notrunc,noerror iflag=direct"
+    debug "${read_type_s}: $dd_cmd  2>$dd_output | cmp - /dev/zero &>$cmp_output"
+    $dd_cmd 2>$dd_output | cmp - /dev/zero &>$cmp_output
     debug "${read_type_s}: dd pid [$!]"
 
     # Fail if not zeroed or error
@@ -681,9 +787,9 @@ read_entire_disk() {
     fi
     
     # Verify the rest of the disk
-    dd_cmd="dd if=$disk bs=$read_bs $count skip=1 $dd_flags 2>$dd_output | cmp - /dev/zero &>$cmp_output"
-    debug "${read_type_s}: $dd_cmd "
-    dd if=$disk bs=$read_bs $count skip=1 $dd_flags 2>$dd_output | cmp - /dev/zero &>$cmp_output &
+    dd_cmd="dd if=$disk bs=$read_bs $count $dd_skip $dd_seek $dd_flags 2>$dd_output | cmp - /dev/zero &>$cmp_output"
+    debug "${read_type_s}: $dd_cmd"
+    dd if=$disk bs=$read_bs $count $dd_skip $dd_seek $dd_flags 2>$dd_output | cmp - /dev/zero &>$cmp_output &
     block_pid=$!
 
     # get pid of dd
@@ -702,7 +808,7 @@ read_entire_disk() {
     fi
 
   else
-    dd_cmd="dd if=$disk of=/dev/null bs=2097152 $count $dd_flags"
+    dd_cmd="dd if=$disk of=/dev/null bs=$read_bs $count $dd_skip $dd_seek $dd_flags"
     debug "${read_type_s}: $dd_cmd"
     $dd_cmd > $dd_output 2>&1 &
     dd_pid=$!
@@ -761,23 +867,56 @@ read_entire_disk() {
 
     # Calculate the current status
     bytes_dd=$(awk 'END{print $1}' $dd_output|xargs)
-    
+
     # Ensure bytes_read is a number
     if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
-      bytes_read=$bytes_dd
+      bytes_read=$(($bytes_dd + $do_seek))
+      bytes_dd_current=$bytes_dd
       let percent_read=($bytes_read*100/$total_bytes)
     fi
+
+    # Detect hung dd read
+    if [ "$bytes_read" == "$dd_last_bytes" -a "$is_paused" != "y" ]; then
+      dd_hang=$(($dd_hang + 1))
+    else
+      dd_hang=0
+      dd_last_bytes=$bytes_read
+    fi
+
+    # Kill dd if hung
+    if [ "$dd_hang" -gt 10 ]; then
+      eval "$initial_bytes='"$bytes_read"';"
+      kill -9 $dd_pid
+      return 2
+    fi
+
+    # Save current status
+    save_current_status "$read_type" "$bytes_read" "n"
 
     time_current=$(timer)
 
     current_speed=$(awk -F',' 'END{print $NF}' $dd_output|xargs)
-    average_speed=$(($bytes_read / ($time_current - $time_start) / 1000000 ))
+    average_speed=$(($bytes_dd_current / ($time_current - $time_start) / 1000000 ))
 
     status="Time elapsed: $(timer $time_start) | Current speed: $current_speed | Average speed: $average_speed MB/s"
     if [ "$cycles" -gt 1 ]; then
       cycle_disp=" ($cycle of $cycles)"
     fi
     echo "$disk_name|NN|${read_type_s}${cycle_disp}: ${percent_read}% @ ${average_speed} MB/s ($(timer $time_start))|$$" > $stat_file
+
+    if [ "$paused_file" == "y" -o "$paused_sync" == "y" -o "$paused_hdparm" == "y" -o "$paused_smart" == "y" ]; then
+      echo "$disk_name|NN|${read_type_t}${cycle_disp} PAUSED|$$" >$stat_file
+      display_status "${read_type_t}|###(${percent_read}% Done)### ***PAUSED***" "** PAUSED"
+      display_pid=$!
+      is_paused=y
+    else
+      # Display refresh
+      if [ ! -e "/proc/${display_pid}/exe" ]; then
+        display_status "$read_type_t|###(${percent_read}% Done)###" "** $status" &
+        display_pid=$!
+      fi
+      is_paused=n
+    fi
 
     # Send mid notification
     if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -eq 4 ] && [ "$percent_read" -ge "$next_notify" ] && [ "$percent_read" -ne 100 ]; then
@@ -791,28 +930,15 @@ read_entire_disk() {
       let next_notify=($next_notify + 25)
     fi
 
-    # Display refresh
-    if [ ! -e "/proc/${display_pid}/exe" ]; then
-      display_status "$read_type|###(${percent_read}% Done)###" "** $status" &
-      display_pid=$!
-    fi
-
+    # Pause if requested
     if [ -f "$pause" ]; then
-      while [ -e "/proc/${display_pid}/exe" ]; do
-        sleep 1
-      done
-
-      display_status "$read_type|###(${percent_read}% Done)### ***PAUSED***" "** PAUSED"
-      echo "$disk_name|NN|${read_type_s}${cycle_disp}: PAUSED|$$" > $stat_file
-
-      # Pause dd
-      kill -TSTP $dd_pid
-      while [[ -f $pause ]]; do
-        sleep 1
-      done
-
-      # Restore dd
+      if [ "$paused_file" != "y" ]; then
+        kill -TSTP $dd_pid
+        paused_file=y
+      fi
+    elif [ ! -f "$pause" -a "$paused_file" == "y" ]; then
       kill -CONT $dd_pid
+      paused_file=n
     fi
 
     maxTimeout=15
@@ -873,9 +999,11 @@ read_entire_disk() {
   debug "${read_type_s}: $dd_exit"
 
   # Fail if not zeroed or error
-  if grep -q "differ" "$cmp_output" &>/dev/null; then
-    debug "${read_type_s}: fail - disk not zeroed"
-    return 1
+  if [ "$verify" == "verify" ]; then
+    if grep -q "differ" "$cmp_output" &>/dev/null; then
+      debug "${read_type_s}: fail - disk not zeroed"
+      return 1
+    fi
   fi
 
   # Send final notification
@@ -1229,7 +1357,7 @@ save_report() {
   local form_out=${all_files[form_out]}
   local title="Preclear Disk<br>Send Anonymous Statistics"
 
-  local text="Send <span style='font-weight:bold;'>anonymous</span> statistics (using TOR) to the developer, helping on bug fixes, "
+  local text="Send <span style='font-weight:bold;'>anonymous</span> statistics (using Google Forms) to the developer, helping on bug fixes, "
   text+="performance tunning and usage statistics that will be open to the community. For detailed information, please visit the "
   text+="<a href='http://lime-technology.com/forum/index.php?topic=39985.0'>support forum topic</a>."
 
@@ -1312,6 +1440,7 @@ cycles=1
 append display_step ""
 erase_disk=n
 erase_preclear=n
+initial_bytes=0
 verify_mbr_only=n
 refresh_period=30
 append canvas 'width'  '123'
@@ -1320,10 +1449,10 @@ append canvas 'brick'  '#'
 smart_type=auto
 notify_channel=0
 notify_freq=0
-opts_long="frequency:,notify:,skip-preread,skip-postread,read-size:,write-size:,read-blocks:,"
-opts_long+="test,no-stress,list,cycles:,signature,verify,no-prompt,version,preclear-only,format-html,erase,erase-clear"
+opts_long="frequency:,notify:,skip-preread,skip-postread,read-size:,write-size:,read-blocks:,test,no-stress,list,"
+opts_long+="cycles:,signature,verify,no-prompt,version,preclear-only,format-html,erase,erase-clear,load-file:"
 
-OPTS=$(getopt -o f:n:sSr:w:b:tdlc:ujvomer \
+OPTS=$(getopt -o f:n:sSr:w:b:tdlc:ujvomera: \
       --long $opts_long -n "$(basename $0)" -- "$@")
 
 if [ "$?" -ne "0" ]; then
@@ -1353,6 +1482,7 @@ while true ; do
     -m|--format-html)    format_html=y;                       shift 1;;
     -e|--erase)          erase_disk=y;                        shift 1;;
     -r|--erase-clear)    erase_preclear=y;                    shift 1;;
+    -a|--load-file)      load_file="$2";                      shift 2;;
 
     --) shift ; break ;;
     * ) echo "Internal error!" ; exit 1 ;;
@@ -1361,13 +1491,18 @@ done
 
 if [ ! -b "$1" ]; then
   echo "Disk not set, please verify the command arguments."
-  exit 1
+  # exit 1
 fi
 
 theDisk=$(echo $1|xargs)
 
 debug "Command: $command"
 debug "Preclear Disk Version: ${version}"
+
+if [ -f "$load_file" ] && $(bash -n "$load_file"); then
+  debug "Restoring previous instance of preclear"
+  . "$load_file"
+fi
 
 # diff /tmp/.init <(set -o >/dev/null; set)
 # exit 0
@@ -1471,6 +1606,7 @@ append all_files 'smart_prefix'  "${all_files[dir]}/smart_"
 append all_files 'smart_final'   "${all_files[dir]}/smart_final"
 append all_files 'smart_out'     "${all_files[dir]}/smart_out"
 append all_files 'form_out'      "${all_files[dir]}/form_out"
+append all_files 'resume_file'   "/boot/config/plugins/preclear.disk/${disk_properties[serial]}.resume"
 
 mkdir -p "${all_files[dir]}"
 # trap "rm -rf ${all_files[dir]}" EXIT;
@@ -1614,6 +1750,17 @@ fi
 ##                 PRECLEAR THE DISK                ##
 ######################################################
 
+is_current_op() {
+  if [ -n "$current_op" ] && [ "$current_op" == "$1" ]; then
+    current_op=""
+    return 0
+  elif [ -z "$current_op" ]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
 # reset timer
 all_timer=$(timer)
 
@@ -1635,6 +1782,12 @@ else
 fi
 
 for cycle in $(seq $cycles); do
+  # Continue to next cycle if restoring new-session
+  if [ -n "$current_op" ] && [ "$cycle" != "$current_cycle" ]; then
+    debug "skipping cycle ${cycle}."
+    continue
+  fi
+
   # Set a cycle timer
   cycle_timer=$(timer)
 
@@ -1675,97 +1828,222 @@ for cycle in $(seq $cycles); do
 
   # Do a preread if not skipped
   if [ "$skip_preread" != "y" ]; then
-    display_status "Pre-Read in progress ..." ''
-    if read_entire_disk no-verify preread preread_average preread_speed; then
+
+    # Check current operation if restoring a previous preclear instance
+    if is_current_op "preread"; then
+
+      # Loading restored position
+      if [ -n "$current_pos" ]; then
+        start_bytes=$current_pos
+        current_pos=0
+      else
+        start_bytes=0
+      fi
+
+      # Updating display status 
+      display_status "Pre-Read in progress ..." ''
+
+      # Saving progress  
+      save_current_status "preread" "0" "n"
+
+      while [[ true ]]; do
+        read_entire_disk no-verify preread start_bytes preread_average preread_speed
+        ret_val=$?
+        if [ "$ret_val" -eq 0 ]; then
+          append display_step "Pre-read verification:|[${preread_average}] ***SUCCESS***"
+          display_status
+          break
+        elif [ "$ret_val" -eq 2 ]; then
+          debug "dd process hung, killing...."
+          continue
+        else
+          append display_step "Pre-read verification:|${bold}FAIL${norm}"
+          display_status
+          echo "${disk_properties[name]}|NY|Pre-read verification failed - Aborted|$$" > ${all_files[stat]}
+          send_mail "FAIL! Pre-read verification failed." "FAIL! Pre-read verification failed." "Pre-read verification failed - Aborted" "" "alert"
+          echo -e "--> FAIL: Result: Pre-Read failed.\n\n"
+          save_report "No - Pre-read verification failed." "$preread_speed" "$postread_speed" "$write_speed"
+          rm "${all_files[resume_file]}"
+          exit 1
+        fi
+      done
+    else
       append display_step "Pre-read verification:|[${preread_average}] ***SUCCESS***"
       display_status
-    else
-      append display_step "Pre-read verification:|${bold}FAIL${norm}"
-      display_status
-      echo "${disk_properties[name]}|NY|Pre-read verification failed - Aborted|$$" > ${all_files[stat]}
-      send_mail "FAIL! Pre-read verification failed." "FAIL! Pre-read verification failed." "Pre-read verification failed - Aborted" "" "alert"
-      echo -e "--> FAIL: Result: Pre-Read failed.\n\n"
-      save_report "No - Pre-read verification failed." "$preread_speed" "$postread_speed" "$write_speed"
-      exit 1
     fi
   fi
 
   # Erase the disk in erase-clear op
   if [ "$erase_preclear" == "y" ]; then
-    # Erase the disk
-    display_status "Erasing in progress ..." ''
-    if write_disk erase write_average write_speed; then
-      append display_step "Erasing the disk:|[${write_average}] ***SUCCESS***"
+
+    # Check current operation if restoring a previous preclear instance
+    if is_current_op "erase"; then
+
+      # Loading restored position
+      if [ -n "$current_pos" ]; then
+        start_bytes=$current_pos
+        current_pos=""
+      else
+        start_bytes=0
+      fi
+
+      display_status "Erasing in progress ..." ''
+      save_current_status "erase" "0" "n"
+
+      # Erase the disk
+      while [[ true ]]; do
+        write_disk erase start_bytes write_average write_speed
+        ret_val=$?
+        if [ "$ret_val" -eq 0 ]; then
+          append display_step "Erasing the disk:|[${write_average}] ***SUCCESS***"
+          display_status
+          break
+        elif [ "$ret_val" -eq 2 ]; then
+          debug "dd process hung, killing...."
+          continue
+        else
+          append display_step "Erasing the disk:|${bold}FAIL${norm}"
+          display_status
+          echo "${disk_properties[name]}|NY|Erasing the disk failed - Aborted|$$" > ${all_files[stat]}
+          send_mail "FAIL! Erasing the disk failed." "FAIL! Erasing the disk failed." "Erasing the disk failed - Aborted" "" "alert"
+          echo -e "--> FAIL: Result: Erasing the disk failed.\n\n"
+          save_report "No - Erasing the disk failed." "$preread_speed" "$postread_speed" "$write_speed"
+          rm "${all_files[resume_file]}"
+          exit 1
+        fi
+      done
     else
-      append display_step "Erasing the disk:|${bold}FAIL${norm}"
+      append display_step "Erasing the disk:|[${write_average}] ***SUCCESS***"
       display_status
-      echo "${disk_properties[name]}|NY|Erasing the disk failed - Aborted|$$" > ${all_files[stat]}
-      send_mail "FAIL! Erasing the disk failed." "FAIL! Erasing the disk failed." "Erasing the disk failed - Aborted" "" "alert"
-      echo -e "--> FAIL: Result: Erasing the disk failed.\n\n"
-      save_report "No - Erasing the disk failed." "$preread_speed" "$postread_speed" "$write_speed"
-      exit 1
     fi
   fi
 
   # Erase/Zero the disk
-  display_status "${title_write} in progress ..." ''
-  if write_disk $write_op write_average write_speed; then
-    append display_step "${title_write} the disk:|[${write_average}] ***SUCCESS***"
+  # Check current operation if restoring a previous preclear instance
+  if is_current_op "$write_op"; then
+    
+    # Loading restored position
+    if [ -n "$current_pos" ]; then
+      start_bytes=$current_pos
+      current_pos=""
+    else
+      start_bytes=0
+    fi
+
+    display_status "${title_write} in progress ..." ''
+    save_current_status "$write_op" "0" "n"
+    while [[ true ]]; do
+      write_disk $write_op start_bytes write_average write_speed
+      ret_val=$?
+      if [ "$ret_val" -eq 0 ]; then
+        append display_step "${title_write} the disk:|[${write_average}] ***SUCCESS***"
+        break
+      elif [ "$ret_val" -eq 2 ]; then
+        debug "dd process hung, killing...."
+        continue
+      else
+        append display_step "${title_write} the disk:|${bold}FAIL${norm}"
+        display_status
+        echo "${disk_properties[name]}|NY|${title_write} the disk failed - Aborted|$$" > ${all_files[stat]}
+        send_mail "FAIL! ${title_write} the disk failed." "FAIL! ${title_write} the disk failed." "${title_write} the disk failed - Aborted" "" "alert"
+        echo -e "--> FAIL: Result: ${title_write} the disk failed.\n\n"
+        save_report "No - ${title_write} the disk failed." "$preread_speed" "$postread_speed" "$write_speed"
+        rm "${all_files[resume_file]}"
+        exit 1
+      fi
+    done
   else
-    append display_step "${title_write} the disk:|${bold}FAIL${norm}"
+    append display_step "${title_write} the disk:|[${write_average}] ***SUCCESS***"
     display_status
-    echo "${disk_properties[name]}|NY|${title_write} the disk failed - Aborted|$$" > ${all_files[stat]}
-    send_mail "FAIL! ${title_write} the disk failed." "FAIL! ${title_write} the disk failed." "${title_write} the disk failed - Aborted" "" "alert"
-    echo -e "--> FAIL: Result: ${title_write} the disk failed.\n\n"
-    save_report "No - ${title_write} the disk failed." "$preread_speed" "$postread_speed" "$write_speed"
-    exit 1
   fi
 
   if [ "$erase_disk" != "y" ]; then
-    # Write unRAID's preclear signature to the disk
-    display_status "Writing unRAID's Preclear signature to the disk ..." ''
-    echo "${disk_properties[name]}|NN|Writing unRAID's Preclear signature|$$" > ${all_files[stat]}
-    write_signature 64
-    # sleep 10
-    append display_step "Writing unRAID's Preclear signature:|***SUCCESS***"
-    echo "${disk_properties[name]}|NN|Writing unRAID's Preclear signature finished|$$" > ${all_files[stat]}
-    # sleep 10
 
-    # Verify unRAID's preclear signature in disk
-    display_status "Verifying unRAID's signature on the MBR ..." ""
-    echo "${disk_properties[name]}|NN|Verifying unRAID's signature on the MBR|$$" > ${all_files[stat]}
-    if verify_mbr $theDisk; then
-      append display_step "Verifying unRAID's Preclear signature:|***SUCCESS*** "
-      display_status
-      echo "${disk_properties[name]}|NN|unRAID's signature on the MBR is valid|$$" > ${all_files[stat]}
-    else
-      append display_step "Verifying unRAID's Preclear signature:|***FAIL*** "
-      display_status
-      echo -e "--> FAIL: unRAID's Preclear signature not valid. \n\n"
-      echo "${disk_properties[name]}|NY|unRAID's signature on the MBR failed - Aborted|$$" > ${all_files[stat]}
-      send_mail "FAIL! unRAID's signature on the MBR failed." "FAIL! unRAID's signature on the MBR failed." "unRAID's signature on the MBR failed - Aborted" "" "alert"
-      save_report  "No - unRAID's Preclear signature not valid." "$preread_speed" "$postread_speed" "$write_speed"
-      exit 1
-    fi
+      # Write unRAID's preclear signature to the disk
+      # Check current operation if restoring a previous preclear instance
+      if is_current_op "write_mbr"; then
+
+        display_status "Writing unRAID's Preclear signature to the disk ..." ''
+        save_current_status "write_mbr" "0" "n"
+        echo "${disk_properties[name]}|NN|Writing unRAID's Preclear signature|$$" > ${all_files[stat]}
+        write_signature 64
+        # sleep 10
+        append display_step "Writing unRAID's Preclear signature:|***SUCCESS***"
+        echo "${disk_properties[name]}|NN|Writing unRAID's Preclear signature finished|$$" > ${all_files[stat]}
+        # sleep 10
+      else
+        append display_step "Writing unRAID's Preclear signature:|***SUCCESS***"
+        display_status
+      fi
+
+      # Verify unRAID's preclear signature in disk
+      # Check current operation if restoring a previous preclear instance
+      if is_current_op "read_mbr"; then
+        display_status "Verifying unRAID's signature on the MBR ..." ""
+        save_current_status "read_mbr" "0" "n"
+        echo "${disk_properties[name]}|NN|Verifying unRAID's signature on the MBR|$$" > ${all_files[stat]}
+        if verify_mbr $theDisk; then
+          append display_step "Verifying unRAID's Preclear signature:|***SUCCESS*** "
+          display_status
+          echo "${disk_properties[name]}|NN|unRAID's signature on the MBR is valid|$$" > ${all_files[stat]}
+        else
+          append display_step "Verifying unRAID's Preclear signature:|***FAIL*** "
+          display_status
+          echo -e "--> FAIL: unRAID's Preclear signature not valid. \n\n"
+          echo "${disk_properties[name]}|NY|unRAID's signature on the MBR failed - Aborted|$$" > ${all_files[stat]}
+          send_mail "FAIL! unRAID's signature on the MBR failed." "FAIL! unRAID's signature on the MBR failed." "unRAID's signature on the MBR failed - Aborted" "" "alert"
+          save_report  "No - unRAID's Preclear signature not valid." "$preread_speed" "$postread_speed" "$write_speed"
+          rm "${all_files[resume_file]}"
+          exit 1
+        fi
+      else
+        append display_step "Verifying unRAID's Preclear signature:|***SUCCESS*** "
+        display_status
+      fi
+
   fi
 
   # Do a post-read if not skipped
   if [ "$skip_postread" != "y" ]; then
-    display_status "Post-Read in progress ..." ""
-    if read_entire_disk verify postread postread_average postread_speed; then
-      append display_step "Post-Read verification:|[${postread_average}] ***SUCCESS*** "
-      display_status
-      echo "${disk_properties[name]}|NY|Post-Read verification successful|$$" > ${all_files[stat]}
-    else
-      append display_step "Post-Read verification:|***FAIL***"
-      display_status
-      echo -e "--> FAIL: Post-Read verification failed. Your drive is not zeroed.\n\n"
-      echo "${disk_properties[name]}|NY|Post-Read verification failed - Aborted|$$" > ${all_files[stat]}
-      send_mail "FAIL! Post-Read verification failed." "FAIL! Post-Read verification failed." "Post-Read verification failed - Aborted" "" "alert"
-      save_report "No - Post-Read verification failed." "$preread_speed" "$postread_speed" "$write_speed"
-      exit 1
+
+    # Check current operation if restoring a previous preclear instance
+    if is_current_op "postread"; then
+
+      # Loading restored position
+      if [ -n "$current_pos" ]; then
+        start_bytes=$current_pos
+        current_pos=""
+      else
+        start_bytes=0
+      fi
+
+      display_status "Post-Read in progress ..." ""
+      save_current_status "postread" "0" "n"
+      while [[ true ]]; do
+        read_entire_disk verify postread start_bytes postread_average postread_speed
+        ret_val=$?
+        if [ "$ret_val" -eq 0 ]; then
+          append display_step "Post-Read verification:|[${postread_average}] ***SUCCESS*** "
+          display_status
+          echo "${disk_properties[name]}|NY|Post-Read verification successful|$$" > ${all_files[stat]}
+          break
+        elif [ "$ret_val" -eq 2 ]; then
+          debug "dd process hung, killing...."
+          continue
+        else
+          append display_step "Post-Read verification:|***FAIL***"
+          display_status
+          echo -e "--> FAIL: Post-Read verification failed. Your drive is not zeroed.\n\n"
+          echo "${disk_properties[name]}|NY|Post-Read verification failed - Aborted|$$" > ${all_files[stat]}
+          send_mail "FAIL! Post-Read verification failed." "FAIL! Post-Read verification failed." "Post-Read verification failed - Aborted" "" "alert"
+          save_report "No - Post-Read verification failed." "$preread_speed" "$postread_speed" "$write_speed"
+          rm "${all_files[resume_file]}"
+          exit 1
+        fi
+      done
     fi
   fi
+
   # Export final SMART status for cycle
   [ "$disable_smart" != "y" ] && save_smart_info $theDisk "$smart_type" "cycle_${cycle}_end"
   # Compare start/end values
@@ -1802,6 +2080,9 @@ echo -e "--> RESULT: ${op_title} Finished Successfully!.\n\n"
 
 # # Saving report
 report="${all_files[dir]}/report"
+
+# Remove resume information
+rm "${all_files[resume_file]}"
 
 tmux_window="preclear_disk_${disk_properties[serial]}"
 if [ "$(tmux ls 2>/dev/null | grep -c "${tmux_window}")" -gt 0 ]; then
