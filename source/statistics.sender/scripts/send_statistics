@@ -71,47 +71,47 @@ function getCURLError($error)
   return $errs[intval($error)];
 }
 
-function isAnonymized($url = Null)
-{
-  global $plugin;
-  $myip     = trim(shell_exec("curl -s http://whatismyip.akamai.com 2>/dev/null"));
-  $torip    = trim(shell_exec("curl -s --socks5-hostname 127.0.0.1:9050 http://whatismyip.akamai.com 2>/dev/null"));
-  $diffip   = ($myip != $torip);
-  if ($url)
-  {
-    // $resp = trim(shell_exec("ping -c 1 ".escapeshellarg($url)." &> /dev/null; echo $?"));  
-    $resp = trim(shell_exec("curl -sSf --socks5-hostname 127.0.0.1:9050 ".escapeshellarg($url)." &> /dev/null; echo $?"));
-    if ($resp == "0" && $diffip)
-    {
-      shell_exec("echo 'my ip = $myip'|logger -t'${plugin}'");
-      shell_exec("echo 'tor ip = $torip'|logger -t'${plugin}'");
-      shell_exec("echo 'host [${url}] reachable'|logger -t'${plugin}'");
-      shell_exec("echo 'successfully established anonymous connection'|logger -t'${plugin}'");
-      return true;
-    }
-    else
-    {
-      shell_exec("echo 'host [${url}] not reachable'|logger -t'${plugin}'");
-      shell_exec("anonymous connection failed.|logger -t'${plugin}'");
-      return false;
-    }
-  }
-  else
-  {
-    if ($diffip)
-    {
-      shell_exec("echo my ip = $myip|logger -t'${plugin}'");
-      shell_exec("echo tor ip = $torip|logger -t'${plugin}'");
-      shell_exec("successfully established anonymous connection|logger -t'${plugin}'");
-      return true;
-    }
-    else
-    {
-      shell_exec("anonymous connection failed.|logger -t'${plugin}'");
-      return false;
-    }
-  }
-}
+// function isAnonymized($url = Null)
+// {
+//   global $plugin;
+//   $myip     = trim(shell_exec("curl -s http://whatismyip.akamai.com 2>/dev/null"));
+//   $torip    = trim(shell_exec("curl -s --socks5-hostname 127.0.0.1:9050 http://whatismyip.akamai.com 2>/dev/null"));
+//   $diffip   = ($myip != $torip);
+//   if ($url)
+//   {
+//     // $resp = trim(shell_exec("ping -c 1 ".escapeshellarg($url)." &> /dev/null; echo $?"));  
+//     $resp = trim(shell_exec("curl -sSf --socks5-hostname 127.0.0.1:9050 ".escapeshellarg($url)." &> /dev/null; echo $?"));
+//     if ($resp == "0" && $diffip)
+//     {
+//       shell_exec("echo 'my ip = $myip'|logger -t'${plugin}'");
+//       shell_exec("echo 'tor ip = $torip'|logger -t'${plugin}'");
+//       shell_exec("echo 'host [${url}] reachable'|logger -t'${plugin}'");
+//       shell_exec("echo 'successfully established anonymous connection'|logger -t'${plugin}'");
+//       return true;
+//     }
+//     else
+//     {
+//       shell_exec("echo 'host [${url}] not reachable'|logger -t'${plugin}'");
+//       shell_exec("anonymous connection failed.|logger -t'${plugin}'");
+//       return false;
+//     }
+//   }
+//   else
+//   {
+//     if ($diffip)
+//     {
+//       shell_exec("echo my ip = $myip|logger -t'${plugin}'");
+//       shell_exec("echo tor ip = $torip|logger -t'${plugin}'");
+//       shell_exec("successfully established anonymous connection|logger -t'${plugin}'");
+//       return true;
+//     }
+//     else
+//     {
+//       shell_exec("anonymous connection failed.|logger -t'${plugin}'");
+//       return false;
+//     }
+//   }
+// }
 
 
 $file   = $argv[1];
@@ -123,36 +123,37 @@ if (array_key_exists("report", $report))
   $url = $report["report"]["url"];
   $host = preg_replace("#^([\w]+://[^/]*).*#", "$1", $url);
 
-  // Start TOR
-  shell_exec("/etc/rc.d/rc.tor start 2>&1");
+  // // Start TOR
+  // shell_exec("/etc/rc.d/rc.tor start 2>&1");
 
-  // Try 5 times to establish an anonymous connection through tor
-  $anonymized = false;
-  for ($i=0; $i < 5; $i++) { 
-    if (isAnonymized($host))
-    {
-      $anonymized = true;
-      break;
-    }
-    else
-    {
-      shell_exec("restarting tor...|logger -t'${plugin}'");
-      shell_exec("/etc/rc.d/rc.tor restart 2>&1");
-    }
-    sleep(1);
-  }
+  // // Try 5 times to establish an anonymous connection through tor
+  // $anonymized = false;
+  // for ($i=0; $i < 5; $i++) { 
+  //   if (isAnonymized($host))
+  //   {
+  //     $anonymized = true;
+  //     break;
+  //   }
+  //   else
+  //   {
+  //     shell_exec("restarting tor...|logger -t'${plugin}'");
+  //     shell_exec("/etc/rc.d/rc.tor restart 2>&1");
+  //   }
+  //   sleep(1);
+  // }
 
-  if (! $anonymized)
-  {
-    shell_exec("an anonymous connection couldn't be established, aborting...|logger -t'${plugin}'");
-    echo json_encode(["success"=>false,"output"=>"An anonymous connection couldn't be established, aborting..."]);
-    // Stop TOR
-    shell_exec("/etc/rc.d/rc.tor stop 2>&1");
-    exit();
-  }
+  // if (! $anonymized)
+  // {
+  //   shell_exec("an anonymous connection couldn't be established, aborting...|logger -t'${plugin}'");
+  //   echo json_encode(["success"=>false,"output"=>"An anonymous connection couldn't be established, aborting..."]);
+  //   // Stop TOR
+  //   shell_exec("/etc/rc.d/rc.tor stop 2>&1");
+  //   exit();
+  // }
 
   unset($report["report"]);
-  $cmd = "curl -s --socks5-hostname 127.0.0.1:9050 ".escapeshellarg($url)." -d ifq";
+  // $cmd = "curl -s --socks5-hostname 127.0.0.1:9050 ".escapeshellarg($url)." -d ifq";
+  $cmd = "curl -s ".escapeshellarg($url)." -d ifq";
   foreach ($report as $key => $value)
   {
     $arg = str_replace("^n", "\n", $value['value']);
@@ -175,8 +176,8 @@ if (array_key_exists("report", $report))
     echo json_encode(["success"=>false,"output"=>"Error code: ".getCURLError($exit_code)]);
   }
 
-  // Stop TOR
-  shell_exec("/etc/rc.d/rc.tor stop 2>&1");
+  // // Stop TOR
+  // shell_exec("/etc/rc.d/rc.tor stop 2>&1");
 }
 
 ?>

@@ -27,19 +27,172 @@ function lsDir($root, $ext = null)
   return $paths;
 }
 
-
 function getReports()
 {
   return lsDir("/boot/config/plugins/","sreport");
 }
-
 ?>
+<link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/chosen.min.css">
+<style type="text/css">
+  #preload-01 { background: url(/plugins/<?=$plugin;?>/images/<?=$plugin;?>.png) no-repeat -9999px -9999px; }
+</style>
+<script type="text/javascript" src="/plugins/<?=$plugin;?>/assets/chosen.jquery.min.js"></script>
 <script type="text/javascript">
+
+  function rfc3986EncodeURIComponent(str)
+  {  
+    return encodeURIComponent(str).replace(/[!'()*]/g, escape);  
+  }
+
+  function getAvailableReports()
+  {
+    $.post(SenderURL,{action:'get_statistics'}, function(data)
+    {
+      if (data)
+      {
+        askStatistics(data, "getAvailableReports()");
+
+      }
+    }, "json");
+  }
+
+  function askStatistics(data, callback)
+  {
+    info = [];
+    keys = Object.keys(data);
+    keys.splice(keys.indexOf('report'),1);
+    $.each(keys, function(k,v)
+    {
+      info.push(data[v]["title"]);
+    });
+    info = info.join(", ");
+    info = info.replace(/,([^,]*)$/,' and $1');
+
+    swal(
+    {
+      title: data.report.title,
+      text: data.report.text + "<br><br><span style='font-weight:bold;'>Info:</span> "+info+". ",
+      imageUrl: "/plugins/<?=$plugin;?>/images/<?=$plugin;?>.png",
+      confirmButtonText: "Send",
+      allowOutsideClick: false,
+      showCancelButton: true,
+      cancelButtonText: "Dismiss",
+      closeOnConfirm: false,
+      showLoaderOnConfirm: true,
+      html: true
+    },
+    function(isConfirm)
+    {
+      if (isConfirm)
+      {
+        $.post(SenderURL,{action:'send_statistics',file:data.report.file},function(data)
+        {
+          if (data.success === true)
+          {
+            swal({title:"Report Sent!",type:"success"},function()
+            {
+              setTimeout(callback, 1000);
+            });
+          }
+          else
+          {
+            swal({title:"Send Report Failed!",type:"error", text: data.output},function()
+            {
+              setTimeout(callback, 1000);
+            });
+          }  
+        },"json");
+      }
+      else
+      {
+        $.post(SenderURL,{action:'remove_statistics',file:data.report.file},function(data)
+        {
+          setTimeout(callback, 1000);
+        });
+      }
+
+      // Fix swal bug
+      div = $(".la-ball-fall").clone();
+      $("button.confirm").wrap("<div class='sa-confirm-button-container'>").after(div);
+      $("head").append("<style type='text/css'>.la-ball-fall {color: #6AB034}</style>");
+    });
+  }
+
+  function getDismissedReports()
+  {
+    $.post(SenderURL,{action:'get_dismissed'}, function(data)
+    {
+      if (data.reports)
+      {
+        var s = $("<select class='chosen swal'></select>");
+
+        $.each(data.reports, function(i,v)
+        {
+          s.append("<option value='"+rfc3986EncodeURIComponent(JSON.stringify(v))+"'>"+v.report.select+"</option>");
+        });
+
+        swal(
+        {
+          title: "Please choose a report to send",
+          text: s.wrap('<div>').parent().html(),
+          imageUrl: "/plugins/<?=$plugin;?>/images/<?=$plugin;?>.png",
+          html: true,
+          closeOnConfirm: false,
+          showCancelButton: true
+        }, function(result)
+        {
+          if (result)
+          {
+            // reset modal overflow
+            $('.showSweetAlert').css('overflow', '');
+            val = JSON.parse(decodeURIComponent($('.chosen.swal').val()));
+            setTimeout(askStatistics, 300, val);
+            swal.close();
+          }
+          else
+          {
+            swal.close();
+          }
+        });
+        
+        // allow dropdown overflow
+        $('.showSweetAlert').css('overflow', 'visible');
+
+        // initialize chosen for cloned element
+        $('.chosen.swal').chosen({
+          width: '85%',
+          allow_single_deselect: true
+        });
+      }
+      else
+      {
+        swal({
+          title:"There aren't reports to sent",
+          imageUrl: "/plugins/<?=$plugin;?>/images/<?=$plugin;?>.png",
+          timer: 1500,
+          showConfirmButton: false
+        });
+      }
+    }, "json");
+  }
+
   var SenderURL = '/plugins/<?=$plugin;?>/StatsSender.php'
 
-  <?if (count(getReports())):?>
-  $(function(){
+  $(function()
+  {
+    // Add Send Dismissed Statistics to Tools
+    if (document.location.pathname == "/Tools" )
+    {
+      titlebar = $("div#title > span.left"    ).filter(function(){return $(this).text() === "System Information";}).parent();
+      if (titlebar.prop("nodeName") == "DIV")
+      {
+        element  = '<div class="Panel"><a style="cursor:pointer" onclick="getDismissedReports()"><img class="PanelImg" src="/plugins/<?=$plugin;?>/images/<?=$plugin;?>.png" width="48px">'
+        element += '<br><div class="PanelText">Dismissed <br>Statistics Reports</div></a></div>';
+        titlebar.nextUntil( "div#title" ).last().after(element);
+      }
+    }
+    <?if (count(getReports())):?>
     getAvailableReports();
-  });
-  <?endif;?>
+    <?endif;?>
+    });
 </script>

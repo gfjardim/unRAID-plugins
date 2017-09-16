@@ -4,7 +4,7 @@
 <!ENTITY name      "statistics.sender">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2017.06.22">
+<!ENTITY version   "2017.09.16">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
 ]>
@@ -13,6 +13,9 @@
 
 <CHANGES>
 ##&name;
+
+###2017.09.16
+- Fix: remove TOR dependency
 
 ###2017.02.15
 - Fix: minor bugfixes
@@ -48,14 +51,6 @@ The 'plugin' package MD5 hash.
 <FILE Name="/boot/config/plugins/&name;/&name;-&version;.md5">
 <URL>&gitURL;/archive/&name;-&version;.md5</URL>
 </FILE>
-  
-<!--
-The 'tor-0.2.9.9-x86_64-2_unRAID.txz' package file.
--->
-<FILE Name="/boot/config/plugins/&name;/tor-0.2.9.9-x86_64-2_unRAID.txz" Run="upgradepkg --install-new">
-<URL>&gitURL;/source/packages/tor-0.2.9.9-x86_64-2_unRAID.txz</URL>
-<MD5>3a175b365f70391babb8d5508a6d0e11</MD5>
-</FILE>
 
 <!--
 The 'post-install' script.
@@ -80,7 +75,10 @@ chmod -R +x /usr/local/emhttp/plugins/&name;/scripts/
 # Cleaning old source files
 find /boot/config/plugins/&name;/ -type f -iname "&name;*.txz" ! -iname "*&version;*" -delete
 find /boot/config/plugins/&name;/ -type f -iname "&name;*.md5" ! -iname "*&version;*" -delete
-find /boot/config/plugins/&name;/ -type f -iname "tor-*.txz"   ! -iname "*0.2.9.9*"   -delete
+
+# Remove TOR
+find /boot/config/plugins/&name;/ -type f -iname "tor-*.txz" -delete
+find /var/log/packages/ -type f -iname "tor-*" -exec removepkg '{}' \;
 
 echo ""
 echo "-----------------------------------------------------------"
