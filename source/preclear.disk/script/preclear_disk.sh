@@ -687,7 +687,7 @@ save_current_status() {
 }
 
 read_entire_disk() { 
-  local average_speed bytes_dd current_speed count disktemp dd_cmd report_out status tb_formatted
+  local average_speed bytes_dd current_speed count disktemp dd_cmd do_seek report_out status tb_formatted
   local skip_b1 skip_b2 skip_b3 skip_p1 skip_p2 skip_p3 skip_p4 skip_p5 time_start time_current read_type_s read_type_t total_bytes
   local bytes_read=0
   local bytes_dd_current=0
@@ -699,6 +699,7 @@ read_entire_disk() {
   local dd_hang=0
   local dd_last_bytes=0
   local dd_output=${all_files[dd_out]}
+  local dd_seek=""
   local disk=${disk_properties[device]}
   local disk_name=${disk_properties[name]}
   local disk_blocks=${disk_properties[blocks_512]}
@@ -722,10 +723,11 @@ read_entire_disk() {
   do_seek=${!initial_bytes}
   do_seek=${do_seek:-0}
   if [ "$do_seek" -gt "$read_bs" ]; then
-    do_seek=$(($do_seek - $read_bs))
     debug "Continuing disk read from byte $do_seek"
+    do_seek=$(($do_seek - $read_bs))
+    dd_flags="$dd_flags iflag=skip_bytes"
+    dd_skip="skip=$do_seek"
   else
-    dd_seek=""
     dd_skip="skip=1"
   fi
 
@@ -733,25 +735,13 @@ read_entire_disk() {
   if [ "$read_type" == "preread" ]; then
     read_type_t="Pre-read in progress:"
     read_type_s="Pre-Read"
-    if [ "$do_seek" -ne 0 ]; then
-      dd_flags="$dd_flags oflag=seek_bytes"
-      dd_seek="seek=$do_seek"
-    fi
   elif [ "$read_type" == "postread" ]; then
     read_type_t="Post-Read in progress:"
     read_type_s="Post-Read"
-    if [ "$do_seek" -ne 0 ]; then
-      dd_flags="$dd_flags iflag=skip_bytes"
-      dd_skip="skip=$do_seek"
-    fi
   else
     read_type_t="Verifying if disk is zeroed:"
     read_type_s="Verify Zeroing"
     read_stress=n
-    if [ "$do_seek" -ne 0 ]; then
-      dd_flags="$dd_flags iflag=skip_bytes"
-      dd_skip="skip=$do_seek"
-    fi
   fi
 
   # start time
