@@ -661,6 +661,9 @@ save_current_status() {
   echo -e "current_pos=$current_pos" >> ${all_files[dir]}/resume
   echo -e "current_cycle=$cycle" >> ${all_files[dir]}/resume
   echo -e "dd_hang=$dd_hang" >> ${all_files[dir]}/resume
+  echo -e "all_timer_diff=$(( $(date '+%s') - $all_timer ))" >> ${all_files[dir]}/resume
+  echo -e "cycle_timer_diff=$(( $(date '+%s') - $cycle_timer ))" >> ${all_files[dir]}/resume
+
   echo -e "notify_freq=$notify_freq" >> ${all_files[dir]}/resume
   echo -e "notify_channel=$notify_channel" >> ${all_files[dir]}/resume
   echo -e "short_test=$short_test" >> ${all_files[dir]}/resume
@@ -1434,6 +1437,8 @@ EOF
 ######################################################
 
 #Defaut values
+all_timer_diff=0
+cycle_timer_diff=0
 command=$(echo "$0 $@")
 read_stress=y
 cycles=1
@@ -1762,7 +1767,7 @@ is_current_op() {
 }
 
 # reset timer
-all_timer=$(timer)
+all_timer=$(( $(date '+%s') - $all_timer_diff ))
 
 # Export initial SMART status
 [ "$disable_smart" != "y" ] && save_smart_info $theDisk "$smart_type" "cycle_initial_start"
@@ -1789,7 +1794,7 @@ for cycle in $(seq $cycles); do
   fi
 
   # Set a cycle timer
-  cycle_timer=$(timer)
+  cycle_timer=$(( $(date '+%s') - $cycle_timer_diff ))
 
   # Reset canvas
   unset display_title
