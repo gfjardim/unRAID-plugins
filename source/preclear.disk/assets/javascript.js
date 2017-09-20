@@ -6,6 +6,25 @@ if (! $.prototype.tooltipsters)
   $("<script type='text/javascript' src='/plugins/"+plugin+"/assets/tooltipster.bundle.min.js'>").appendTo("head");
 }
 
+String.prototype.formatUnicorn = String.prototype.formatUnicorn ||
+function () {
+    "use strict";
+    var str = this.toString();
+    if (arguments.length) {
+        var t = typeof arguments[0];
+        var key;
+        var args = ("string" === t || "number" === t) ?
+            Array.prototype.slice.call(arguments)
+            : arguments[0];
+
+        for (key in args) {
+            str = str.replace(new RegExp("\\{" + key + "\\}", "gi"), args[key]);
+        }
+    }
+
+    return str;
+};
+
 $('body').on('mouseenter', '.tooltip:not(.tooltipstered), .tooltip-toggle:not(.tooltipstered)', function()
 {
   onClose = {click:true, scroll:true, mouseleave:true, tap:true};
@@ -104,12 +123,20 @@ function startPreclear(serial)
     return false;
   }
 
-  var title = 'Start Preclear';
-  $( "#preclear-dialog" ).html("<dl><dt>Model Family:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(serial, 'FAMILY')+"</span></dd></dl>");
-  $( "#preclear-dialog" ).append("<dl><dt>Device Model:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(serial, 'MODEL')+"</span></dd></dl>");
-  $( "#preclear-dialog" ).append("<dl><dt>Serial Number:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(serial, 'SERIAL_SHORT')+"</span></dd></dl>");
-  $( "#preclear-dialog" ).append("<dl><dt>Firmware Version:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(serial, 'FIRMWARE')+"</span></dd></dl>");
-  $( "#preclear-dialog" ).append("<dl><dt>Size:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>"+getDiskInfo(serial, 'SIZE_H')+"</span></dd></dl><hr style='margin-left:12px;'>");
+  preclear_dialog = $( "#preclear-dialog" );
+
+  var opts = {
+    family:       getDiskInfo(serial, 'FAMILY'),
+    model:        getDiskInfo(serial, 'MODEL'),
+    serial_short: getDiskInfo(serial, 'SERIAL_SHORT'),
+    firmware:     getDiskInfo(serial, 'FIRMWARE'),
+    size_h:       getDiskInfo(serial, 'SIZE_H')
+    };
+
+  var header = $("#dialog-header-defaults").html();
+
+  preclear_dialog.html( header.formatUnicorn(opts) );
+  preclear_dialog.append("<hr style='margin-left:12px;'>");
 
   if (typeof(scripts) !== 'undefined')
   {
@@ -117,80 +144,85 @@ function startPreclear(serial)
 
     if (size)
     {
-      var options = "<dl><dt>Script<st><dd><select onchange='toggleScript(this,\""+serial+"\");'>";
+      var options = "<dl class='dl-dialog'><dt>Script<st><dd><select onchange='toggleScript(this,\""+serial+"\");'>";
       $.each( scripts, function( key, value )
         {
           var sel = ( key == scope ) ? "selected" : "";
           options += "<option value='"+key+"' "+sel+">"+authors[key]+"</option>";
         }
       );
-      $( "#preclear-dialog" ).append(options+"</select></dd></dl>");
+      preclear_dialog.append(options+"</select></dd></dl>");
 
     }
   }
 
-  $( "#preclear-dialog" ).append($("#"+scope+"-start-defaults").html());
-  $( "#preclear-dialog" ).find(".switch").switchButton({labels_placement:"right",on_label:'YES',off_label:'NO'});
-  $( "#preclear-dialog" ).find(".switch-button-background").css("margin-top", "6px");
-  $( "#preclear-dialog" ).dialog({
-    title: title,
-    resizable: false,
-    width: 600,
-    modal: true,
-    show : {effect: 'fade' , duration: 250},
-    hide : {effect: 'fade' , duration: 250},
-    buttons: {
-      "Start": function(e)
+  preclear_dialog.append($("#"+scope+"-start-defaults").html());
+
+  swal(
+  {
+    title: "Start Preclear",
+    text:  preclear_dialog.html(),
+    type:  "info",
+    html:  true,
+    closeOnConfirm: false,
+    showCancelButton: true,
+    confirmButtonText:"Start",
+    cancelButtonText:"Cancel"
+  }, function(result)
+  {
+    if (result)
+    {
+       // $('button:eq(0)',$('#dialog_id').dialog.buttons).button('disable');
+      // $(e.target).attr('disabled', true);
+      var opts       = new Object();
+      popup = $(".sweet-alert.showSweetAlert > p:first");
+      opts["action"] = "start_preclear";
+      opts["device"] = getDiskInfo(serial, 'DEVICE');
+      opts["op"]     = getVal(popup, "op");
+      opts["scope"]  = scope;
+
+      if (scope == "joel")
       {
-        // $('button:eq(0)',$('#dialog_id').dialog.buttons).button('disable');
-        $(e.target).attr('disabled', true);
-        var opts       = new Object();
-        opts["action"] = "start_preclear";
-        opts["device"] = getDiskInfo(serial, 'DEVICE');
-        opts["op"]     = getVal(this, "op");
-        opts["scope"]  = scope;
-
-        if (scope == "joel")
-        {
-          opts["-c"]  = getVal(this, "-c");
-          opts["-o"]  = getVal(this, "preclear_notify1") == "on" ? 1 : 0;
-          opts["-o"] += getVal(this, "preclear_notify2") == "on" ? 2 : 0;
-          opts["-o"] += getVal(this, "preclear_notify3") == "on" ? 4 : 0;
-          opts["-M"]  = getVal(this, "-M");
-          opts["-r"]  = getVal(this, "-r");
-          opts["-w"]  = getVal(this, "-w");
-          opts["-W"]  = getVal(this, "-W");
-          opts["-f"]  = getVal(this, "-f");
-          opts["-s"]  = getVal(this, "-s");
-        }
-
-        else
-        {
-          opts["--cycles"]        = getVal(this, "--cycles");
-          opts["--notify"]        = getVal(this, "preclear_notify1") == "on" ? 1 : 0;
-          opts["--notify"]       += getVal(this, "preclear_notify2") == "on" ? 2 : 0;
-          opts["--notify"]       += getVal(this, "preclear_notify3") == "on" ? 4 : 0;
-          opts["--frequency"]     = getVal(this, "--frequency");
-          opts["--skip-preread"]  = getVal(this, "--skip-preread");
-          opts["--skip-postread"] = getVal(this, "--skip-postread");      
-          opts["--test"]          = getVal(this, "--test");      
-        }
-
-        $.post(PreclearURL, opts, function(data)
-                {
-                  openPreclear(serial);
-                }
-              ).always(function(data)
-                {
-                  window.location=window.location.pathname+window.location.hash;
-                }
-              );
-        $( this ).dialog( "close" );
-      },
-      Cancel: function()
-      {
-        $( this ).dialog( "close" );
+        opts["-c"]  = getVal(popup, "-c");
+        opts["-o"]  = getVal(popup, "preclear_notify1") == "on" ? 1 : 0;
+        opts["-o"] += getVal(popup, "preclear_notify2") == "on" ? 2 : 0;
+        opts["-o"] += getVal(popup, "preclear_notify3") == "on" ? 4 : 0;
+        opts["-M"]  = getVal(popup, "-M");
+        opts["-r"]  = getVal(popup, "-r");
+        opts["-w"]  = getVal(popup, "-w");
+        opts["-W"]  = getVal(popup, "-W");
+        opts["-f"]  = getVal(popup, "-f");
+        opts["-s"]  = getVal(popup, "-s");
       }
+
+      else
+      {
+        opts["--cycles"]        = getVal(popup, "--cycles");
+        opts["--notify"]        = getVal(popup, "preclear_notify1") == "on" ? 1 : 0;
+        opts["--notify"]       += getVal(popup, "preclear_notify2") == "on" ? 2 : 0;
+        opts["--notify"]       += getVal(popup, "preclear_notify3") == "on" ? 4 : 0;
+        opts["--frequency"]     = getVal(popup, "--frequency");
+        opts["--skip-preread"]  = getVal(popup, "--skip-preread");
+        opts["--skip-postread"] = getVal(popup, "--skip-postread");      
+        opts["--test"]          = getVal(popup, "--test");      
+      }
+
+      $.post(PreclearURL, opts, function(data)
+              {
+                openPreclear(serial);
+              }
+            ).always(function(data)
+              {
+                window.location=window.location.pathname+window.location.hash;
+              }
+            );
+
+      swal.close();
+
+    }
+    else
+    {
+      swal.close();
     }
   });
 }
@@ -200,7 +232,6 @@ function stopPreclear(serial, ask)
 {
   var title = 'Stop Preclear';
   var exec  = '$.post(PreclearURL,{action:"stop_preclear",serial:"'+serial+'"}).always(function(){window.location=window.location.pathname+window.location.hash});'
-  var model = getDiskInfo(serial,"SERIAL");
 
   if (ask != "ask")
   {
@@ -209,26 +240,37 @@ function stopPreclear(serial, ask)
     return true;
   }
 
-  $( "#preclear-dialog" ).html('Disk: ' + model);
-  $( "#preclear-dialog" ).append( "<br><br><span style='color: #E80000;'>Are you sure?</span>" );
-  $( "#preclear-dialog" ).dialog({
-    title: title,
-    resizable: false,
-    width: 500,
-    modal: true,
-    show : {effect: 'fade' , duration: 250},
-    hide : {effect: 'fade' , duration: 250},
-    buttons: {
-      "Stop": function()
-      {
-        eval(exec);
-        $( this ).dialog( "close" );
-      },
-      Cancel: function()
-      {
-        $( this ).dialog( "close" );
-      }
+  preclear_dialog = $( "#preclear-dialog" );
+
+  var opts = {
+    family:       getDiskInfo(serial, 'FAMILY'),
+    model:        getDiskInfo(serial, 'MODEL'),
+    serial_short: getDiskInfo(serial, 'SERIAL_SHORT'),
+    firmware:     getDiskInfo(serial, 'FIRMWARE'),
+    size_h:       getDiskInfo(serial, 'SIZE_H')
+    };
+
+  var header = $("#dialog-header-defaults").html();
+
+  preclear_dialog.html("<div>" + header.formatUnicorn(opts) + "");
+
+  swal(
+  {
+    title: "Stop Preclear",
+    text:  preclear_dialog.html(),
+    type:  "warning",
+    html:  true,
+    closeOnConfirm: false,
+    showCancelButton: true,
+    confirmButtonText:"Stop",
+    cancelButtonText:"Cancel"
+  }, function(result)
+  {
+    if (result)
+    {
+      eval(exec);
     }
+    swal.close();
   });
 }
 

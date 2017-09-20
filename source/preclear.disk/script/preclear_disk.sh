@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="0.9.0-beta"
+version="0.9.1-beta"
 
 # PID
 script_pid=$BASHPID
@@ -591,7 +591,7 @@ write_disk(){
 
   bytes_dd=$(awk 'END{print $1}' $dd_output|xargs)
   if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
-    bytes_wrote=$(( $bytes_dd + $write_bs ))
+    bytes_wrote=$(( $bytes_dd + $do_seek + $write_bs ))
   fi
 
   debug "${write_type_s}: dd - wrote ${bytes_wrote} of ${total_bytes}."
@@ -984,7 +984,7 @@ read_entire_disk() {
 
   bytes_dd=$(awk 'END{print $1}' $dd_output|xargs)
   if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
-    bytes_read=$(( $bytes_dd + $read_bs ))
+    bytes_read=$(( $bytes_dd + $do_seek + $read_bs ))
   fi
 
   debug "${read_type_s}: dd - read ${bytes_read} of ${total_bytes}."
@@ -1849,7 +1849,7 @@ for cycle in $(seq $cycles); do
           display_status
           break
         elif [ "$ret_val" -eq 2 ]; then
-          debug "dd process hung, killing...."
+          debug "dd process hung at ${start_bytes}, killing...."
           continue
         else
           append display_step "Pre-read verification:|${bold}FAIL${norm}"
@@ -1894,7 +1894,7 @@ for cycle in $(seq $cycles); do
           display_status
           break
         elif [ "$ret_val" -eq 2 ]; then
-          debug "dd process hung, killing...."
+          debug "dd process hung at ${start_bytes}, killing...."
           continue
         else
           append display_step "Erasing the disk:|${bold}FAIL${norm}"
@@ -1934,7 +1934,7 @@ for cycle in $(seq $cycles); do
         append display_step "${title_write} the disk:|[${write_average}] ***SUCCESS***"
         break
       elif [ "$ret_val" -eq 2 ]; then
-        debug "dd process hung, killing...."
+        debug "dd process hung at ${start_bytes}, killing...."
         continue
       else
         append display_step "${title_write} the disk:|${bold}FAIL${norm}"
@@ -2023,7 +2023,7 @@ for cycle in $(seq $cycles); do
           echo "${disk_properties[name]}|NY|Post-Read verification successful|$$" > ${all_files[stat]}
           break
         elif [ "$ret_val" -eq 2 ]; then
-          debug "dd process hung, killing...."
+          debug "dd process hung at ${start_bytes}, killing...."
           continue
         else
           append display_step "Post-Read verification:|***FAIL***"

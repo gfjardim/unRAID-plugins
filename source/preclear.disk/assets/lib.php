@@ -312,9 +312,20 @@ class Preclear
     $scripts = $this->scriptFiles();
     $capabilities = array_key_exists("joel", $scripts) ? $this->scriptCapabilities($scripts["joel"]) : [];
     ?>
+      <style type="text/css">
+        .dl-dialog{margin-bottom: 8px; line-height: 16px; text-align: left;}
+        .sweet-alert input[type="checkbox"] {display: initial; width: auto; height: auto; margin: auto 3px auto auto; vertical-align: top;}
+      </style>
       <div id="preclear-dialog" style="display:none;" title=""></div>
+      <div id="dialog-header-defaults" style="display:none;">
+        <dl class="dl-dialog"><dt>Model Family:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>{family}</span></dd></dl>
+        <dl class="dl-dialog"><dt>Device Model:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>{model}</span></dd></dl>
+        <dl class="dl-dialog"><dt>Serial Number:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>{serial_short}</span></dd></dl>
+        <dl class="dl-dialog"><dt>Firmware Version:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>{firmware}</span></dd></dl>
+        <dl class="dl-dialog"><dt>Size:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>{size_h}</span></dd></dl>
+      </div>
       <div id="joel-start-defaults" style="display:none;">
-        <dl>
+        <dl class="dl-dialog">
           <dt>Operation: </dt>
           <dd>
             <select name="op" onchange="toggleSettings(this);">
@@ -389,7 +400,7 @@ class Preclear
       </div>
 
       <div id="gfjardim-start-defaults" style="display:none;">
-        <dl>
+        <dl class="dl-dialog">
           <dt>Operation: </dt>
           <dd>
             <select name="op" onchange="toggleSettings(this);">
