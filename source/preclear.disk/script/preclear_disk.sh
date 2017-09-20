@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="0.9.1-beta"
+version="0.9.2-beta"
 
 # PID
 script_pid=$BASHPID
@@ -373,7 +373,6 @@ write_disk(){
   local disk=${disk_properties[device]}
   local disk_name=${disk_properties[name]}
   local disk_blocks=${disk_properties[blocks]}
-  local initial_bytes=$2
   local pause=${all_files[pause]}
   local paused_file=n
   local paused_smart=n
@@ -385,19 +384,28 @@ write_disk(){
   local tb_formatted
   local total_bytes
   local write_bs=""
-  local write_type=$1
   local time_start
-  local output=$3
-  local output_speed=$4
   local display_pid=0
   local write_bs=2097152
 
-  time_start=$(timer)
+  local write_type=$1
+  local initial_bytes=${!2}
+  local initial_timer=${!3}
+  local output=$4
+  local output_speed=$5
+
+  # start time
+  initial_timer=${initial_timer:-0}
+  if [ "$initial_timer" -gt "0" ]; then
+    time_start=$(( $(date '+%s') - $initial_timer ))
+  else
+    time_start=$(timer)
+  fi
+
   touch $dd_output
 
   # Seek if restored
-  do_seek=${!initial_bytes}
-  do_seek=${do_seek:-0}
+  do_seek=${initial_bytes:-0}
   if [ "$do_seek" -gt "$write_bs" ]; then
     do_seek=$(($do_seek - $write_bs))
     debug "Continuing disk write on byte $do_seek"
@@ -494,7 +502,7 @@ write_disk(){
     fi
 
     # Save current status
-    save_current_status "$write_type" "$bytes_wrote" "n"
+    save_current_status "$write_type" "$bytes_wrote" $(( $(date '+%s') - $time_start ))
 
     let percent_wrote=($bytes_wrote*100/$total_bytes)
     if [ ! -z "${bytes_wrote##*[!0-9]*}" ]; then
@@ -503,7 +511,7 @@ write_disk(){
     time_current=$(timer)
 
     current_speed=$(awk -F',' 'END{print $NF}' $dd_output|xargs)
-    average_speed=$(($bytes_dd_current / ($time_current - $time_start) / 1000000 ))
+    average_speed=$(($bytes_wrote / ($time_current - $time_start) / 1000000 ))
 
     status="Time elapsed: $(timer $time_start) | Write speed: $current_speed | Average speed: $average_speed MB/s"
     if [ "$cycles" -gt 1 ]; then
@@ -655,12 +663,12 @@ is_numeric() {
 save_current_status() {
   local current_op=$1
   local current_pos=$2
-  local dd_hang=$3
+  local current_timer=$3
 
   echo -e "current_op=$current_op" > ${all_files[dir]}/resume
   echo -e "current_pos=$current_pos" >> ${all_files[dir]}/resume
+  echo -e "current_timer=$current_timer" >> ${all_files[dir]}/resume
   echo -e "current_cycle=$cycle" >> ${all_files[dir]}/resume
-  echo -e "dd_hang=$dd_hang" >> ${all_files[dir]}/resume
   echo -e "all_timer_diff=$(( $(date '+%s') - $all_timer ))" >> ${all_files[dir]}/resume
   echo -e "cycle_timer_diff=$(( $(date '+%s') - $cycle_timer ))" >> ${all_files[dir]}/resume
 
@@ -703,28 +711,37 @@ read_entire_disk() {
   local disk=${disk_properties[device]}
   local disk_name=${disk_properties[name]}
   local disk_blocks=${disk_properties[blocks_512]}
-  local initial_bytes=$3
-  local output=$4
-  local output_speed=$5
   local pause=${all_files[pause]}
   local paused_file=n
   local paused_smart=n
   local paused_sync=n
   local percent_read=0
   local read_stress=$read_stress
-  local read_type=$2
   local short_test=$short_test
   local stat_file=${all_files[stat]}
   local verify_errors=${all_files[verify_errors]}
-  local verify=$1
   local read_bs=2097152
 
+  local verify=$1
+  local read_type=$2
+  local initial_bytes=${!3}
+  local initial_timer=${!4}
+  local output=$5
+  local output_speed=$6
+
+  # start time
+  initial_timer=${initial_timer:-0}
+  if [ "$initial_timer" -gt "0" ]; then
+    time_start=$(( $(date '+%s') - $initial_timer ))
+  else
+    time_start=$(timer)
+  fi
+
   # Seek if restored
-  do_seek=${!initial_bytes}
-  do_seek=${do_seek:-0}
+  do_seek=${initial_bytes:-0}
   if [ "$do_seek" -gt "$read_bs" ]; then
-    debug "Continuing disk read from byte $do_seek"
     do_seek=$(($do_seek - $read_bs))
+    debug "Continuing disk read from byte $do_seek"
     dd_flags="$dd_flags iflag=skip_bytes"
     dd_skip="skip=$do_seek"
   else
@@ -743,9 +760,6 @@ read_entire_disk() {
     read_type_s="Verify Zeroing"
     read_stress=n
   fi
-
-  # start time
-  time_start=$(timer)
 
   if [ "$short_test" == "y" ]; then
     total_bytes=$(($read_bs * 2048))
@@ -884,12 +898,12 @@ read_entire_disk() {
     fi
 
     # Save current status
-    save_current_status "$read_type" "$bytes_read" "n"
+    save_current_status "$read_type" "$bytes_read" $(( $(date '+%s') - $time_start ))
 
     time_current=$(timer)
 
     current_speed=$(awk -F',' 'END{print $NF}' $dd_output|xargs)
-    average_speed=$(($bytes_dd_current / ($time_current - $time_start) / 1000000 ))
+    average_speed=$(($bytes_read / ($time_current - $time_start) / 1000000 ))
 
     status="Time elapsed: $(timer $time_start) | Current speed: $current_speed | Average speed: $average_speed MB/s"
     if [ "$cycles" -gt 1 ]; then
@@ -1830,19 +1844,21 @@ for cycle in $(seq $cycles); do
       # Loading restored position
       if [ -n "$current_pos" ]; then
         start_bytes=$current_pos
+        start_timer=$current_timer
         current_pos=0
       else
         start_bytes=0
+        current_timer=0
       fi
 
       # Updating display status 
       display_status "Pre-Read in progress ..." ''
 
       # Saving progress  
-      save_current_status "preread" "0" "n"
+      save_current_status "preread" "$start_bytes" "$start_timer"
 
       while [[ true ]]; do
-        read_entire_disk no-verify preread start_bytes preread_average preread_speed
+        read_entire_disk no-verify preread start_bytes start_timer preread_average preread_speed
         ret_val=$?
         if [ "$ret_val" -eq 0 ]; then
           append display_step "Pre-read verification:|[${preread_average}] ***SUCCESS***"
@@ -1877,17 +1893,19 @@ for cycle in $(seq $cycles); do
       # Loading restored position
       if [ -n "$current_pos" ]; then
         start_bytes=$current_pos
+        start_timer=$current_timer
         current_pos=""
       else
         start_bytes=0
+        start_timer=0
       fi
 
       display_status "Erasing in progress ..." ''
-      save_current_status "erase" "0" "n"
+      save_current_status "erase" "$start_bytes" "$start_timer"
 
       # Erase the disk
       while [[ true ]]; do
-        write_disk erase start_bytes write_average write_speed
+        write_disk erase start_bytes start_timer write_average write_speed
         ret_val=$?
         if [ "$ret_val" -eq 0 ]; then
           append display_step "Erasing the disk:|[${write_average}] ***SUCCESS***"
@@ -1920,15 +1938,17 @@ for cycle in $(seq $cycles); do
     # Loading restored position
     if [ -n "$current_pos" ]; then
       start_bytes=$current_pos
+      start_timer=$current_timer
       current_pos=""
     else
       start_bytes=0
+      start_timer=0
     fi
 
     display_status "${title_write} in progress ..." ''
-    save_current_status "$write_op" "0" "n"
+    save_current_status "$write_op" "$start_bytes" "$start_timer"
     while [[ true ]]; do
-      write_disk $write_op start_bytes write_average write_speed
+      write_disk $write_op start_bytes start_timer write_average write_speed
       ret_val=$?
       if [ "$ret_val" -eq 0 ]; then
         append display_step "${title_write} the disk:|[${write_average}] ***SUCCESS***"
@@ -1959,7 +1979,7 @@ for cycle in $(seq $cycles); do
       if is_current_op "write_mbr"; then
 
         display_status "Writing unRAID's Preclear signature to the disk ..." ''
-        save_current_status "write_mbr" "0" "n"
+        save_current_status "write_mbr" "0" "0"
         echo "${disk_properties[name]}|NN|Writing unRAID's Preclear signature|$$" > ${all_files[stat]}
         write_signature 64
         # sleep 10
@@ -1975,7 +1995,7 @@ for cycle in $(seq $cycles); do
       # Check current operation if restoring a previous preclear instance
       if is_current_op "read_mbr"; then
         display_status "Verifying unRAID's signature on the MBR ..." ""
-        save_current_status "read_mbr" "0" "n"
+        save_current_status "read_mbr" "0" "0"
         echo "${disk_properties[name]}|NN|Verifying unRAID's signature on the MBR|$$" > ${all_files[stat]}
         if verify_mbr $theDisk; then
           append display_step "Verifying unRAID's Preclear signature:|***SUCCESS*** "
@@ -2007,15 +2027,17 @@ for cycle in $(seq $cycles); do
       # Loading restored position
       if [ -n "$current_pos" ]; then
         start_bytes=$current_pos
+        start_timer=$current_timer
         current_pos=""
       else
         start_bytes=0
+        start_timer=0
       fi
 
       display_status "Post-Read in progress ..." ""
-      save_current_status "postread" "0" "n"
+      save_current_status "postread" "$start_bytes" "$start_timer"
       while [[ true ]]; do
-        read_entire_disk verify postread start_bytes postread_average postread_speed
+        read_entire_disk verify postread start_bytes start_timer postread_average postread_speed
         ret_val=$?
         if [ "$ret_val" -eq 0 ]; then
           append display_step "Post-Read verification:|[${postread_average}] ***SUCCESS*** "

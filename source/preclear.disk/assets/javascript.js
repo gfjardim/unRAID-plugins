@@ -531,8 +531,8 @@ function getResumablePreclear(serial)
         html:  true,
         closeOnConfirm: false,
         showCancelButton: true,
-        confirmButtonText:"Yes",
-        cancelButtonText:"No"
+        confirmButtonText:"Resume",
+        cancelButtonText:"Cancel"
       }, function(result)
       {
         if (result)
