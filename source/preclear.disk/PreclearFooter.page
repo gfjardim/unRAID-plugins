@@ -80,7 +80,7 @@ if (! $is_installed && ! $is_dismissed):
   swal(
   {
     title: original_plugin + "Install Statistics Plugin",
-    text: "This plugin is used to send statistics anonymously using Google Forms and TOR. <br>Don't worry, you will be asked before sending every report.",
+    text: "This plugin is used to send statistics anonymously using Google Forms. <br>Don't worry, you will be asked before sending every report.",
     type: "info",
     confirmButtonText: "Install",
     allowOutsideClick: false,
