@@ -19,9 +19,11 @@ function lsDir($root, $ext = null)
     }
     if ($fileinfo->isFile())
     {
-      $paths[] = $path;
+      $paths[$fileinfo->getMTime()][] = $path;
     }
   }
+  krsort($paths);
+  $paths = call_user_func_array('array_merge', $paths);
   return $paths;
 }
 

@@ -4,7 +4,7 @@
 <!ENTITY name      "statistics.sender">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2017.09.16">
+<!ENTITY version   "2017.09.22">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
 ]>
@@ -13,6 +13,9 @@
 
 <CHANGES>
 ##&name;
+
+###2017.09.22
+- Fix: remove TOR logrotate leftover
 
 ###2017.09.16
 - Fix: remove TOR dependency
@@ -69,7 +72,6 @@ else
   upgradepkg --install-new /boot/config/plugins/&name;/&name;-&version;.txz
 fi
 
-chmod 644 /etc/logrotate.d/tor*
 chmod -R +x /usr/local/emhttp/plugins/&name;/scripts/
 
 # Cleaning old source files
