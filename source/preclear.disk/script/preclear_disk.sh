@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="0.9.2-beta"
+version="0.9.3-beta"
 
 # PID
 script_pid=$BASHPID
@@ -389,15 +389,16 @@ write_disk(){
   local write_bs=2097152
 
   local write_type=$1
-  local initial_bytes=${!2}
-  local initial_timer=${!3}
+  local initial_bytes=$2
+  local initial_timer=$3
   local output=$4
   local output_speed=$5
 
   # start time
-  initial_timer=${initial_timer:-0}
-  if [ "$initial_timer" -gt "0" ]; then
-    time_start=$(( $(date '+%s') - $initial_timer ))
+  resume_timer=${!initial_timer}
+  resume_timer=${resume_timer:-0}
+  if [ "$resume_timer" -gt "0" ]; then
+    time_start=$(( $(date '+%s') - $resume_timer ))
   else
     time_start=$(timer)
   fi
@@ -405,12 +406,13 @@ write_disk(){
   touch $dd_output
 
   # Seek if restored
-  do_seek=${initial_bytes:-0}
-  if [ "$do_seek" -gt "$write_bs" ]; then
-    do_seek=$(($do_seek - $write_bs))
-    debug "Continuing disk write on byte $do_seek"
+  resume_seek=${!initial_bytes:-0}
+  resume_seek=${resume_seek:-0}
+  if [ "$resume_seek" -gt "$write_bs" ]; then
+    resume_seek=$(($resume_seek - $write_bs))
+    debug "Continuing disk write on byte $resume_seek"
     dd_flags="$dd_flags oflag=seek_bytes"
-    dd_seek="seek=$do_seek"
+    dd_seek="seek=$resume_seek"
   else
     dd_seek="seek=1"
   fi
@@ -482,7 +484,7 @@ write_disk(){
 
     # Ensure bytes_wrote is a number
     if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
-      bytes_wrote=$(($bytes_dd + $do_seek))
+      bytes_wrote=$(($bytes_dd + $resume_seek))
       bytes_dd_current=$bytes_dd
     fi
 
@@ -497,6 +499,7 @@ write_disk(){
     # Kill dd if hung
     if [ "$dd_hang" -gt 10 ]; then
       eval "$initial_bytes='$bytes_wrote';"
+      eval "$initial_timer='$(( $(date '+%s') - $time_start ))';"
       kill -9 $dd_pid
       return 2
     fi
@@ -599,7 +602,7 @@ write_disk(){
 
   bytes_dd=$(awk 'END{print $1}' $dd_output|xargs)
   if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
-    bytes_wrote=$(( $bytes_dd + $do_seek + $write_bs ))
+    bytes_wrote=$(( $bytes_dd + $resume_seek + $write_bs ))
   fi
 
   debug "${write_type_s}: dd - wrote ${bytes_wrote} of ${total_bytes}."
@@ -695,7 +698,7 @@ save_current_status() {
 }
 
 read_entire_disk() { 
-  local average_speed bytes_dd current_speed count disktemp dd_cmd do_seek report_out status tb_formatted
+  local average_speed bytes_dd current_speed count disktemp dd_cmd resume_skip report_out status tb_formatted
   local skip_b1 skip_b2 skip_b3 skip_p1 skip_p2 skip_p3 skip_p4 skip_p5 time_start time_current read_type_s read_type_t total_bytes
   local bytes_read=0
   local bytes_dd_current=0
@@ -724,26 +727,28 @@ read_entire_disk() {
 
   local verify=$1
   local read_type=$2
-  local initial_bytes=${!3}
-  local initial_timer=${!4}
+  local initial_bytes=$3
+  local initial_timer=$4
   local output=$5
   local output_speed=$6
 
   # start time
-  initial_timer=${initial_timer:-0}
-  if [ "$initial_timer" -gt "0" ]; then
-    time_start=$(( $(date '+%s') - $initial_timer ))
+  resume_timer=${!initial_timer}
+  resume_timer=${resume_timer:-0}
+  if [ "$resume_timer" -gt "0" ]; then
+    time_start=$(( $(date '+%s') - $resume_timer ))
   else
     time_start=$(timer)
   fi
 
   # Seek if restored
-  do_seek=${initial_bytes:-0}
-  if [ "$do_seek" -gt "$read_bs" ]; then
-    do_seek=$(($do_seek - $read_bs))
-    debug "Continuing disk read from byte $do_seek"
+  resume_skip=${!initial_bytes}
+  resume_skip=${resume_skip:-0}
+  if [ "$resume_skip" -gt "$read_bs" ]; then
+    resume_skip=$(($resume_skip - $read_bs))
+    debug "Continuing disk read from byte $resume_skip"
     dd_flags="$dd_flags iflag=skip_bytes"
-    dd_skip="skip=$do_seek"
+    dd_skip="skip=$resume_skip"
   else
     dd_skip="skip=1"
   fi
@@ -877,7 +882,7 @@ read_entire_disk() {
 
     # Ensure bytes_read is a number
     if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
-      bytes_read=$(($bytes_dd + $do_seek))
+      bytes_read=$(($bytes_dd + $resume_skip))
       bytes_dd_current=$bytes_dd
       let percent_read=($bytes_read*100/$total_bytes)
     fi
@@ -893,6 +898,7 @@ read_entire_disk() {
     # Kill dd if hung
     if [ "$dd_hang" -gt 10 ]; then
       eval "$initial_bytes='"$bytes_read"';"
+      eval "$initial_timer='$(( $(date '+%s') - $time_start ))';"
       kill -9 $dd_pid
       return 2
     fi
@@ -998,7 +1004,7 @@ read_entire_disk() {
 
   bytes_dd=$(awk 'END{print $1}' $dd_output|xargs)
   if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
-    bytes_read=$(( $bytes_dd + $do_seek + $read_bs ))
+    bytes_read=$(( $bytes_dd + $resume_skip + $read_bs ))
   fi
 
   debug "${read_type_s}: dd - read ${bytes_read} of ${total_bytes}."
