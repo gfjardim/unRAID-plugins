@@ -333,12 +333,15 @@ class Disks
     exec("timeout -s 9 ". $this->exec_time ." /bin/lsblk -nbP -o name,type,serial 2>/dev/null", $blocks);
     foreach( array_merge($serials,$cache_serial,$flash_serial) as $serial )
     {
-      foreach ($blocks as $block)
+      if (strlen($serial))
       {
-        $block  = parse_ini_string(preg_replace('$"\s$', '"'.PHP_EOL, $block)) ?: [];
-        if ( $block['TYPE'] == "disk" && ! is_bool(strpos($serial, $block['SERIAL'])) )
+        foreach ($blocks as $block)
         {
-          $this->unraid[] = $block['NAME'];
+          $block  = parse_ini_string(preg_replace('$"\s$', '"'.PHP_EOL, $block)) ?: [];
+          if ( $block['TYPE'] == "disk" && ! is_bool(strpos($serial, $block['SERIAL'])) )
+          {
+            $this->unraid[] = $block['NAME'];
+          }
         }
       }
     }
