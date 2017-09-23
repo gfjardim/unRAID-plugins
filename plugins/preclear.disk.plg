@@ -426,6 +426,7 @@ if [ -f "/etc/rc.d/rc.diskinfo" ]; then
 fi
 mv /usr/local/emhttp/plugins/&name;/rc.diskinfo /etc/rc.d/rc.diskinfo
 chmod +x /etc/rc.d/rc.diskinfo
+/etc/rc.d/rc.diskinfo --quit
 /etc/rc.d/rc.diskinfo --daemon
 
 # Add CRON entry to keep alive
