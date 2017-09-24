@@ -338,7 +338,7 @@ class Disks
         foreach ($blocks as $block)
         {
           $block  = parse_ini_string(preg_replace('$"\s$', '"'.PHP_EOL, $block)) ?: [];
-          if ( $block['TYPE'] == "disk" && ! is_bool(strpos($serial, $block['SERIAL'])) )
+          if ( $block['TYPE'] == "disk" && strlen($block['SERIAL']) && ! is_bool(strpos($serial, $block['SERIAL'])) )
           {
             $this->unraid[] = $block['NAME'];
           }
