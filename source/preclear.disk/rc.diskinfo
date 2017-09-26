@@ -189,7 +189,8 @@ else
 
 if ($daemon || $refresh)
 {
-  exec("php $service ".($debug ? "&":"&>/dev/null &"));
+  exec("php $service  1>/dev/null ".($debug ? "":"2>&1 ")."&");
+  // exec("php $service ".($debug ? "--debug &":"&>/dev/null &"));
   // syslog(LOG_INFO, "process started. To terminate it, type: $prog --quit");
   exit(0);
 }
@@ -324,27 +325,27 @@ class Disks
       $this->unraid = array_values(array_filter(array_map(function($disk){return $disk['device'];}, $disksIni)));
     }
 
-    exec("timeout -s 9 ". $this->exec_time ." /usr/bin/strings /boot/config/super.dat 2>/dev/null|grep -Po '.{6,}'", $serials);
-    exec("timeout -s 9 ". $this->exec_time ." udevadm info --query=property --name /dev/disk/by-label/UNRAID 2>/dev/null|grep -Po 'ID_SERIAL=\K.*'", $flash_serial);
+    // exec("timeout -s 9 ". $this->exec_time ." /usr/bin/strings /boot/config/super.dat 2>/dev/null|grep -Po '.{6,}'", $serials);
+    // exec("timeout -s 9 ". $this->exec_time ." udevadm info --query=property --name /dev/disk/by-label/UNRAID 2>/dev/null|grep -Po 'ID_SERIAL=\K.*'", $flash_serial);
     
-    $disks_cfg = is_file("/boot/config/disk.cfg") ? parse_ini_file("/boot/config/disk.cfg") : [];
-    $cache_serial = array_flip(preg_grep("#cacheId#i", array_flip($disks_cfg)));
+    // $disks_cfg = is_file("/boot/config/disk.cfg") ? parse_ini_file("/boot/config/disk.cfg") : [];
+    // $cache_serial = array_flip(preg_grep("#cacheId#i", array_flip($disks_cfg)));
 
-    exec("timeout -s 9 ". $this->exec_time ." /bin/lsblk -nbP -o name,type,serial 2>/dev/null", $blocks);
-    foreach( array_merge($serials,$cache_serial,$flash_serial) as $serial )
-    {
-      if (strlen($serial))
-      {
-        foreach ($blocks as $block)
-        {
-          $block  = parse_ini_string(preg_replace('$"\s$', '"'.PHP_EOL, $block)) ?: [];
-          if ( $block['TYPE'] == "disk" && strlen($block['SERIAL']) && ! is_bool(strpos($serial, $block['SERIAL'])) )
-          {
-            $this->unraid[] = $block['NAME'];
-          }
-        }
-      }
-    }
+    // exec("timeout -s 9 ". $this->exec_time ." /bin/lsblk -nbP -o name,type,serial 2>/dev/null", $blocks);
+    // foreach( array_merge($serials,$cache_serial,$flash_serial) as $serial )
+    // {
+    //   if (strlen($serial))
+    //   {
+    //     foreach ($blocks as $block)
+    //     {
+    //       $block  = parse_ini_string(preg_replace('$"\s$', '"'.PHP_EOL, $block)) ?: [];
+    //       if ( $block['TYPE'] == "disk" && strlen($block['SERIAL']) && ! is_bool(strpos($serial, $block['SERIAL'])) )
+    //       {
+    //         $this->unraid[] = $block['NAME'];
+    //       }
+    //     }
+    //   }
+    // }
     $this->unraid = array_unique($this->unraid);
   }
 
