@@ -457,7 +457,7 @@ echo ""
 # Start diskinfo
 /etc/rc.d/rc.diskinfo --quit &amp;&gt;/dev/null
 rm -f /var/local/emhttp/plugins/diskinfo/diskinfo.json &amp;&gt;/dev/null
-echo "sleep 5 ; /etc/rc.d/rc.diskinfo --daemon" | at now &amp;&gt;/dev/null
+echo "sleep 5 ; /etc/rc.d/rc.diskinfo --daemon &amp;&gt;/dev/null" | at now &amp;&gt;/dev/null
 </INLINE>
 </FILE>
 
