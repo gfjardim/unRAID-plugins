@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2017.09.26">
+<!ENTITY version   "2017.09.27">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,9 @@
 
 <CHANGES>
 ##&name;
+
+###2017.09.27
+- Fix: diskinfo not starting properly
 
 ###2017.09.25
 - Fix: install/update not showing the Done button
@@ -424,7 +427,6 @@ ln -sf /usr/local/emhttp/plugins/&name;/script/preclear.sh /usr/local/bin/precle
 # Install diskinfo service
 mv /usr/local/emhttp/plugins/&name;/rc.diskinfo /etc/rc.d/rc.diskinfo
 chmod +x /etc/rc.d/rc.diskinfo
-trap '/etc/rc.d/rc.diskinfo --quit &amp; &gt;/dev/null;exit' EXIT
 
 # Add CRON entry to keep alive
 cat &lt;&lt;'EOT' &gt; /etc/cron.d/diskinfo
@@ -451,6 +453,11 @@ echo " Copyright 2015-2017, gfjardim"
 echo " Version: &version;"
 echo "-----------------------------------------------------------"
 echo ""
+
+# Start diskinfo
+/etc/rc.d/rc.diskinfo --quit &amp;&gt;/dev/null
+rm -f /var/local/emhttp/plugins/diskinfo/diskinfo.json &amp;&gt;/dev/null
+echo "sleep 5 ; /etc/rc.d/rc.diskinfo --daemon" | at now &amp;&gt;/dev/null
 </INLINE>
 </FILE>
 
