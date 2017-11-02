@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="0.9.3-beta"
+version="0.9.4-beta"
 
 # PID
 script_pid=$BASHPID
@@ -34,6 +34,10 @@ fi
 # Redirect errors to log
 exec 2> >(while read err; do echo "$(date +"%b %d %T" ) ${log_prefix} ${err}" >> /var/log/preclear.disk.log; echo "${err}"; done; >&2)
 
+debug() {
+  cat <<< "$(date +"%b %d %T" ) ${log_prefix} $@" >> /var/log/preclear.disk.log
+}
+
 # Let's make sure some features are supported by BASH
 BV=$(echo $BASH_VERSION|tr '.' "\n"|grep -Po "^\d+"|xargs printf "%.2d\n"|tr -d '\040\011\012\015')
 if [ "$BV" -lt "040253" ]; then
@@ -43,10 +47,10 @@ if [ "$BV" -lt "040253" ]; then
 fi
 
 # Let's verify all dependencies
-for dep in cat awk basename blockdev comm date dd find fold getopt grep kill openssl printf readlink seq sort strings sum tac tmux todos tput udevadm xargs; do
+for dep in cat awk basename blockdev comm date dd find fold getopt grep kill openssl printf readlink seq sort sum tac tmux todos tput udevadm xargs; do
   if ! type $dep >/dev/null 2>&1 ; then
-    echo -e "The following dependency isn'y met: [$dep]\nPlease install it and try again."
-    debug "The following dependency isn'y met: [$dep]\nPlease install it and try again."
+    echo -e "The following dependency isn't met: [$dep]. Please install it and try again."
+    debug "The following dependency isn't met: [$dep]. Please install it and try again."
     exit 1
   fi
 done
@@ -94,14 +98,6 @@ list_unraid_disks(){
         unraid_disks[$i]=$(readlink -f $disk)
       fi
     done < <(cat /var/local/emhttp/disks.ini | grep -Po 'device="\K[^"]*')
-  elif [ -f "/boot/config/super.dat" ]; then
-    while read line ; do
-      disk=$(find /dev/disk/by-id/ -type l -iname "*-${line}*" ! -iname "*-part*")
-      if [ -n "$disk" ]; then
-        let "i+=1"
-        unraid_disks[$i]=$(readlink -f $disk)
-      fi
-    done < <(strings /boot/config/super.dat|grep -x '.\{5,1000\}')
   fi
   eval "$_result=(${unraid_disks[@]})"
 }
@@ -1506,7 +1502,8 @@ done
 
 if [ ! -b "$1" ]; then
   echo "Disk not set, please verify the command arguments."
-  # exit 1
+  debug "Disk not set, please verify the command arguments."
+  exit 1
 fi
 
 theDisk=$(echo $1|xargs)
