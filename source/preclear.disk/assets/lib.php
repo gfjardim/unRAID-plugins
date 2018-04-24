@@ -68,7 +68,8 @@ class Misc
 
   public static function get_json($file)
   {
-    return file_exists($file) ? json_decode(file_get_contents($file), true) : [];
+    $out = file_exists($file) ? json_decode(file_get_contents($file), true) : [];
+    return is_array($out) ? $out : []; 
   }
 
 

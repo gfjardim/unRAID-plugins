@@ -688,7 +688,7 @@ class Disks
 
 
 
-function force_reload($sig, $signum)
+function force_reload($sig, $signum = false)
 {
   if (! $GLOBALS["reload_force"])
   {

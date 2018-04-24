@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2018.03.29">
+<!ENTITY version   "2018.04.24">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,12 @@
 
 <CHANGES>
 ##&name;
+
+###018.04.24
+- Fix: rc.diskinfo - PHP Warning: Missing argument 2 for force_reload()
+- Fix: script not detecting array disks correctly
+- Fix: correctly detect dd exit code - may fix link problems hanging preclear operation
+- Fix: pause dd if s6-sync (part of s6-utils used by linuxserver) is invoked
 
 ###2018.03.29
 - Fix: early unRAID 6.5 compatibility

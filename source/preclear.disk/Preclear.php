@@ -319,7 +319,7 @@ switch ($_POST['action'])
     {
       $output = "<script>window.close();</script>";
     }
-    $content = TMUX::getSession($session);
+    $content = preg_replace("#root@[^:]*:.*#", "", TMUX::getSession($session));
     $output .= "<pre>".preg_replace("#\n{5,}#", "<br>", $content)."</pre>";
     if ( strpos($content, "Answer Yes to continue") )
     {
@@ -345,6 +345,7 @@ switch ($_POST['action'])
     }
     break;
 
+
   case 'download':
     $dir  = "/preclear";
     $file = $_POST["file"];
@@ -357,6 +358,7 @@ switch ($_POST['action'])
     exec("zip -qmr ".escapeshellarg($file)." ".escapeshellarg($dir));
     echo "/$file";
   break;
+
 
   case 'get_resumable':
     $serial  = urldecode($_POST['serial']);
