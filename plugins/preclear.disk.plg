@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2018.04.24">
+<!ENTITY version   "2018.04.27">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,9 @@
 
 <CHANGES>
 ##&name;
+
+###2018.04.27
+- Fix: script deem failed small dd reads/writes
 
 ###018.04.24
 - Fix: rc.diskinfo - PHP Warning: Missing argument 2 for force_reload()

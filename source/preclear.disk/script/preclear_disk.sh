@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="0.9.5-beta"
+version="0.9.6-beta"
 
 # PID
 script_pid=$BASHPID
@@ -451,18 +451,8 @@ write_disk(){
     if [ -n "$dd_pid" ]; then
       debug "${write_type_s}: dd pid [$dd_pid]"
       break;
-    else
-      sleep 1
     fi
   done
-
-  sleep 1
-
-  # return 1 if dd failed
-  if ! ps -p $dd_pid &>/dev/null; then
-    debug "${write_type_s}: dd command failed -> $(cat $dd_output)"
-    return 1
-  fi
 
   # if we are interrupted, kill the background zeroing of the disk.
   trap 'kill -9 $dd_pid 2>/dev/null;exit' EXIT
@@ -806,15 +796,8 @@ read_entire_disk() {
       if [ -n "$dd_pid" ]; then
         debug "${read_type_s}: dd pid [$dd_pid]"
         break;
-      else
-        sleep 1
       fi
     done
-
-    if [ -z "$dd_pid" ]; then
-      debug "${read_type_s}: dd command failed -> $(cat $dd_output)"
-      return 1
-    fi
 
     while [ -d "/proc/$dd_pid" ]; do continue; done
 
@@ -862,8 +845,6 @@ read_entire_disk() {
     debug "${read_type_s}: dd command failed -> $(cat $dd_output)"
     return 1
   fi
-
-  sleep 1
 
   # return 1 if dd failed
   if ! ps -p $dd_pid &>/dev/null; then
@@ -2195,14 +2176,14 @@ todos < $report > "/boot/preclear_reports/${file_name}"
 if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 1 ]; then
   report_out="Disk ${disk_properties[name]} has successfully finished a preclear cycle!\\n\\n"
   report_out+="Ran $cycles cycles.\\n"
-  [ "$skip_preread" != "y" ] && report_out+="Last Cycle's Pre-Read Time: ${preread_average}.\\n"
+  [ "$skip_preread" != "y" ] && report_out+="Last Cycle\'s Pre-Read Time: ${preread_average}.\\n"
   if [ "$erase_disk" == "y" ]; then
-    report_out+="Last Cycle's Erasing Time: ${write_average}.\\n"
+    report_out+="Last Cycle\'s Erasing Time: ${write_average}.\\n"
   else
-    report_out+="Last Cycle's Zeroing Time: ${write_average}.\\n"
+    report_out+="Last Cycle\'s Zeroing Time: ${write_average}.\\n"
   fi
-  [ "$skip_postread" != "y" ] && report_out+="Last Cycle's Post-Read Time: ${postread_average}.\\n"
-  report_out+="Last Cycle's Elapsed TIme: $(timer cycle_timer)\\n"
+  [ "$skip_postread" != "y" ] && report_out+="Last Cycle\'s Post-Read Time: ${postread_average}.\\n"
+  report_out+="Last Cycle\'s Elapsed TIme: $(timer cycle_timer)\\n"
   report_out+="Disk Start Temperature: ${disk_properties[temp]}\n"
   report_out+="Disk Current Temperature: $(get_disk_temp $theDisk "$smart_type")\\n"
   if [ "$disable_smart" != "y" ]; then

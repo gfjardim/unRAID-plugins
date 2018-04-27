@@ -244,15 +244,17 @@ foreach ($arguments as $key => $Name) {
       $allAutoStart[] = $Name;
       file_put_contents($autoStartFile, implode(PHP_EOL, $allAutoStart).(count($allAutoStart)? PHP_EOL : ""));
     }
-    $oldContainerDetails['State']['Running'] = $ContainerConfig["status"];
   }
 
   // determine if the container is still running
-  if (( isset($oldContainerDetails['State']['Running']) && $oldContainerDetails['State']['Running'] ) || empty($oldContainerDetails) )
+  if ($ContainerConfig["status"] || ( isset($oldContainerDetails['State']['Running']) && $oldContainerDetails['State']['Running'] ))
   {
     // since container was already running, put it back it to a running state after update
     $Cmd = str_replace('docker create ', 'docker run -d ', $Cmd);
+  }
 
+  if ($oldContainerDetails['State']['Running'])
+  {
     // attempt graceful stop of container first
     $ok = $DockerClient->stopContainer($Name);
 
