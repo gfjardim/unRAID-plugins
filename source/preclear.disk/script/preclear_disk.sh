@@ -363,7 +363,7 @@ write_disk(){
   local cycles=$cycles
   local current_speed
   local dd_exit=${all_files[dd_exit]}
-  local dd_flags="conv=notrunc iflag=count_bytes,nocache oflag=seek_bytes"
+  local dd_flags="conv=notrunc iflag=count_bytes,nocache,fullblock oflag=seek_bytes"
   local dd_hang=0
   local dd_last_bytes=0
   local dd_pid
@@ -412,7 +412,6 @@ write_disk(){
 
   # Seek if restored
   resume_seek=${!initial_bytes:-0}
-  resume_seek=${resume_seek:-$write_bs}
   if test "$resume_seek" -eq 0; then resume_seek=$write_bs; fi
 
   if [ "$resume_seek" -gt "$write_bs" ]; then
