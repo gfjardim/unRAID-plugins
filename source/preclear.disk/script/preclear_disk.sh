@@ -363,7 +363,7 @@ write_disk(){
   local cycles=$cycles
   local current_speed
   local dd_exit=${all_files[dd_exit]}
-  local dd_flags="conv=notrunc iflag=count_bytes,nocache,fullblock oflag=seek_bytes"
+  local dd_flags="iflag=count_bytes,nocache,fullblock oflag=seek_bytes,dsync"
   local dd_hang=0
   local dd_last_bytes=0
   local dd_pid
@@ -597,11 +597,12 @@ write_disk(){
     sleep 1
   done
 
-  # Exit if dd failed
+  local exit_code=0
+  # Check dd status
   if test "$dd_exit_code" -ne 0; then
     debug "${write_type_s}: dd command failed, exit code [$dd_exit_code]."
     save_current_status "$write_type" "$bytes_wrote" $(( $(date '+%s') - $time_start ))
-    return 1
+    exit_code=1
   else
     debug "${write_type_s}: dd exit code - $dd_exit_code"
   fi
@@ -618,6 +619,7 @@ write_disk(){
   fi
 
   eval "$output='$(timer $time_start) @ $average_speed MB/s';$output_speed='$average_speed MB/s'"
+  return $exit_code
 }
 
 format_number() {
