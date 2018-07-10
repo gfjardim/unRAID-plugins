@@ -15,6 +15,9 @@
 <CHANGES>
 ##&name;
 
+###2018.05.03
+- Fix: script not completely zeroing the disk
+
 ###2018.04.27
 - Fix: script deem failed small dd reads/writes
 
