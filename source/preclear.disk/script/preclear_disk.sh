@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="0.9.6-beta"
+version="0.9.7-beta"
 
 # PID
 script_pid=$BASHPID
@@ -464,7 +464,7 @@ write_disk(){
   fi
 
   while kill -0 $dd_pid &>/dev/null; do
-    sleep 5 && kill -USR1 $dd_pid 2>/dev/null && sleep 2
+    sleep 5 && kill -USR1 $dd_pid 2>/dev/null && sleep 5
     # Calculate the current status
     bytes_dd=$(awk 'END{print $1}' $dd_output|xargs)
 
@@ -472,22 +472,6 @@ write_disk(){
     if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
       bytes_wrote=$(($bytes_dd + $resume_seek))
       bytes_dd_current=$bytes_dd
-    fi
-
-    # Detect hung dd write
-    if [ "$bytes_dd_current" -eq "$dd_last_bytes" -a "$is_paused" != "y" ]; then
-      let dd_hang=($dd_hang +1)
-    else
-      dd_last_bytes=$bytes_dd_current
-      dd_hang=0
-    fi
-
-    # Kill dd if hung
-    if [ "$dd_hang" -gt 10 ]; then
-      eval "$initial_bytes='$bytes_wrote';"
-      eval "$initial_timer='$(( $(date '+%s') - $time_start ))';"
-      kill -9 $dd_pid
-      return 2
     fi
 
     # Save current status
@@ -558,8 +542,10 @@ write_disk(){
 
     if [ $"$paused_file" == "y" -o "$paused_sync" == "y" -o "$paused_hdparm" == "y" -o "$paused_smart" == "y" ]; then
       echo "$disk_name|NN|${write_type_s}${cycle_disp}: PAUSED|$$" >$stat_file
-      display_status "${write_type_s} in progress:|###(${percent_wrote}% Done)### ***PAUSED***" "** PAUSED"
-      display_pid=$!
+      if [ ! -e "/proc/${display_pid}/exe" ]; then
+        display_status "${write_type_s} in progress:|###(${percent_wrote}% Done)### ***PAUSED***" "** PAUSED"
+        display_pid=$!
+      fi
       is_paused=y
     else
       # Display refresh
@@ -568,6 +554,23 @@ write_disk(){
         display_pid=$!
       fi
       is_paused=n
+    fi
+
+    # Detect hung dd write
+    if [ "$bytes_dd_current" -eq "$dd_last_bytes" -a "$is_paused" != "y" ]; then
+      let dd_hang=($dd_hang + 1)
+    else
+      dd_last_bytes=$bytes_dd_current
+      dd_hang=0
+    fi
+
+    # Kill dd if hung
+    if [ "$dd_hang" -gt 30 ]; then
+      eval "$initial_bytes='$bytes_wrote';"
+      eval "$initial_timer='$(( $(date '+%s') - $time_start ))';"
+      while read l; do debug "${write_type_s}: dd output: ${l}"; done < <(tail -n20 "$dd_output")
+      kill -9 $dd_pid
+      return 2
     fi
 
     # Send mid notification
@@ -601,6 +604,8 @@ write_disk(){
   # Check dd status
   if test "$dd_exit_code" -ne 0; then
     debug "${write_type_s}: dd command failed, exit code [$dd_exit_code]."
+    while read l; do debug "${write_type_s}: dd output: ${l}"; done < <(tail -n20 "$dd_output")
+
     save_current_status "$write_type" "$bytes_wrote" $(( $(date '+%s') - $time_start ))
     exit_code=1
   else
@@ -892,7 +897,7 @@ read_entire_disk() {
     fi
 
     # Refresh dd status
-    sleep 5 && kill -USR1 $dd_pid 2>/dev/null && sleep 2
+    sleep 5 && kill -USR1 $dd_pid 2>/dev/null && sleep 5
 
     # Calculate the current status
     bytes_dd=$(awk 'END{print $1}' $dd_output|xargs)
@@ -902,22 +907,6 @@ read_entire_disk() {
       bytes_read=$(($bytes_dd + $resume_skip))
       bytes_dd_current=$bytes_dd
       let percent_read=($bytes_read*100/$total_bytes)
-    fi
-
-    # Detect hung dd read
-    if [ "$bytes_dd_current" == "$dd_last_bytes" -a "$is_paused" != "y" ]; then
-      dd_hang=$(($dd_hang + 1))
-    else
-      dd_hang=0
-      dd_last_bytes=$bytes_dd_current
-    fi
-
-    # Kill dd if hung
-    if [ "$dd_hang" -gt 10 ]; then
-      eval "$initial_bytes='"$bytes_read"';"
-      eval "$initial_timer='$(( $(date '+%s') - $time_start ))';"
-      kill -9 $dd_pid
-      return 2
     fi
 
     # Save current status
@@ -936,8 +925,10 @@ read_entire_disk() {
 
     if [ "$paused_file" == "y" -o "$paused_sync" == "y" -o "$paused_hdparm" == "y" -o "$paused_smart" == "y" ]; then
       echo "$disk_name|NN|${read_type_t}${cycle_disp} PAUSED|$$" >$stat_file
-      display_status "${read_type_t}|###(${percent_read}% Done)### ***PAUSED***" "** PAUSED"
-      display_pid=$!
+      if [ ! -e "/proc/${display_pid}/exe" ]; then
+        display_status "${read_type_t}|###(${percent_read}% Done)### ***PAUSED***" "** PAUSED"
+        display_pid=$!
+      fi
       is_paused=y
     else
       # Display refresh
@@ -946,6 +937,24 @@ read_entire_disk() {
         display_pid=$!
       fi
       is_paused=n
+    fi
+
+    # Detect hung dd read
+    if [ "$bytes_dd_current" == "$dd_last_bytes" -a "$is_paused" != "y" ]; then
+      dd_hang=$(($dd_hang + 1))
+    else
+      dd_hang=0
+      dd_last_bytes=$bytes_dd_current
+    fi
+
+    # Kill dd if hung
+    if [ "$dd_hang" -gt 30 ]; then
+      eval "$initial_bytes='"$bytes_read"';"
+      eval "$initial_timer='$(( $(date '+%s') - $time_start ))';"
+      while read l; do debug "${read_type_s}: dd output: ${l}"; done < <(tail -n20 "$dd_output")
+
+      kill -9 $dd_pid
+      return 2
     fi
 
     # Send mid notification
@@ -1027,8 +1036,7 @@ read_entire_disk() {
 
   if test "$dd_exit_code" -ne 0; then
     debug "${read_type_s}: dd command failed, exit code [$dd_exit_code]."
-    debug "${read_type_s}: dd output -> $(cat $dd_output)"
-
+    while read l; do debug "${read_type_s}: dd output: ${l}"; done < <(tail -n20 "$dd_output")
     save_current_status "$read_type" "$bytes_read" $(( $(date '+%s') - $time_start ))
     return 1
   else
