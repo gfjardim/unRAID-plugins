@@ -363,7 +363,7 @@ write_disk(){
   local cycles=$cycles
   local current_speed
   local dd_exit=${all_files[dd_exit]}
-  local dd_flags="iflag=count_bytes,nocache,fullblock oflag=seek_bytes,dsync"
+  local dd_flags="conv=notrunc,fsync iflag=count_bytes,nocache,fullblock oflag=seek_bytes"
   local dd_hang=0
   local dd_last_bytes=0
   local dd_pid
@@ -706,7 +706,7 @@ read_entire_disk() {
   local cycles=$cycles
   local display_pid=0
   local dd_exit=${all_files[dd_exit]}
-  local dd_flags="conv=notrunc iflag=nocache,sync,count_bytes,skip_bytes"
+  local dd_flags="conv=notrunc,fsync iflag=nocache,count_bytes,skip_bytes"
   local dd_hang=0
   local dd_last_bytes=0
   local dd_output=${all_files[dd_out]}

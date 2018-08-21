@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2018.08.20">
+<!ENTITY version   "2018.08.21">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,10 @@
 
 <CHANGES>
 ##&name;
+
+###2018.08.21
+- Fix: diskinfo PHP warnings
+- Fix: revert direcr I/O usage in dd invocation (reduced write performance)
 
 ###2018.08.20
 - Fix: increase verbosity of script.

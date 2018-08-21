@@ -467,7 +467,7 @@ class Disks
       $disk = array_intersect_key($udev, array_flip($whitelist));
 
       $disk['SERIAL_SHORT'] = isset($disk["ID_SCSI_SERIAL"]) ? $disk["ID_SCSI_SERIAL"] : $disk['ID_SERIAL_SHORT'];
-      $disk['SERIAL']       = trim("{$disk[ID_MODEL]}_{$disk[SERIAL_SHORT]}");
+      $disk['SERIAL']       = trim("{$disk['ID_MODEL']}_{$disk['SERIAL_SHORT']}");
 
       // Get device BUS
       $disk["BUS"] = (stripos($disk["DEVPATH"], "usb") !== -1) ? "usb" : "ata";
@@ -659,8 +659,8 @@ class Disks
         $cleared = FALSE;
       }
     }
-    $sc = hexdec("0x{$b[byte11h]}{$b[byte10h]}{$b[byte9h]}{$b[byte8h]}");
-    $sl = hexdec("0x{$b[byte15h]}{$b[byte14h]}{$b[byte13h]}{$b[byte12h]}");
+    $sc = hexdec("0x{$b['byte11h']}{$b['byte10h']}{$b['byte9h']}{$b['byte8h']}");
+    $sl = hexdec("0x{$b['byte15h']}{$b['byte14h']}{$b['byte13h']}{$b['byte12h']}");
     switch ($sc) {
       case 63:
       case 64:
