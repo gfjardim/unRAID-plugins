@@ -170,6 +170,7 @@ switch ($_POST['action'])
                       <td>${title}${report_files}</td>
                       <td>{$temp}</td>
                       <td><span>${disk['SIZE_H']}</span></td>
+                      <td><a href=\"#\" title=\"Disk Log Information\" onclick=\"openBox('/webGui/scripts/disk_log&amp;arg1=$disk_name','Disk Log Information',600,900,false);return false\"><i class=\"fa fa-file-text-o icon\"></i></a></td>
                       <td>{$status}</td>
                     </tr>";
         $disks_o .= $report_files;
@@ -414,6 +415,12 @@ switch ($_GET['action']) {
               }
             },"json").always(function() {
               timers.preclear=setTimeout('get_preclear()',1000);
+            }).fail(function (jqXHR, textStatus, error)
+            {
+              if (jqXHR.status == 200)
+              {
+                window.location=window.location.pathname+window.location.hash;
+              }
             });
           }
           function hit_yes(serial)
@@ -429,6 +436,10 @@ switch ($_GET['action']) {
       </body>
     </html>
     <?
+    break;
+
+  case 'get_csrf_token':
+    echo json_encode(["csrf_token" => $var['csrf_token']]);
     break;
 }
 

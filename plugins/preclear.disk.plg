@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2018.08.21">
+<!ENTITY version   "2018.08.21a">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,11 @@
 
 <CHANGES>
 ##&name;
+
+###2018.08.21a
+- Fix: avoid custom version of Tooltipster to load if the official version is present
+- Fix: detect wrong csrf_token and update it
+- Add: disk log to Tools > Preclear Disk
 
 ###2018.08.21
 - Fix: diskinfo PHP warnings

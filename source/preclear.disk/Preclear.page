@@ -55,11 +55,15 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
   table.preclear {padding:0px;border-collapse:collapse;white-space:nowrap;}
   table.preclear thead tr>td{text-align:left;vertical-align:top;width:8%;padding-left:12px;}
   table.preclear thead tr>td+td{text-align:left;width:auto;padding-left:12px;}
+  table.preclear thead tr>td+td+td{text-align:center;}
+  table.preclear thead tr>td+td+td+td{text-align:right;}
+
   table.preclear tr>td{vertical-align:top;text-align:left;width:8%;padding-left:12px;padding-right:0;white-space:nowrap;}
   table.preclear tr>td+td{width:450px;}
-  table.preclear tr>td+td+td{width:8%;}
-  table.preclear tr>td+td+td+td{text-align:left;width:auto;padding-left:30px;}
-  table.preclear tr>td+td+td+td+td{text-align:right;padding-left:0;padding-right:12px;width: 5em;}
+  table.preclear tr>td+td+td{width:8%;text-align: center;}
+  table.preclear tr>td+td+td+td{text-align:right;width:8%;padding-left:15px;}
+  table.preclear tr>td+td+td+td+td{text-align:center;width:8%;padding-left:15px;}
+  table.preclear tr>td+td+td+td+td+td{text-align:right;padding-left:0;padding-right:12px;width: 5em;}
 
   button[type=button] {margin:0px 14px 0 14px;}
   i.glyphicon{margin:0px 5px 0 5px;}
@@ -75,8 +79,9 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
     <tr>
       <td>Device</td>
       <td>Identification</td>
-      <td>Temp</td>
+      <td>Temp.</td>
       <td>Size</td>
+      <td>Log</td>
       <td>Preclear Status</td>
     </tr>
   </thead>

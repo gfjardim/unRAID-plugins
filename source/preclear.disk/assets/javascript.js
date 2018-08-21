@@ -1,6 +1,6 @@
 var PreclearURL = '/plugins/'+plugin+'/Preclear.php'
 
-if (! $.prototype.tooltipsters)
+if (! $.tooltipster)
 {
   $("<link rel='stylesheet' type='text/css' href='/plugins/"+plugin+"/assets/tooltipster.bundle.hibrid.css'>").appendTo("head");
   $("<script type='text/javascript' src='/plugins/"+plugin+"/assets/tooltipster.bundle.min.js'>").appendTo("head");
@@ -93,9 +93,26 @@ function getPreclearContent()
   },'json').always(function()
   {
     timers.preclear = setTimeout('getPreclearContent()', 10000);
+  }).fail(function (jqXHR, textStatus, error)
+  {
+    if (jqXHR.status == 200)
+    {
+      updateCsrfToken();
+    }
   });
 }
 
+function updateCsrfToken()
+{
+  $.get(PreclearURL,{action: "get_csrf_token"}, function(response)
+  {
+    $.ajaxPrefilter(function(s, orig, xhr){
+      if (s.type.toLowerCase() == "post" && !s.crossDomain) {
+        s.data = s.data.replace(/csrf_token=.{16}/g, "csrf_token=" + response.csrf_token);
+      }
+    }); 
+  }, "json");
+}
 
 function openPreclear(serial)
 {
