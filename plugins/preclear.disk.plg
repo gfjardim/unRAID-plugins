@@ -17,7 +17,7 @@
 
 ###2018.08.22
 - Fix: make sure blkid file is created before retrieving dd pid
-- FIx: export syslog messages to predlear disk log
+- FIx: export syslog messages to preclear disk log
 
 ###2018.08.21c
 - Add: SMART info to preclear log
@@ -32,7 +32,7 @@
 
 ###2018.08.21
 - Fix: diskinfo PHP warnings
-- Fix: revert direcr I/O usage in dd invocation (reduced write performance)
+- Fix: revert direct I/O usage in dd invocation (reduced write performance)
 
 ###2018.08.20
 - Fix: increase verbosity of script.
