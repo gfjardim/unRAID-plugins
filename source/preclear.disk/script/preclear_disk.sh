@@ -440,6 +440,8 @@ write_disk(){
   # run dd command
   ( echo $BASHPID >$blkpid; eval "$dd_cmd"; echo $? >&3 ) 3>$dd_exit &
 
+  while [ ! -f "$blkpid" ]; do sleep 0.1; done
+
   # get pid of dd
   for i in $(seq 5); do
     dd_pid=$(ps --ppid $(<$blkpid) | awk '/dd/{print $1}')
@@ -792,6 +794,8 @@ read_entire_disk() {
     # cmp pid
     cmp_pid=$!
 
+    while [ ! -f "$blkpid" ]; do sleep 0.1; done
+
     # get pid of dd
     for i in $(seq 5); do
       dd_pid=$(ps --ppid $(<$blkpid) | awk '/dd/{print $1}')
@@ -832,6 +836,8 @@ read_entire_disk() {
     ( echo $BASHPID >$blkpid; $dd_cmd 2>$dd_output; echo $? >&3 ) 3>$dd_exit &
   fi
 
+  while [ ! -f "$blkpid" ]; do sleep 0.1; done
+  
   # get pid of dd
   for i in $(seq 5); do
     dd_pid=$(ps --ppid $(<$blkpid) | awk '/dd/{print $1}')
@@ -1474,7 +1480,24 @@ debug_smart()
   local disk=$1
   local smart=$2
   [ "$disable_smart" != "y" ] && save_smart_info $disk "$smart" "error"
-  while read l; do debug "S.M.A.R.T.: ${l}"; done < <(cat "${all_files[smart_prefix]}error" | column --separator '|' --table)
+  while read l; do 
+    debug "S.M.A.R.T.: ${l}"; 
+  done < <(cat "${all_files[smart_prefix]}error" | column --separator '|' --table)
+}
+
+debug_syslog()
+{
+  name=$(basename "$1")
+  ata=$(ls -n "/sys/block/${name}" |grep -Po 'ata\d+');
+  [ -n "$ata" ] && dev="${name}|${ata}[.:]" || dev="$name"
+
+  while read line; do
+    if [ $(echo "$line"|grep -c "disk_log") -gt 0 ]; then
+      continue;
+    fi
+    line=$(trim $(echo "$line" | cut -d':' -f4- ))
+    debug "syslog: $line"
+  done < <(grep -P "$dev" /var/log/syslog)
 }
 
 ######################################################
@@ -1931,6 +1954,7 @@ for cycle in $(seq $cycles); do
           echo -e "--> FAIL: Result: Pre-Read failed.\n\n"
           save_report "No - Pre-read verification failed." "$preread_speed" "$postread_speed" "$write_speed"
           debug_smart $theDisk "$smart_type"
+          debug_syslog $theDisk
           # rm "${all_files[resume_file]}"
           exit 1
         fi
@@ -1979,6 +2003,7 @@ for cycle in $(seq $cycles); do
           echo -e "--> FAIL: Result: Erasing the disk failed.\n\n"
           save_report "No - Erasing the disk failed." "$preread_speed" "$postread_speed" "$write_speed"
           debug_smart $theDisk "$smart_type"
+          debug_syslog $theDisk
           # rm "${all_files[resume_file]}"
           exit 1
         fi
@@ -2022,6 +2047,7 @@ for cycle in $(seq $cycles); do
         echo -e "--> FAIL: Result: ${title_write} the disk failed.\n\n"
         save_report "No - ${title_write} the disk failed." "$preread_speed" "$postread_speed" "$write_speed"
         debug_smart $theDisk "$smart_type"
+        debug_syslog $theDisk
         # rm "${all_files[resume_file]}"
         exit 1
       fi
@@ -2069,6 +2095,7 @@ for cycle in $(seq $cycles); do
           save_report  "No - unRAID's Preclear signature not valid." "$preread_speed" "$postread_speed" "$write_speed"
           rm "${all_files[resume_file]}"
           debug_smart $theDisk "$smart_type"
+          debug_syslog $theDisk
           exit 1
         fi
       else
@@ -2115,6 +2142,7 @@ for cycle in $(seq $cycles); do
           send_mail "FAIL! Post-Read verification failed." "FAIL! Post-Read verification failed." "Post-Read verification failed - Aborted" "" "alert"
           save_report "No - Post-Read verification failed." "$preread_speed" "$postread_speed" "$write_speed"
           debug_smart $theDisk "$smart_type"
+          debug_syslog $theDisk
           # rm "${all_files[resume_file]}"
           exit 1
         fi
@@ -2149,6 +2177,9 @@ for cycle in $(seq $cycles); do
     send_mail "Disk ${disk_properties[name]} PASSED cycle ${cycle}!" "${op_title}: Disk ${disk_properties[name]} PASSED cycle ${cycle}!" "$report_out"
   fi
 done
+
+# Save syslog messages to log file
+debug_syslog $theDisk
 
 echo "${disk_properties[name]}|NN|${op_title} Finished Successfully!|$$" > ${all_files[stat]};
 
@@ -2214,8 +2245,8 @@ if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 1 ]; then
 fi
 
 # debug
-debug "dd_out:\n $(cat ${all_files[dd_out]})"
-debug "dd_out:\n $(cat ${all_files[cmp_out]})"
+# debug "dd_out:\n $(cat ${all_files[dd_out]})"
+# debug "dd_out:\n $(cat ${all_files[cmp_out]})"
 
 save_report "Yes" "$preread_speed" "$postread_speed" "$write_speed"
 
