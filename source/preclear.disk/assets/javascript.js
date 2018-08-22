@@ -93,25 +93,22 @@ function getPreclearContent()
   },'json').always(function()
   {
     timers.preclear = setTimeout('getPreclearContent()', 10000);
-  }).fail(function (jqXHR, textStatus, error)
-  {
-    if (jqXHR.status == 200)
-    {
-      updateCsrfToken();
-    }
-  });
+  }).fail(updateCsrfToken);
 }
 
-function updateCsrfToken()
+function updateCsrfToken(jqXHR, textStatus, error)
 {
-  $.get(PreclearURL,{action: "get_csrf_token"}, function(response)
+  if (jqXHR.status == 200)
   {
-    $.ajaxPrefilter(function(s, orig, xhr){
-      if (s.type.toLowerCase() == "post" && !s.crossDomain) {
-        s.data = s.data.replace(/csrf_token=.{16}/g, "csrf_token=" + response.csrf_token);
-      }
-    }); 
-  }, "json");
+    $.get(PreclearURL,{action: "get_csrf_token"}, function(response)
+    {
+      $.ajaxPrefilter(function(s, orig, xhr){
+        if (s.type.toLowerCase() == "post" && !s.crossDomain) {
+          s.data = s.data.replace(/csrf_token=.{16}/g, "csrf_token=" + response.csrf_token);
+        }
+      }); 
+    }, "json");
+  }
 }
 
 function openPreclear(serial)
@@ -232,7 +229,7 @@ function startPreclear(serial)
               {
                 window.location=window.location.pathname+window.location.hash;
               }
-            );
+            ).fail(updateCsrfToken);
 
       swal.close();
 
@@ -248,7 +245,7 @@ function startPreclear(serial)
 function stopPreclear(serial, ask)
 {
   var title = 'Stop Preclear';
-  var exec  = '$.post(PreclearURL,{action:"stop_preclear",serial:"'+serial+'"}).always(function(){window.location=window.location.pathname+window.location.hash});'
+  var exec  = '$.post(PreclearURL,{action:"stop_preclear",serial:"'+serial+'"}).always(function(){window.location=window.location.pathname+window.location.hash}).fail(updateCsrfToken);'
 
   if (ask != "ask")
   {
@@ -458,8 +455,7 @@ function rmReport(file, el)
       }
       $(el).parent().remove();
     }
-
-  });
+  }).fail(updateCsrfToken);
 }
 
 function get_tab_title_by_name(name) {
@@ -578,7 +574,7 @@ function getResumablePreclear(serial)
           swal.close();
           setTimeout(startPreclear, 300, serial);
         }
-      });
+      }).fail(updateCsrfToken);
     }
     else
     {

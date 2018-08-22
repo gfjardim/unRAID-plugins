@@ -68,10 +68,6 @@ trim() {
   echo -n "$var"
 }
 
-debug() {
-  cat <<< "$(date +"%b %d %T" ) ${log_prefix} $@" >> /var/log/preclear.disk.log
-}
-
 list_unraid_disks(){
   local _result=$1
   local i=0
@@ -1473,6 +1469,14 @@ save_report() {
 EOF
 }
 
+debug_smart()
+{
+  local disk=$1
+  local smart=$2
+  [ "$disable_smart" != "y" ] && save_smart_info $disk "$smart" "error"
+  while read l; do debug "S.M.A.R.T.: ${l}"; done < <(cat "${all_files[smart_prefix]}error" | column --separator '|' --table)
+}
+
 ######################################################
 ##                                                  ##
 ##                  PARSE OPTIONS                   ##
@@ -1926,6 +1930,7 @@ for cycle in $(seq $cycles); do
           send_mail "FAIL! Pre-read verification failed." "FAIL! Pre-read verification failed." "Pre-read verification failed - Aborted" "" "alert"
           echo -e "--> FAIL: Result: Pre-Read failed.\n\n"
           save_report "No - Pre-read verification failed." "$preread_speed" "$postread_speed" "$write_speed"
+          debug_smart $theDisk "$smart_type"
           # rm "${all_files[resume_file]}"
           exit 1
         fi
@@ -1973,6 +1978,7 @@ for cycle in $(seq $cycles); do
           send_mail "FAIL! Erasing the disk failed." "FAIL! Erasing the disk failed." "Erasing the disk failed - Aborted" "" "alert"
           echo -e "--> FAIL: Result: Erasing the disk failed.\n\n"
           save_report "No - Erasing the disk failed." "$preread_speed" "$postread_speed" "$write_speed"
+          debug_smart $theDisk "$smart_type"
           # rm "${all_files[resume_file]}"
           exit 1
         fi
@@ -2015,6 +2021,7 @@ for cycle in $(seq $cycles); do
         send_mail "FAIL! ${title_write} the disk failed." "FAIL! ${title_write} the disk failed." "${title_write} the disk failed - Aborted" "" "alert"
         echo -e "--> FAIL: Result: ${title_write} the disk failed.\n\n"
         save_report "No - ${title_write} the disk failed." "$preread_speed" "$postread_speed" "$write_speed"
+        debug_smart $theDisk "$smart_type"
         # rm "${all_files[resume_file]}"
         exit 1
       fi
@@ -2061,6 +2068,7 @@ for cycle in $(seq $cycles); do
           send_mail "FAIL! unRAID's signature on the MBR failed." "FAIL! unRAID's signature on the MBR failed." "unRAID's signature on the MBR failed - Aborted" "" "alert"
           save_report  "No - unRAID's Preclear signature not valid." "$preread_speed" "$postread_speed" "$write_speed"
           rm "${all_files[resume_file]}"
+          debug_smart $theDisk "$smart_type"
           exit 1
         fi
       else
@@ -2106,6 +2114,7 @@ for cycle in $(seq $cycles); do
           echo "${disk_properties[name]}|NY|Post-Read verification failed - Aborted|$$" > ${all_files[stat]}
           send_mail "FAIL! Post-Read verification failed." "FAIL! Post-Read verification failed." "Post-Read verification failed - Aborted" "" "alert"
           save_report "No - Post-Read verification failed." "$preread_speed" "$postread_speed" "$write_speed"
+          debug_smart $theDisk "$smart_type"
           # rm "${all_files[resume_file]}"
           exit 1
         fi
@@ -2120,6 +2129,7 @@ for cycle in $(seq $cycles); do
   # Add current SMART status to display_smart
   [ "$disable_smart" != "y" ] && output_smart $theDisk "$smart_type"
   display_status '' ''
+  debug_smart $theDisk "$smart_type"
 
   # Send end of the cycle notification
   if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 2 ]; then
