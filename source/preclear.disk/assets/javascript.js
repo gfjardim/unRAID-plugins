@@ -125,7 +125,7 @@ function openPreclear(serial)
 function toggleScript(el, serial)
 {
   window.scope = $(el).val();
-  $( "#preclear-dialog" ).dialog( "close" );
+ 
   startPreclear( serial );
 }
 
