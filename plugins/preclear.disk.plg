@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2018.08.23">
+<!ENTITY version   "2018.08.27">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,10 @@
 
 <CHANGES>
 ##&name;
+
+###2018.08.27
+- Fix: change 'direct' iflag option to 'nocache' - apparently some hdds don't like it
+- Fix: only export initial smart status if not resuming
 
 ###2018.08.23
 - Fix: not toggling between preclear scripts
@@ -542,7 +546,8 @@ find /var/log/packages -type f -iname "&name;-*" -delete
 rm -rf /boot/config/plugins/&name; \
        /usr/local/emhttp/plugins/&name; \
        /var/state/&name; \
-       /boot/.preclear/
+       /boot/.preclear/ \
+       /tmp/.preclear
 
 # Remove diskinfo
 rm /etc/cron.d/diskinfo
@@ -555,7 +560,7 @@ echo ""
 echo "-----------------------------------------------------------"
 echo " &name; has been uninstalled."
 echo " Please reboot your server to complete uninstall this plugin."
-echo " Copyright 2015-2017, gfjardim"
+echo " Copyright 2015-2018, gfjardim"
 echo " Version: &version;"
 echo "-----------------------------------------------------------"
 echo ""

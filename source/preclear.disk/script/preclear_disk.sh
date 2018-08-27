@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="0.9.7a-beta"
+version="0.9.7b-beta"
 
 # PID
 script_pid=$BASHPID
@@ -785,7 +785,7 @@ read_entire_disk() {
 
     # Verify the beginning of the disk skipping the MBR
     debug "${read_type_s}: verifying the beggining of the disk."
-    dd_cmd="dd if=$disk bs=512 count=4095 skip=1 conv=notrunc iflag=direct"
+    dd_cmd="dd if=$disk bs=512 count=4095 skip=1 conv=notrunc iflag=nocache"
     debug "${read_type_s}: $dd_cmd  2>$dd_output | cmp - /dev/zero &>$cmp_output"
 
     # exec dd/compare command
@@ -1852,8 +1852,10 @@ is_current_op() {
 # reset timer
 all_timer=$(( $(date '+%s') - $all_timer_diff ))
 
-# Export initial SMART status
-[ "$disable_smart" != "y" ] && save_smart_info $theDisk "$smart_type" "cycle_initial_start"
+if [ -z "$current_op" ] || [ ! -f "${all_files[smart_prefix]}cycle_initial_start" ]; then
+  # Export initial SMART status
+  [ "$disable_smart" != "y" ] && save_smart_info $theDisk "$smart_type" "cycle_initial_start"
+fi
 
 # Add current SMART status to display_smart
 [ "$disable_smart" != "y" ] && compare_smart "cycle_initial_start"
