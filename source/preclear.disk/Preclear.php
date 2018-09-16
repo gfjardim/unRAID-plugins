@@ -157,7 +157,7 @@ switch ($_POST['action'])
           $footer = base64_encode("<span>${disk['SERIAL']} - ${disk['SIZE_H']} (${disk['NAME']})</span><br><span style='float:right;'>$status</span>");
           $footer = "<a class='tooltip-toggle-html exec' id='preclear_footer_${disk['SERIAL_SHORT']}' title=' ' data='${footer}'><img src='/plugins/preclear.disk/icons/precleardisk.png'></a>";
           $all_status[$disk['SERIAL_SHORT']]["footer"] = $footer;
-          $all_status[$disk['SERIAL_SHORT']]["footer"] = "<span>${disk['SERIAL']} - ${disk['SIZE_H']} (${disk['NAME']})</span><br><span style='float:right;'>$status</span>";
+          $all_status[$disk['SERIAL_SHORT']]["footer"] = "<span>${disk['SERIAL']} (${disk['NAME']}) <br> Size: ${disk['SIZE_H']} | Temp: ". my_temp($disk['TEMP']) ."</span><br><span style='float:right;'>$status</span>";
           $all_status[$disk['SERIAL_SHORT']]["status"] = $status;
         }
         else

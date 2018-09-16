@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="0.9.8-beta"
+version="0.9.7b-beta"
 
 # PID
 script_pid=$BASHPID
@@ -368,7 +368,6 @@ write_disk(){
   local disk_name=${disk_properties[name]}
   local disk_blocks=${disk_properties[blocks]}
   local disk_bytes=${disk_properties[size]}
-  local last_progress=0
   local pause=${all_files[pause]}
   local paused_file=n
   local paused_smart=n
@@ -376,7 +375,6 @@ write_disk(){
   local percent_wrote
   local percent_pause=0
   local short_test=$short_test
-  local skip_initial=0
   local stat_file=${all_files[stat]}
   local tb_formatted
   local total_bytes
@@ -384,7 +382,6 @@ write_disk(){
   local time_start
   local display_pid=0
   local write_bs=2097152
-  local write_type_v
 
   local write_type=$1
   local initial_bytes=$2
@@ -416,44 +413,43 @@ write_disk(){
   if [ "$resume_seek" -gt "$write_bs" ]; then
     resume_seek=$(($resume_seek - $write_bs))
     debug "Continuing disk write on byte $resume_seek"
-    skip_initial=1
   fi
   dd_seek="seek=$resume_seek count=$(( $total_bytes - $resume_seek ))"
 
   # Print-formatted bytes
   tb_formatted=$(format_number $total_bytes)
 
-
   # Type of write: zero or erase (random data)
   if [ "$write_type" == "zero" ]; then
     write_type_s="Zeroing"
-    write_type_v="zeroed"
     device="/dev/zero"
-    dd_cmd="dd if=$device of=$disk bs=$write_bs $dd_seek $dd_flags"
-
+    dd_cmd="dd if=$device of=$disk bs=$write_bs $dd_seek $dd_flags 2>$dd_output"
   else
     write_type_s="Erasing"
-    write_type_v="erased"
     device="/dev/urandom"
     pass=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 -w 0)
-    openssl_cmd="openssl enc -aes-256-ctr -pass pass:'${pass}' -nosalt"
-    debug "${write_type_s}: openssl enc -aes-256-ctr -pass pass:'******' -nosalt < /dev/zero > ${all_files[fifo]}"
-    $openssl_cmd < /dev/zero > ${all_files[fifo]} 2>/dev/null &
-
-    dd_cmd="dd if=${all_files[fifo]} of=${disk} bs=${write_bs} $dd_seek $dd_flags iflag=fullblock"
+    dd_cmd="openssl enc -aes-256-ctr -pass pass:'${pass}' -nosalt < /dev/zero 2>/dev/null | dd of=${disk} bs=${write_bs} $dd_seek $dd_flags iflag=fullblock 2>$dd_output"
   fi
 
-  if [ "$skip_initial" -eq 0 ]; then
-    # Empty the MBR partition table
-    debug "${write_type_s}: emptying the MBR."
-    dd if=$device bs=$write_bs count=1 of=$disk >/dev/null 2>&1
-    blockdev --rereadpt $disk
-  fi
+  # Empty the MBR partition table
+  dd if=$device bs=$write_bs count=1 of=$disk >/dev/null 2>&1
+  blockdev --rereadpt $disk
 
-  # running dd
   debug "${write_type_s}: $dd_cmd"
-  $dd_cmd 2>$dd_output & dd_pid=$!
-  debug "${write_type_s}: dd pid [$dd_pid]"
+
+  # run dd command
+  ( echo $BASHPID >$blkpid; eval "$dd_cmd"; echo $? >&3 ) 3>$dd_exit &
+
+  while [ ! -f "$blkpid" ]; do sleep 0.1; done
+
+  # get pid of dd
+  for i in $(seq 5); do
+    dd_pid=$(ps --ppid $(<$blkpid) | awk '/dd/{print $1}')
+    if [ -n "$dd_pid" ]; then
+      debug "${write_type_s}: dd pid [$dd_pid]"
+      break;
+    fi
+  done
 
   # if we are interrupted, kill the background zeroing of the disk.
   trap 'kill -9 $dd_pid 2>/dev/null;exit' EXIT
@@ -586,16 +582,9 @@ write_disk(){
       send_mail "${write_type_s} in Progress on ${disk_name}." "${write_type_s} in Progress on ${disk_name}: ${percent_wrote}% @ ${current_speed}. Temp: ${disktemp}. Cycle ${cycle} of ${cycles}." "${report_out}"
       let next_notify=($next_notify + 25)
     fi
-
-    if (( $percent_wrote % 5 == 0 )) && [ "$last_progress" -ne $percent_wrote ]; then
-      debug "${write_type_s}: progress - ${percent_wrote}% $write_type_v"
-      last_progress=$percent_wrote
-    fi
-
   done
 
-  wait $dd_pid
-  dd_exit_code=$?
+  dd_exit_code=$(<$dd_exit)
 
   bytes_dd=$(awk 'END{print $1}' $dd_output|xargs)
   if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
@@ -706,11 +695,10 @@ save_current_status() {
 
 read_entire_disk() { 
   local average_speed bytes_dd current_speed count disktemp dd_cmd resume_skip report_out status tb_formatted
-  local skip_b1 skip_b2 skip_b3 skip_p1 skip_p2 skip_p3 skip_p4 skip_p5 time_start time_current read_type_s read_type_t read_type_v total_bytes
+  local skip_b1 skip_b2 skip_b3 skip_p1 skip_p2 skip_p3 skip_p4 skip_p5 time_start time_current read_type_s read_type_t total_bytes
   local blkpid=${all_files[blkpid]}
   local bytes_read=0
   local bytes_dd_current=0
-  local cmp_exit_status=0
   local cmp_output=${all_files[cmp_out]}
   local cycle=$cycle
   local cycles=$cycles
@@ -724,7 +712,6 @@ read_entire_disk() {
   local disk=${disk_properties[device]}
   local disk_name=${disk_properties[name]}
   local disk_blocks=${disk_properties[blocks_512]}
-  local last_progress=0
   local pause=${all_files[pause]}
   local paused_file=n
   local paused_smart=n
@@ -770,22 +757,18 @@ read_entire_disk() {
     debug "Continuing disk read from byte $resume_skip"
     skip_initial=1
   fi
-
   dd_skip="skip=$resume_skip count=$(( $total_bytes - $resume_skip ))"
 
   # Type of read: Pre-Read or Post-Read
   if [ "$read_type" == "preread" ]; then
     read_type_t="Pre-read in progress:"
     read_type_s="Pre-Read"
-    read_type_v="read"
   elif [ "$read_type" == "postread" ]; then
     read_type_t="Post-Read in progress:"
     read_type_s="Post-Read"
-    read_type_v="verified"
   else
     read_type_t="Verifying if disk is zeroed:"
     read_type_s="Verify Zeroing"
-    read_type_v="verified"
     read_stress=n
   fi
 
@@ -802,28 +785,36 @@ read_entire_disk() {
   # Start the disk read
   if [ "$verify" == "verify" ]; then
 
-    if [ "$skip_initial" -eq 0 ]; then
+    if [ "$skip_initial"-eq 0 ]; then
       # Verify the beginning of the disk skipping the MBR
       debug "${read_type_s}: verifying the beggining of the disk."
-      cmp_cmd="cmp ${all_files[fifo]} /dev/zero"
-      debug "${read_type_s}: $cmp_cmd"
-
-      dd_cmd="dd if=$disk of=${all_files[fifo]} count=$(( $read_bs - 512 )) skip=512 $dd_flags"
-      debug "${read_type_s}: $dd_cmd"
+      dd_cmd="dd if=$disk count=$(( $read_bs - 512 )) skip=512 $dd_flags"
+      debug "${read_type_s}: $dd_cmd  2>$dd_output | cmp - /dev/zero &>$cmp_output"
 
       # exec dd/compare command
-      $cmp_cmd &> $cmp_output & cmp_pid=$!
-      sleep 1
-      $dd_cmd 2> $dd_output & dd_pid=$!
+      ( echo $BASHPID >$blkpid; $dd_cmd 2>$dd_output; echo $? >&3 ) 3>$dd_exit | cmp - /dev/zero &>$cmp_output &
 
-      wait $dd_pid
-      dd_exit=$?
+      # cmp pid
+      cmp_pid=$!
+
+      while [ ! -f "$blkpid" ]; do sleep 0.1; done
+
+      # get pid of dd
+      for i in $(seq 5); do
+        dd_pid=$(ps --ppid $(<$blkpid) | awk '/dd/{print $1}')
+        if [ -n "$dd_pid" ]; then
+          debug "${read_type_s}: dd pid [$dd_pid]"
+          break;
+        fi
+      done
+
+      while [ -d "/proc/$dd_pid" ]; do continue; done
 
       # Fail if not zeroed or error
       if grep -q "differ" "$cmp_output" &>/dev/null; then
         debug "${read_type_s}: fail - beggining of the disk not zeroed"
         return 1
-      elif test $dd_exit -ne 0; then
+      elif test $(<$dd_exit) -ne 0; then
         debug "${read_type_s}: dd command failed -> $(cat $dd_output)"
         return 1
       fi
@@ -831,28 +822,36 @@ read_entire_disk() {
     
     # Verify the rest of the disk
     debug "${read_type_s}: verifying the rest of the disk."
-    cmp_cmd="cmp ${all_files[fifo]} /dev/zero"
-    debug "${read_type_s}: $cmp_cmd"
-    dd_cmd="dd if=$disk of=${all_files[fifo]} bs=$read_bs $dd_skip $dd_flags"
-    debug "${read_type_s}: $dd_cmd"
+    dd_cmd="dd if=$disk bs=$read_bs $dd_skip $dd_flags"
+    cmp_cmd="cmp - /dev/zero"
+    debug "${read_type_s}: $dd_cmd 2>$dd_output | $cmp_cmd &>$cmp_output"
 
     # exec dd/compare command
-    $cmp_cmd &> $cmp_output & cmp_pid=$!
-    sleep 1
-    $dd_cmd 2> $dd_output & dd_pid=$!
+    ( echo $BASHPID >$blkpid; $dd_cmd 2>$dd_output; echo $? >&3 ) 3>$dd_exit | $cmp_cmd &>$cmp_output &
+
+    # cmp pid
+    cmp_pid=$!
 
   else
-    if [ "$skip_initial" -eq 0 ]; then
-      dd_skip="skip=0 count=$total_bytes"
-    fi
-
     dd_cmd="dd if=$disk of=/dev/null bs=$read_bs $dd_skip $dd_flags"
     debug "${read_type_s}: $dd_cmd"
 
     # exec dd command
-    $dd_cmd 2>$dd_output &
-    dd_pid=$!
+    ( echo $BASHPID >$blkpid; $dd_cmd 2>$dd_output; echo $? >&3 ) 3>$dd_exit &
   fi
+
+  while [ ! -f "$blkpid" ]; do sleep 0.1; done
+  
+  # get pid of dd
+  for i in $(seq 5); do
+    dd_pid=$(ps --ppid $(<$blkpid) | awk '/dd/{print $1}')
+    if [ -n "$dd_pid" ]; then
+      debug "${read_type_s}: dd pid [$dd_pid]"
+      break;
+    else
+      sleep 1
+    fi
+  done
 
   if [ -z "$dd_pid" ]; then
     debug "${read_type_s}: dd command failed -> $(cat $dd_output)"
@@ -1025,28 +1024,12 @@ read_entire_disk() {
       paused_sync=n
     fi
 
-    if (( $percent_read  % 5 == 0 )) && [ "$last_progress" -ne $percent_read ]; then
-      debug "${read_type_s}: progress - ${percent_read}% $read_type_v"
-      last_progress=$percent_read
-    fi
   done
 
-  wait $dd_pid
-  dd_exit_code=$?
-
-  # Verify status
-  if [ "$verify" == "verify" ]; then
-    if grep -q "differ" "$cmp_output" &>/dev/null; then
-      debug "${read_type_s}: cmp command failed - disk not zeroed"
-      cmp_exit_status=1
-    fi
-  fi
+  dd_exit_code=$(<$dd_exit)
 
   # Wait last display refresh
-  for i in $(seq 30); do
-    if ! kill -0 $display_pid &>/dev/null; then
-      break
-    fi
+  while kill -0 $display_pid &>/dev/null; do
     sleep 1
   done
 
@@ -1068,8 +1051,11 @@ read_entire_disk() {
 
 
   # Fail if not zeroed or error
-  if [ "$cmp_exit_status" -ne 0 ]; then
-    return 1
+  if [ "$verify" == "verify" ]; then
+    if grep -q "differ" "$cmp_output" &>/dev/null; then
+      debug "${read_type_s}: fail - disk not zeroed"
+      return 1
+    fi
   fi
 
   # Send final notification
@@ -1694,7 +1680,6 @@ append all_files 'dd_out'        "${all_files[dir]}/dd_output"
 append all_files 'dd_exit'       "${all_files[dir]}/dd_exit_code"
 append all_files 'cmp_out'       "${all_files[dir]}/cmp_out"
 append all_files 'blkpid'        "${all_files[dir]}/blkpid"
-append all_files 'fifo'          "${all_files[dir]}/fifo"
 append all_files 'pause'         "${all_files[dir]}/pause"
 append all_files 'verify_errors' "${all_files[dir]}/verify_errors"
 append all_files 'pid'           "${all_files[dir]}/pid"
@@ -1707,9 +1692,6 @@ append all_files 'resume_file'   "/boot/config/plugins/preclear.disk/${disk_prop
 
 mkdir -p "${all_files[dir]}"
 # trap "rm -rf ${all_files[dir]}" EXIT;
-if [ ! -p "${all_files[fifo]}" ]; then
-  mkfifo "${all_files[fifo]}" || exit
-fi
 
 # Set terminal variables
 if [ "$format_html" == "y" ]; then

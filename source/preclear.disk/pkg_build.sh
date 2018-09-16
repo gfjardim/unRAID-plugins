@@ -23,7 +23,9 @@ sed -i -e "s#\(ENTITY\s*version[^\"]*\).*#\1\"${VERSION}\">#" "$PLG_FILE"
 
 mkdir -p "${DESTDIR}/"
 cd "$DIR"
-cp --parents -f $(find . -type f ! \( -iname "pkg_build.sh" -o -iname "sftp-config.json" -o -iname ".DS_Store"  \) ) "${DESTDIR}/"
+while read f; do
+  cp --parents -f "$f" "${DESTDIR}/"
+done < <(find . -type f ! \( -iname "pkg_build.sh" -o -iname "sftp-config.json" -o -iname ".DS_Store"  \) )
 cd "$TMPDIR/"
 makepkg -l y -c y "${PACKAGE}"
 cd "$ARCHIVE/"
