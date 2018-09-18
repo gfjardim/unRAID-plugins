@@ -582,3 +582,11 @@ function getResumablePreclear(serial)
     }
   }, "json");
 }
+
+function resumePreclear(disk)
+{
+  $.post(PreclearURL,{action:'resume_preclear', disk:disk}, function(data)
+  {
+    getPreclearContent();
+  }).fail(updateCsrfToken);
+}

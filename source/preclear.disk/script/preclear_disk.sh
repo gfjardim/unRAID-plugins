@@ -63,6 +63,9 @@ done
 
 trim() {
   local var="$*"
+  if [ -z "$var" ]; then
+    read var;
+  fi
   var="${var#"${var%%[![:space:]]*}"}"   # remove leading whitespace characters
   var="${var%"${var##*[![:space:]]}"}"   # remove trailing whitespace characters
   echo -n "$var"
@@ -468,7 +471,7 @@ write_disk(){
   while kill -0 $dd_pid &>/dev/null; do
     sleep 5 && kill -USR1 $dd_pid 2>/dev/null && sleep 5
     # Calculate the current status
-    bytes_dd=$(awk 'END{print $1}' $dd_output|xargs)
+    bytes_dd=$(awk 'END{print $1}' $dd_output|trim)
 
     # Ensure bytes_wrote is a number
     if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
@@ -485,7 +488,7 @@ write_disk(){
     fi
     time_current=$(timer)
 
-    current_speed=$(awk -F',' 'END{print $NF}' $dd_output|xargs)
+    current_speed=$(awk -F',' 'END{print $NF}' $dd_output|trim)
     average_speed=$(($bytes_wrote / ($time_current - $time_start) / 1000000 ))
 
     status="Time elapsed: $(timer $time_start) | Write speed: $current_speed | Average speed: $average_speed MB/s"
@@ -597,7 +600,7 @@ write_disk(){
   wait $dd_pid
   dd_exit_code=$?
 
-  bytes_dd=$(awk 'END{print $1}' $dd_output|xargs)
+  bytes_dd=$(awk 'END{print $1}' $dd_output|trim)
   if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
     bytes_wrote=$(( $bytes_dd + $resume_seek ))
   fi
@@ -637,7 +640,7 @@ write_disk(){
 }
 
 format_number() {
-  echo " $1 " | sed -r ':L;s=\b([0-9]+)([0-9]{3})\b=\1,\2=g;t L'|xargs
+  echo " $1 " | sed -r ':L;s=\b([0-9]+)([0-9]{3})\b=\1,\2=g;t L'|trim
 }
 
 # Keep track of the elapsed time of the preread/clear/postread process
@@ -907,7 +910,7 @@ read_entire_disk() {
     sleep 5 && kill -USR1 $dd_pid 2>/dev/null && sleep 5
 
     # Calculate the current status
-    bytes_dd=$(awk 'END{print $1}' $dd_output|xargs)
+    bytes_dd=$(awk 'END{print $1}' $dd_output|trim)
 
     # Ensure bytes_read is a number
     if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
@@ -921,7 +924,7 @@ read_entire_disk() {
 
     time_current=$(timer)
 
-    current_speed=$(awk -F',' 'END{print $NF}' $dd_output|xargs)
+    current_speed=$(awk -F',' 'END{print $NF}' $dd_output|trim)
     average_speed=$(($bytes_read / ($time_current - $time_start) / 1000000 ))
 
     status="Time elapsed: $(timer $time_start) | Current speed: $current_speed | Average speed: $average_speed MB/s"
@@ -1050,7 +1053,7 @@ read_entire_disk() {
     sleep 1
   done
 
-  bytes_dd=$(awk 'END{print $1}' $dd_output|xargs)
+  bytes_dd=$(awk 'END{print $1}' $dd_output|trim)
   if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
     bytes_read=$(( $bytes_dd + $resume_skip ))
   fi
@@ -1588,7 +1591,7 @@ if [ ! -b "$1" ]; then
   exit 1
 fi
 
-theDisk=$(echo $1|xargs)
+theDisk=$(echo $1|trim)
 
 debug "Command: $command"
 debug "Preclear Disk Version: ${version}"

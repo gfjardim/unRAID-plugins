@@ -370,6 +370,14 @@ switch ($_POST['action'])
     else
       {echo json_encode(["resume" => false]);}
     break;
+
+  case 'resume_preclear':
+    $disk = $_POST['disk'];
+    $file = "/tmp/.preclear/${disk}/pause";
+    if (file_exists($file))
+    {
+      unlink($file);
+    }
 }
 
 
