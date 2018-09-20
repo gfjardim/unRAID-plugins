@@ -20,7 +20,9 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
 <?endif;?>
 
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/glyphicons.css">
+<? if (file_exists("/plugins/${plugin}/assets/style-${display['theme']}.css")): ?>
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/style-<?=$display['theme'];?>.css">
+<? endif;?>
 <script type="text/javascript">
 
   <?=$Preclear->Script();?>

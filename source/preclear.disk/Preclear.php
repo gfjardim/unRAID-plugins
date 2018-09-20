@@ -115,7 +115,7 @@ switch ($_POST['action'])
         $serial    = $disk['SERIAL'];
         $temp      = $disk['TEMP'] ? my_temp($disk['TEMP']) : "*";
         $mounted   = $disk["MOUNTED"];
-        $reports   = is_dir("/boot/preclear_reports") ? listDir("/boot/preclear_reports") : [];
+        $reports   = is_dir("/boot/preclear_reports") ? glob("/boot/preclear_reports/*.txt") : [];
         $reports   = array_filter($reports, function ($report) use ($disk)
                                   {
                                     return preg_match("|".$disk["SERIAL_SHORT"]."|", $report) && ( preg_match("|_report_|", $report) || preg_match("|_rpt_|", $report) ); 

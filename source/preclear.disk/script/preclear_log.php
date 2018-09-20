@@ -55,24 +55,6 @@ $(function()
   var curr_index = 0;
   var last_index = 0;
 
-// $.ajax({
-//   type: 'POST',
-//   url: "/plugins/preclear.disk/script/preclear_log.php", // arquivo de envio dos emails
-//   data: {"disk":"sdi", "csrf_token": "9DB26ECD1CF5F2C6"},
-//   xhrFields: {
-//     onprogress: function(e) {
-//       var data = e.currentTarget.response;
-//       var atual = data.slice((data.lastIndexOf('|') + 1));
-//       console.log(atual);
-//     }
-//   },
-//   success: function(data) {
-//     console.log(data); // resultado final
-//   },
-//   error: function(data) {
-//     alert(data.responseText);
-//   }
-// });
   pi = 0;
   ps = 0;
   $.ajax({
@@ -170,7 +152,6 @@ while(connection_aborted() == 0)
     $span = "span class='syslog'";
     foreach ($match as $type) foreach ($type['text'] as $text) if (preg_match("/$text/i",$line)) {$span = "span class='{$type['class']} syslog'"; break 2;}
     echo "<$span>".htmlspecialchars(trim($line))."</span><br>";
-    sleep(0.1);
   }
 
   $line = fgets($handler2);
@@ -180,17 +161,10 @@ while(connection_aborted() == 0)
     $span = "span class='plugin'";
     foreach ($match as $type) foreach ($type['text'] as $text) if (preg_match("/$text/i",$line)) {$span = "span class='{$type['class']} plugin' "; break 2;}
     echo "<$span>".htmlspecialchars(trim($line))."</span><br>";
-    sleep(0.1);
   }
   sleep(0.1);
 }
 pclose(handler1);
 pclose(handler2);
-
-
-
-
-
-
 
 ?>
