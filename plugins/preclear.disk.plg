@@ -438,7 +438,7 @@ else
   version="unknown"
 fi
 
-ncurses=$(ls /var/log/packages/ | grep -Po 'ncurses-\K[\d\.]*')
+ncurses=$(ls /var/log/packages/ | grep -Po 'ncurses-\K[\d\.]*' | head -1)
 
 case $ncurses in
   '5.9')
