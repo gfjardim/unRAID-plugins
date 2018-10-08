@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2018.09.20">
+<!ENTITY version   "2018.10.07">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,12 @@
 
 <CHANGES>
 ##&name;
+
+###2018.10.07
+- Fix: remove glyphicon fount dependency
+- Fix: vshift in title banners on 6.6.1
+- Fix: install full ncurse package depending on stripped version installed (no GCC version dependant)
+- Fix: bump preclear script to 1.0.0 (first main version)
 
 ###2018.09.20
 - Fix: Unraid 6.6 - black theme dropdown ui displaying white-on-white text
@@ -432,35 +438,29 @@ else
   version="unknown"
 fi
 
-gcc_version=$(cat /proc/version|grep -Po 'gcc version \K[\d.]*')
+ncurses=$(ls /var/log/packages/ | grep -Po 'ncurses-\K[\d\.]*')
 
-case $gcc_version in
-  '5.3.0'|'5.4.0'|'7.1.0')
+case $ncurses in
+  '5.9')
+    download_install ncurses-5.9-x86_64-4.txz c2d2b01f021dc2f4752c4fff02f65fd5
     download_install libevent-2.0.22-x86_64-1.txz 7a755ece3e378f244a3c327369e7f2ac
     download_install tmux-2.2-x86_64-2.txz a268019858c88d5f2f702d9fc182a37c
-    download_install ncurses-5.9-x86_64-4.txz c2d2b01f021dc2f4752c4fff02f65fd5
     download_install utempter-1.1.6-x86_64-2.txz aed1f39d4a5acddb225b542145e0eeaf
   ;;
-  '7.2.0')
+  '6.0')
     download_install ncurses-6.0-x86_64-3.txz c04358fd7d7cb0b5ca67f215871f3692
     download_install libevent-2.1.8-x86_64-1.txz 9ba9d61dcd90d45719d27b9e7a111913
     download_install tmux-2.5-x86_64-1.txz a48783401331620b7c7e5d7af58f53db
     download_install utempter-1.1.6-x86_64-2.txz aed1f39d4a5acddb225b542145e0eeaf
   ;;
-  '7.3.0')
-    download_install libevent-2.1.8-x86_64-1.txz 9ba9d61dcd90d45719d27b9e7a111913
-    download_install tmux-2.6-x86_64-1.txz f1619312e255de8fe4e04b4c3efbc453
+  '6.1')
     download_install ncurses-6.1_20180324-x86_64-1.txz 96ebaee8f6a62f220dbdf4723a81e535
-    download_install utempter-1.1.6-x86_64-2.txz aed1f39d4a5acddb225b542145e0eeaf
-  ;;
-  '8.1.1')
     download_install libevent-2.1.8-x86_64-1.txz 9ba9d61dcd90d45719d27b9e7a111913
-    download_install ncurses-6.1_20180616-x86_64-1.txz 471139514664b4ffb48c739bb6bf5dbe
     download_install tmux-2.7-x86_64-1.txz a4a7fdd5ff9910bee3477a2aa0e5fa25
     download_install utempter-1.1.6-x86_64-2.txz aed1f39d4a5acddb225b542145e0eeaf
   ;;
   *)
-    echo "unRAID version ($version - GCC $gcc_version) not supported."
+    echo "unRAID version ($version) not supported."
     exit 1;
   ;;
 esac

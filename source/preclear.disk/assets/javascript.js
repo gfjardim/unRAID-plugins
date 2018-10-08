@@ -78,7 +78,7 @@ function getPreclearContent()
       $.each(data.status, function(i,v)
       {
         var target = $("#preclear_"+i);
-        $("#preclear_"+i).html("<i class='glyphicon glyphicon-dashboard hdd'></i><span style='margin-left: 0px;'></span>"+v.status);
+        $("#preclear_"+i).html("<i class='fa fa-tachometer hdd'></i><span style='margin-left: 0px;'></span>"+v.status);
       });
     }
     $.each(hovered, function(k,v){ if(v.length) { $("#"+v).trigger("mouseenter");} });
@@ -113,7 +113,7 @@ function updateCsrfToken(jqXHR, textStatus, error)
 
 function openPreclear(serial)
 {
-  var width   = 985;
+  var width   = 1000;
   var height  = 730;
   var top     = (screen.height-height)/2;
   var left    = (screen.width-width)/2;
@@ -406,11 +406,11 @@ function toggleReports(opened)
       {
         if ( $("div.toggle-"+disk+":first").is(":visible") )
         {
-          elem.find(".glyphicon-append").addClass("glyphicon-minus-sign").removeClass("glyphicon-plus-sign");
+          elem.find(".fa-append").addClass("fa-minus-circle").removeClass("fa-plus-circle");
         }
         else
         {
-          elem.find(".glyphicon-append").removeClass("glyphicon-minus-sign").addClass("glyphicon-plus-sign");
+          elem.find(".fa-append").removeClass("fa-minus-circle").addClass("fa-plus-circle");
         }
       });
     });
@@ -420,7 +420,7 @@ function toggleReports(opened)
       if ( $.inArray(disk, opened) > -1 )
       {
         $(".toggle-"+disk).css("display","block");
-        elem.find(".glyphicon-append").addClass("glyphicon-minus-sign").removeClass("glyphicon-plus-sign");
+        elem.find(".fa-append").addClass("fa-minus-circle").removeClass("fa-plus-circle");
       }
     }      
   });
@@ -451,7 +451,7 @@ function rmReport(file, el)
       var remain = $(el).closest("div").siblings().length;
       if ( remain == "0")
       {
-        $(el).closest("td").find(".glyphicon-minus-sign, .glyphicon-plus-sign").css("opacity", "0.0");
+        $(el).closest("td").find(".fa-minus-circle, .fa-plus-circle").css("opacity", "0.0");
       }
       $(el).parent().remove();
     }
@@ -480,14 +480,15 @@ function addButtonTab(Button, Name, autoHide, Append)
   var elementId = 'event-' + new Date().getTime() * Math.floor(Math.random()*100000);
   var element   = $("<span id='"+elementId+"' class='status' style='padding-left:5px;'>"+Button+"</span>");
   
-  if (element.find("input[type='button']").length)
+  if (element.find("input[type='button']").length )
   {
     element.addClass("vhshift");
-    element.find("input[type='button']").prop("style","padding-top: 5px; padding-bottom: 5px;");
+    element.find("input[type='button']").prop("style","padding-top: 5px; padding-bottom: 5px; margin-top:-3px; margin-bottom:0;");
   }
 
   if (Target.prop('nodeName') === "DIV")
   {
+    element.addClass("vhshift");
     if (Append)
     {
       Target.append(element);

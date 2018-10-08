@@ -19,7 +19,6 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
 <link type="text/css" rel="stylesheet" href="/webGui/styles/jquery.switchbutton.css">
 <?endif;?>
 
-<link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/glyphicons.css">
 <? if (file_exists("/plugins/${plugin}/assets/style-${display['theme']}.css")): ?>
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/style-<?=$display['theme'];?>.css">
 <? endif;?>
@@ -68,11 +67,11 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
   table.preclear tr>td+td+td+td+td+td{text-align:right;padding-left:0;padding-right:12px;width: 5em;}
 
   button[type=button] {margin:0px 14px 0 14px;}
-  i.glyphicon{margin:0px 5px 0 5px;}
-  i.hdd{margin:0px 0px;font-size: 1.1em}
+  i.fa{margin:0px 5px 0 5px;}
+  i.hdd{margin:0px 0px;font-size: 1.3em}
   i.partition{margin-left: 18px;}
   .exec{cursor: pointer;}
-  i.glyphicon-append{margin:0px;font-size: 0.8em;position: relative; left:-0.5em;top:0.7em;}
+  i.fa-append{margin:0px;font-size: 0.8em;position: relative; left:-0.5em;top:0.7em;}
 
 </style>
 <?=$Preclear->html();?>

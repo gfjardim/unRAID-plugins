@@ -215,10 +215,10 @@ class Preclear
     $file    = "/tmp/preclear_stat_{$disk}";
     $serial  = $this->diskSerial($disk);
     $session = TMUX::hasSession("preclear_disk_{$serial}");
-    $paused  = file_exists("/tmp/.preclear/${disk}/pause") ? "<a class='exec tooltip' style='margin-left:10px;color:#4F8A10;' onclick='resumePreclear(\"${disk}\")' title='Resume'><i class='fa fa-play'></i></a>" : "";
+    $paused  = file_exists("/tmp/.preclear/${disk}/pause") ? "<a class='exec tooltip' style='margin-left:10px;color:#00BE37;' onclick='resumePreclear(\"${disk}\")' title='Resume'><i class='fa fa-play'></i></a>" : "";
     $rm      = "<a id='preclear_rm_{$disk}' class='exec tooltip' style='color:#CC0000;font-weight:bold;margin-left:5px;' title='%s' onclick='stopPreclear(\"{$serial}\",\"%s\");'>";
-    $rm     .= "<i class='glyphicon glyphicon-remove hdd'></i></a>";
-    $preview = "$paused<a id='preclear_open_{$disk}' class='exec tooltip' style='margin-left:5px;' onclick='openPreclear(\"{$serial}\");' title='Preview'><i class='glyphicon glyphicon-eye-open hdd'></i></a>";
+    $rm     .= "<i class='fa fa-times hdd'></i></a>";
+    $preview = "$paused<a id='preclear_open_{$disk}' class='exec tooltip' style='margin-left:5px;color:#1E90FF;' onclick='openPreclear(\"{$serial}\");' title='Preview'><i class='fa fa-eye hdd'></i></a>";
     
     if (is_file($file))
     {
@@ -231,7 +231,7 @@ class Preclear
           
           if ($running)
           {
-            $status .= "<span style='color:#478406;'>{$stat[2]}</span>";
+            $status .= "<span style='color:#00BE37;'>{$stat[2]}</span>";
           }
 
           else

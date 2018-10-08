@@ -124,8 +124,8 @@ switch ($_POST['action'])
         if (count($reports))
         {
           $title  = "<span title='Click to view reports.' class='exec toggle-reports' style='margin-left:0px;' hdd='{$disk_name}'>
-                      <i class='glyphicon glyphicon-hdd hdd'></i>
-                      <i class='glyphicon glyphicon-plus-sign glyphicon-append'></i>
+                      <i class='fa fa-hdd-o hdd'></i>
+                      <i class='fa fa-plus-circle fa-append'></i>
                       ${disk['SERIAL']}
                     </span>";
           
@@ -134,11 +134,11 @@ switch ($_POST['action'])
           foreach ($reports as $report)
           {
             $report_files .= "<div style='margin:4px 0px 4px 0px;'>
-                                <i class='glyphicon glyphicon-list-alt hdd'></i>
+                                <i class='fa fa-list-alt hdd'></i>
                                 <span style='margin:7px;'></span>
                                 <a href='${report}'>".pathinfo($report, PATHINFO_FILENAME)."</a>
                                 <a class='exec' title='Remove Report' style='color:#CC0000;font-weight:bold;' onclick='rmReport(\"{$report}\", this);'>
-                                  &nbsp;<i class='glyphicon glyphicon-remove hdd'></i>
+                                  &nbsp;<i class='fa fa-times hdd'></i>
                                 </a>
                               </div>";  
           }
@@ -148,7 +148,7 @@ switch ($_POST['action'])
         else
         {
           $report_files="";
-          $title  = "<span class='toggle-reports' hdd='{$disk_name}' style='margin-left:0px;'><i class='glyphicon glyphicon-hdd hdd'></i><span style='margin:8px;'></span>{$serial}";
+          $title  = "<span class='toggle-reports' hdd='{$disk_name}' style='margin-left:0px;'><i class='fa fa-hdd-o hdd'></i><span style='margin:8px;'></span>{$serial}";
         }
 
         if ($Preclear->isRunning($disk_name))

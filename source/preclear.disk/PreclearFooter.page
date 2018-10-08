@@ -6,7 +6,6 @@ $plugin="preclear.disk";
 require_once("plugins/${plugin}/assets/lib.php");
 $Preclear = new Preclear;
 ;?>
-<link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/glyphicons.css">
 <? if (file_exists("/plugins/${plugin}/assets/style-${display['theme']}.css")): ?>
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/style-<?=$display['theme'];?>.css">
 <? endif;?>
