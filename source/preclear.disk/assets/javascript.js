@@ -58,43 +58,41 @@ function getPreclearContent()
       toggleReports(currentToggled);
       $(window).scrollTop(currentScroll);
     }
-    else
+
+    $.each(data.status, function(i,v)
     {
-      $.each(data.status, function(i,v)
+      var target = $("#preclear_"+i);
+      var icon = "#preclear_footer_" + i;
+      
+      $("#preclear_"+i).html("<i class='fa fa-tachometer hdd'></i><span style='margin-left: 0px;'></span>"+v.status);
+
+      if (! $(icon).length)
       {
-        var target = $("#preclear_"+i);
-        
-        $("#preclear_"+i).html("<i class='fa fa-tachometer hdd'></i><span style='margin-left: 0px;'></span>"+v.status);
-
-        var icon = "#preclear_footer_" + i;
-        if (! $(icon).length)
+        el  = "<a class='exec' title='' id='"+icon.substring(1)+"'><img src='/plugins/"+plugin+"/icons/precleardisk.png'></a>";
+        el  = $(el).prependTo("#preclear-footer").css("margin-right", "6px");
+        el.tooltipster(
         {
-          el  = "<a class='exec' title='' id='"+icon.substring(1)+"'><img src='/plugins/"+plugin+"/icons/precleardisk.png'></a>";
-          el  = $(el).prependTo("#preclear-footer").css("margin-right", "6px");
-          el.tooltipster(
+          delay:100,
+          zIndex:100,
+          trigger:'custom',
+          triggerOpen:{mouseenter:true, touchstart:true},
+          triggerClose:{click:false, scroll:true, mouseleave:true, tap:true},
+          contentAsHTML: true,
+          interactive: true,
+          updateAnimation: false,
+          functionBefore: function(instance, helper)
           {
-            delay:100,
-            zIndex:100,
-            trigger:'custom',
-            triggerOpen:{mouseenter:true, touchstart:true},
-            triggerClose:{click:false, scroll:true, mouseleave:true, tap:true},
-            contentAsHTML: true,
-            interactive: true,
-            updateAnimation: false,
-            functionBefore: function(instance, helper)
-            {
-              instance.content($(helper.origin).attr("data"));
-            }
-          });
-        }
-        content = $("<div>").append(v.footer);
-        content.find("a[id^='preclear_rm_']").attr("id", "preclear_footer_rm_" + i);
-        content.find("a[id^='preclear_open_']").attr("id", "preclear_footer_open_" + i);
-        $(icon).tooltipster('content', content.html());
-      });
-    }
-    $.each(hovered, function(k,v){ if(v.length) { $("#"+v).trigger("mouseenter");} });
+            instance.content($(helper.origin).attr("data"));
+          }
+        });
+      }
+      content = $("<div>").append(v.footer);
+      content.find("a[id^='preclear_rm_']").attr("id", "preclear_footer_rm_" + i);
+      content.find("a[id^='preclear_open_']").attr("id", "preclear_footer_open_" + i);
+      $(icon).tooltipster('content', content.html());
+    });
 
+    $.each(hovered, function(k,v){ if(v.length) { $("#"+v).trigger("mouseenter");} });
 
     window.disksInfo = JSON.parse(data.info);
 
@@ -105,7 +103,7 @@ function getPreclearContent()
     }
   },'json').always(function(data)
   {
-    timers.preclear = setTimeout('getPreclearContent()', (data.status.length > 0) ? 10000 : 30000);
+    timers.preclear = setTimeout('getPreclearContent()', ($(data.status).length > 0) ? 5000 : 15000);
   }).fail(updateCsrfToken);
 }
 
