@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="1.0.0"
+version="1.0.1"
 
 # PID
 script_pid=$BASHPID
@@ -677,34 +677,35 @@ save_current_status() {
   local current_op=$1
   local current_pos=$2
   local current_timer=$3
+  local tmp_resume="${all_files[resume_file]}.tmp"
 
-  echo -e "current_op=$current_op" > ${all_files[dir]}/resume
-  echo -e "current_pos=$current_pos" >> ${all_files[dir]}/resume
-  echo -e "current_timer=$current_timer" >> ${all_files[dir]}/resume
-  echo -e "current_cycle=$cycle" >> ${all_files[dir]}/resume
-  echo -e "all_timer_diff=$(( $(date '+%s') - $all_timer ))" >> ${all_files[dir]}/resume
-  echo -e "cycle_timer_diff=$(( $(date '+%s') - $cycle_timer ))" >> ${all_files[dir]}/resume
+  echo -e "current_op=$current_op" > "$tmp_resume"
+  echo -e "current_pos=$current_pos" >> "$tmp_resume"
+  echo -e "current_timer=$current_timer" >> "$tmp_resume"
+  echo -e "current_cycle=$cycle" >> "$tmp_resume"
+  echo -e "all_timer_diff=$(( $(date '+%s') - $all_timer ))" >> "$tmp_resume"
+  echo -e "cycle_timer_diff=$(( $(date '+%s') - $cycle_timer ))" >> "$tmp_resume"
 
-  echo -e "notify_freq=$notify_freq" >> ${all_files[dir]}/resume
-  echo -e "notify_channel=$notify_channel" >> ${all_files[dir]}/resume
-  echo -e "short_test=$short_test" >> ${all_files[dir]}/resume
-  echo -e "skip_preread=$skip_preread" >> ${all_files[dir]}/resume
-  echo -e "skip_postread=$skip_postread" >> ${all_files[dir]}/resume
-  echo -e "read_size=$read_size" >> ${all_files[dir]}/resume
-  echo -e "write_size=$write_size" >> ${all_files[dir]}/resume
-  echo -e "read_blocks=$read_blocks" >> ${all_files[dir]}/resume
-  echo -e "read_stress=$read_stress" >> ${all_files[dir]}/resume
-  echo -e "cycles=$cycles" >> ${all_files[dir]}/resume
-  echo -e "no_prompt=$no_prompt" >> ${all_files[dir]}/resume
-  echo -e "erase_disk=$erase_disk" >> ${all_files[dir]}/resume
-  echo -e "erase_preclear=$erase_preclear" >> ${all_files[dir]}/resume
-  echo -e "preread_average='$preread_average'" >> ${all_files[dir]}/resume
-  echo -e "preread_speed='$preread_speed'" >> ${all_files[dir]}/resume
-  echo -e "write_average='$write_average'" >> ${all_files[dir]}/resume
-  echo -e "write_speed='$write_speed'" >> ${all_files[dir]}/resume
-  echo -e "postread_average='$postread_average'" >> ${all_files[dir]}/resume
-  echo -e "postread_speed='$postread_speed'" >> ${all_files[dir]}/resume
-  cp ${all_files[dir]}/resume ${all_files[resume_file]}
+  echo -e "notify_freq=$notify_freq" >> "$tmp_resume"
+  echo -e "notify_channel=$notify_channel" >> "$tmp_resume"
+  echo -e "short_test=$short_test" >> "$tmp_resume"
+  echo -e "skip_preread=$skip_preread" >> "$tmp_resume"
+  echo -e "skip_postread=$skip_postread" >> "$tmp_resume"
+  echo -e "read_size=$read_size" >> "$tmp_resume"
+  echo -e "write_size=$write_size" >> "$tmp_resume"
+  echo -e "read_blocks=$read_blocks" >> "$tmp_resume"
+  echo -e "read_stress=$read_stress" >> "$tmp_resume"
+  echo -e "cycles=$cycles" >> "$tmp_resume"
+  echo -e "erase_disk=$erase_disk" >> "$tmp_resume"
+  echo -e "erase_preclear=$erase_preclear" >> "$tmp_resume"
+  echo -e "preread_average='$preread_average'" >> "$tmp_resume"
+  echo -e "preread_speed='$preread_speed'" >> "$tmp_resume"
+  echo -e "write_average='$write_average'" >> "$tmp_resume"
+  echo -e "write_speed='$write_speed'" >> "$tmp_resume"
+  echo -e "postread_average='$postread_average'" >> "$tmp_resume"
+  echo -e "postread_speed='$postread_speed'" >> "$tmp_resume"
+  echo -e "no_prompt=$no_prompt" >> "$tmp_resume"
+  mv -f "$tmp_resume" "${all_files[resume_file]}"
 }
 
 read_entire_disk() { 

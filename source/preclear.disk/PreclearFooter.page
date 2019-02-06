@@ -15,55 +15,21 @@ $Preclear = new Preclear;
 
   <?=$Preclear->Script();?>
 
-  function getPreclearFooter()
-  {
-    $.post(PreclearURL,{action:'get_content', display:display},function(data)
-    {
-      var hovered = $(".tooltipster-box").find(".tooltipstered:hover").map(function(){return this.id;}).get();
-
-      $.each(data.status, function(i,v)
-      {
-        var icon = "#preclear_footer_" + i;
-
-        if (! $(icon).length)
-        {
-          el  = "<a class='exec' title='' id='"+icon.substring(1)+"'><img src='/plugins/"+plugin+"/icons/precleardisk.png'></a>";
-          el  = $(el).prependTo("#preclear-footer").css("margin-right", "6px");
-          el.tooltipster(
-          {
-            delay:100,
-            zIndex:100,
-            trigger:'custom',
-            triggerOpen:{mouseenter:true, touchstart:true},
-            triggerClose:{click:false, scroll:true, mouseleave:true, tap:true},
-            contentAsHTML: true,
-            interactive: true,
-            updateAnimation: false,
-            functionBefore: function(instance, helper)
-            {
-              instance.content($(helper.origin).attr("data"));
-            }
-          });
-        }
-        content = $("<div>").append(v.footer);
-        content.find("a[id^='preclear_rm_']").attr("id", "preclear_footer_rm_" + i);
-        content.find("a[id^='preclear_open_']").attr("id", "preclear_footer_open_" + i);
-        $(icon).tooltipster('content', content.html());
-      });
-
-      $.each(hovered, function(k,v){ if(v.length) { $(".tooltipster-box").find("#"+v).trigger("mouseenter");} });
-
-    }, "json").always(function(data)
-    {
-      setTimeout("getPreclearFooter()", 5000);
-    });
-  }
-
   $(function()
-  {
-    footer = $("<span id='preclear-footer'></span>").insertAfter("div#footer > span#copyright").css("float","right").css("margin-right", "6px");
-    getPreclearFooter();
-  });
+    {
+      footer = $("<span id='preclear-footer'></span>").insertAfter("div#footer > span#copyright").css("float","right").css("margin-right", "6px");
+      getPreclearContent();
+      if ( $('#usb_devices_list').length )
+      {
+        $('#usb_devices_list').bind("change", function(e)
+        {
+          clearTimeout(timers.preclear);
+          timers.preclear = setTimeout('getPreclearContent()', 100);
+        });
+        $('#usb_devices_list').trigger("change");
+      }
+    }
+  );
 </script>
 
 <!-- Status installer -->

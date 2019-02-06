@@ -71,8 +71,7 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
   i.hdd{margin:0px 0px;font-size: 1.3em}
   i.partition{margin-left: 18px;}
   .exec{cursor: pointer;}
-  i.fa-append{margin:0px;font-size: 0.8em;position: relative; left:-0.5em;top:0.7em;}
-
+  i.fa-append{margin:0px;font-size: 0.8em;position: relative; left:-0.5em;top:0.6em;}
 </style>
 <?=$Preclear->html();?>
 <table class='disk_status preclear custom_head'>

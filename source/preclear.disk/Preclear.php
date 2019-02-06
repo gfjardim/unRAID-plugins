@@ -271,11 +271,11 @@ switch ($_POST['action'])
 
     TMUX::killSession( $session );
     TMUX::NewSession( $session );
-    TMUX::sendCommand($session, "$cmd");
+    TMUX::sendCommand($session, $cmd);
 
     if ( $confirm && ! $noprompt )
     {
-      foreach( range(0, 3) as $x )
+      foreach( range(0, 5) as $x )
       {
         if ( strpos(TMUX::getSession($session), "Answer Yes to continue") )
         {

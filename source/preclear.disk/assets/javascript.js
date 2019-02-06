@@ -35,27 +35,12 @@ $('body').on('mouseenter', '.tooltip:not(.tooltipstered), .tooltip-toggle:not(.t
   $(this).tooltipster(
   {
     delay:100,
-    zIndex:100,
+    zIndex:999,
     trigger:'custom',
     triggerOpen:{mouseenter:true, touchstart:true},
     triggerClose:onClose,
   }).tooltipster('open');
 });
-
-$(function()
-  {
-    getPreclearContent();
-    if ( $('#usb_devices_list').length )
-    {
-      $('#usb_devices_list').bind("change", function(e)
-      {
-        clearTimeout(timers.preclear);
-        timers.preclear = setTimeout('getPreclearContent()', 100);
-      });
-      $('#usb_devices_list').trigger("change");
-    }
-  }
-);
 
 
 function getPreclearContent()
@@ -78,10 +63,38 @@ function getPreclearContent()
       $.each(data.status, function(i,v)
       {
         var target = $("#preclear_"+i);
+        
         $("#preclear_"+i).html("<i class='fa fa-tachometer hdd'></i><span style='margin-left: 0px;'></span>"+v.status);
+
+        var icon = "#preclear_footer_" + i;
+        if (! $(icon).length)
+        {
+          el  = "<a class='exec' title='' id='"+icon.substring(1)+"'><img src='/plugins/"+plugin+"/icons/precleardisk.png'></a>";
+          el  = $(el).prependTo("#preclear-footer").css("margin-right", "6px");
+          el.tooltipster(
+          {
+            delay:100,
+            zIndex:100,
+            trigger:'custom',
+            triggerOpen:{mouseenter:true, touchstart:true},
+            triggerClose:{click:false, scroll:true, mouseleave:true, tap:true},
+            contentAsHTML: true,
+            interactive: true,
+            updateAnimation: false,
+            functionBefore: function(instance, helper)
+            {
+              instance.content($(helper.origin).attr("data"));
+            }
+          });
+        }
+        content = $("<div>").append(v.footer);
+        content.find("a[id^='preclear_rm_']").attr("id", "preclear_footer_rm_" + i);
+        content.find("a[id^='preclear_open_']").attr("id", "preclear_footer_open_" + i);
+        $(icon).tooltipster('content', content.html());
       });
     }
     $.each(hovered, function(k,v){ if(v.length) { $("#"+v).trigger("mouseenter");} });
+
 
     window.disksInfo = JSON.parse(data.info);
 
@@ -90,9 +103,9 @@ function getPreclearContent()
       startPreclear(startDisk);
       delete window.startDisk;
     }
-  },'json').always(function()
+  },'json').always(function(data)
   {
-    timers.preclear = setTimeout('getPreclearContent()', 10000);
+    timers.preclear = setTimeout('getPreclearContent()', (data.status.length > 0) ? 10000 : 30000);
   }).fail(updateCsrfToken);
 }
 
@@ -100,14 +113,15 @@ function updateCsrfToken(jqXHR, textStatus, error)
 {
   if (jqXHR.status == 200)
   {
+    console.log("Updating CSRF token");
     $.get(PreclearURL,{action: "get_csrf_token"}, function(response)
     {
       $.ajaxPrefilter(function(s, orig, xhr){
-        if (s.type.toLowerCase() == "post" && !s.crossDomain) {
+        if (s.type.toLowerCase() == "post" && ! s.crossDomain) {
           s.data = s.data.replace(/csrf_token=.{16}/g, "csrf_token=" + response.csrf_token);
         }
       }); 
-    }, "json");
+    }, "json").fail(function(s,o,xhr){location.reload(true);});
   }
 }
 
@@ -402,17 +416,15 @@ function toggleReports(opened)
     {
       var elem = $(this);
       var disk = elem.attr("hdd");
-      $(".toggle-"+disk).slideToggle(150, function()
+      if ( $("div.toggle-"+disk+":first").is(":visible") )
       {
-        if ( $("div.toggle-"+disk+":first").is(":visible") )
-        {
-          elem.find(".fa-append").addClass("fa-minus-circle").removeClass("fa-plus-circle");
-        }
-        else
-        {
-          elem.find(".fa-append").removeClass("fa-minus-circle").addClass("fa-plus-circle");
-        }
-      });
+        elem.find(".fa-append").removeClass("fa-minus-circle").addClass("fa-plus-circle");
+      }
+      else
+      {
+        elem.find(".fa-append").addClass("fa-minus-circle").removeClass("fa-plus-circle");
+      }
+      $(".toggle-"+disk).slideToggle(150);
     });
 
     if (typeof(opened) !== 'undefined')
