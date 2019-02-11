@@ -35,7 +35,11 @@ fi
 exec 2> >(while read err; do echo "$(date +"%b %d %T" ) ${log_prefix} ${err}" >> /var/log/preclear.disk.log; echo "${err}"; done; >&2)
 
 debug() {
-  cat <<< "$(date +"%b %d %T" ) ${log_prefix} $@" >> /var/log/preclear.disk.log
+  local msg="$*"
+  if [ -z "$msg" ]; then
+    read msg;
+  fi
+  cat <<< "$(date +"%b %d %T" ) ${log_prefix} $msg" >> /var/log/preclear.disk.log
 }
 
 # Let's make sure some features are supported by BASH
@@ -1524,6 +1528,21 @@ debug_syslog()
   done < <(grep -P "$dev" /var/log/syslog)
 }
 
+syslog_to_debug()
+{
+  name=$(basename "$1")
+  ata=$(ls -n "/sys/block/${name}" |grep -Po 'ata\d+');
+  [ -n "$ata" ] && dev="${name}|${ata}[.:]" || dev="$name"
+
+  while read line; do
+    if [ $(echo "$line"|grep -c "disk_log") -gt 0 ] || [ $(echo $line | grep -cP "$dev") -eq 0 ]; then
+      continue;
+    fi
+    line=$(trim $(echo "$line" | cut -d':' -f4- ))
+    debug "syslog: $line"
+  done < <(tail -f -n0 /var/log/syslog 2>&1)
+}
+
 ######################################################
 ##                                                  ##
 ##                  PARSE OPTIONS                   ##
@@ -1603,6 +1622,8 @@ if [ -f "$load_file" ] && $(bash -n "$load_file"); then
   debug "Restoring previous instance of preclear"
   . "$load_file"
 fi
+
+syslog_to_debug $theDisk &
 
 # diff /tmp/.init <(set -o >/dev/null; set)
 # exit 0
