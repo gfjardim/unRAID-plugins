@@ -121,6 +121,10 @@ function updateCsrfToken(jqXHR, textStatus, error)
       }); 
     }, "json").fail(function(s,o,xhr){location.reload(true);});
   }
+  else if (jqXHR.status == 404)
+  {  
+    setTimeout( clearTimeout, 300, timers.preclear);
+  }
 }
 
 function openPreclear(serial)

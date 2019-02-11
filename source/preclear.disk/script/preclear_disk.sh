@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="1.0.1"
+version="1.0.2"
 
 # PID
 script_pid=$BASHPID
@@ -587,7 +587,7 @@ write_disk(){
       report_out+="Disk temperature: ${disktemp}\\n"
       report_out+="Cycle's Elapsed Time: $(timer ${cycle_timer})\\n"
       report_out+="Total Elapsed time: $(timer ${all_timer})"
-      send_mail "${write_type_s} in progress on ${disk_serial ($disk_name)}" "${write_type_s} in progress on ${disk_serial ($disk_name)}: ${percent_wrote}% @ ${current_speed}. Temp: ${disktemp}. Cycle ${cycle} of ${cycles}." "${report_out}"
+      send_mail "${write_type_s} in progress on $disk_serial ($disk_name)" "${write_type_s} in progress on $disk_serial ($disk_name): ${percent_wrote}% @ ${current_speed}. Temp: ${disktemp}. Cycle ${cycle} of ${cycles}." "${report_out}"
       let next_notify=($next_notify + 25)
     fi
 
@@ -978,7 +978,7 @@ read_entire_disk() {
       report_out+="Disk temperature: ${disktemp}\\n"
       report_out+="Cycle's Elapsed Time: $(timer ${cycle_timer}).\\n"
       report_out+="Total Elapsed time: $(timer ${all_timer})."
-      send_mail "$read_type_s in progress on ${disk_serial ($disk_name)}" "${read_type_s} in progress on ${disk_serial ($disk_name)}: ${percent_read}% @ ${current_speed}. Temp: ${disktemp}. Cycle ${cycle} of ${cycles}." "${report_out}" &
+      send_mail "$read_type_s in progress on $disk_serial ($disk_name)" "${read_type_s} in progress on $disk_serial ($disk_name): ${percent_read}% @ ${current_speed}. Temp: ${disktemp}. Cycle ${cycle} of ${cycles}." "${report_out}" &
       let next_notify=($next_notify + 25)
     fi
 
@@ -1986,7 +1986,7 @@ for cycle in $(seq $cycles); do
         else
           append display_step "Pre-read verification:|${bold}FAIL${norm}"
           display_status
-          echo "${disk_properties[name]}|NY|Pre-read $diskName ($theDisk) failed - Aborted|$$" > ${all_files[stat]}
+          echo "${disk_properties[name]}|NY|Pre-read failed - Aborted|$$" > ${all_files[stat]}
           send_mail "FAIL! Pre-read $diskName ($theDisk) failed" "FAIL! Pre-read $diskName ($theDisk) failed." "Pre-read $diskName ($theDisk) failed - Aborted" "" "alert"
           echo -e "--> FAIL: Result: Pre-Read failed.\n\n"
           save_report "No - Pre-read $diskName ($theDisk) failed." "$preread_speed" "$postread_speed" "$write_speed"
