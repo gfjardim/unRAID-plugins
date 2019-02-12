@@ -269,6 +269,18 @@ switch ($_POST['action'])
       }
     }
 
+    // Enabling queue
+    $queue_file="/boot/config/plugins/${plugin}/queue";
+    $queue = is_file($queue_file) ? (is_numeric(file_get_contents($queue_file)) ? file_get_contents($queue_file) : 0 ) : 0;
+    if ($queue > 0)
+    {
+      if (! TMUX::hasSession("preclear_queue"))
+      {
+        TMUX::NewSession("preclear_queue");
+      }
+      TMUX::sendCommand("preclear_queue", "/usr/local/emhttp/plugins/${plugin}/script/preclear_queue.sh $queue");
+    }
+
     TMUX::killSession( $session );
     TMUX::NewSession( $session );
     TMUX::sendCommand($session, $cmd);
@@ -397,6 +409,8 @@ switch ($_POST['action'])
       }
       TMUX::killSession( $queue_session );
     }
+
+    file_put_contents("/boot/config/plugins/${plugin}/queue", $queue);
 
     if ($queue > 0)
     {

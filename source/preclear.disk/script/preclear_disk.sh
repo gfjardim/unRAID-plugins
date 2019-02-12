@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="1.0.2"
+version="1.0.3"
 
 # PID
 script_pid=$BASHPID
@@ -383,6 +383,8 @@ write_disk(){
   local paused_sync=n
   local percent_wrote
   local percent_pause=0
+  local queued=n
+  local queued_file=${all_files[queued]}
   local short_test=$short_test
   local skip_initial=0
   local stat_file=${all_files[stat]}
@@ -504,14 +506,18 @@ write_disk(){
     echo "$disk_name|NN|${write_type_s}${cycle_disp}: ${percent_wrote}% @ $current_speed ($(timer $time_start))|$$" >$stat_file
 
     # Pause if requested
-    if [ -f "$pause" ]; then
-      if [ -f "$pause" -a "$paused_file" != "y" ]; then
-        kill -TSTP $dd_pid
-        paused_file=y
-      fi
+    if [ -f "$pause" -a "$paused_file" != "y" ]; then
+      kill -TSTP $dd_pid
+      paused_file=y
+    elif [ -f "$queued_file" -a "$queued" != "y" ]; then
+      kill -TSTP $dd_pid
+      queued=y
     elif [ ! -f "$pause" -a "$paused_file" == "y" ]; then
       kill -CONT $dd_pid
       paused_file=n
+    elif [ ! -f "$queued_file" -a "$queued" == "y" ]; then
+      kill -CONT $dd_pid
+      queued=n
     fi
 
     # Pause if a 'smartctl' command is taking too much time to complete
@@ -550,10 +556,17 @@ write_disk(){
       paused_sync=n
     fi
 
-    if [ $"$paused_file" == "y" -o "$paused_sync" == "y" -o "$paused_hdparm" == "y" -o "$paused_smart" == "y" ]; then
+    if [ "$paused_file" == "y" -o "$paused_sync" == "y" -o "$paused_hdparm" == "y" -o "$paused_smart" == "y" ]; then
       echo "$disk_name|NN|${write_type_s}${cycle_disp}: PAUSED|$$" >$stat_file
       if [ ! -e "/proc/${display_pid}/exe" ]; then
         display_status "${write_type_s} in progress:|###(${percent_wrote}% Done)### ***PAUSED***" "** PAUSED"
+        display_pid=$!
+      fi
+      is_paused=y
+    elif [ "$queued" == "y" ]; then
+      echo "$disk_name|NN|${write_type_s}${cycle_disp}: QUEUED|$$" >$stat_file
+      if [ ! -e "/proc/${display_pid}/exe" ]; then
+        display_status "${write_type_s} in progress:|###(${percent_wrote}% Done)### ***QUEUED***" "** QUEUED"
         display_pid=$!
       fi
       is_paused=y
@@ -740,6 +753,8 @@ read_entire_disk() {
   local paused_smart=n
   local paused_sync=n
   local percent_read=0
+  local queued=n
+  local queued_file=${all_files[queued]}
   local read_stress=$read_stress
   local short_test=$short_test
   local skip_initial=0
@@ -947,6 +962,13 @@ read_entire_disk() {
         display_pid=$!
       fi
       is_paused=y
+    elif [ "$queued" == "y" ]; then
+      echo "$disk_name|NN|${read_type_t}${cycle_disp} QUEUED|$$" >$stat_file
+      if [ ! -e "/proc/${display_pid}/exe" ]; then
+        display_status "${read_type_t}|###(${percent_read}% Done)### ***QUEUED***" "** QUEUED"
+        display_pid=$!
+      fi
+      is_paused=y
     else
       # Display refresh
       if [ ! -e "/proc/${display_pid}/exe" ]; then
@@ -987,14 +1009,22 @@ read_entire_disk() {
     fi
 
     # Pause if requested
-    if [ -f "$pause" ]; then
-      if [ "$paused_file" != "y" ]; then
-        kill -TSTP $dd_pid
-        paused_file=y
-      fi
+    if [ -f "$pause" -a "$paused_file" != "y" ]; then
+      kill -TSTP $dd_pid
+      paused_file=y
+      debug "Paused"
+    elif [ -f "$queued_file" -a "$queued" != "y" ]; then
+      kill -TSTP $dd_pid
+      queued=y
+      debug "Enqueued"
     elif [ ! -f "$pause" -a "$paused_file" == "y" ]; then
       kill -CONT $dd_pid
       paused_file=n
+      debug "Resumed"
+    elif [ ! -f "$queued_file" -a "$queued" == "y" ]; then
+      kill -CONT $dd_pid
+      queued=n
+      debug "Resumed"
     fi
 
     maxTimeout=15
@@ -1621,6 +1651,10 @@ debug "Preclear Disk Version: ${version}"
 if [ -f "$load_file" ] && $(bash -n "$load_file"); then
   debug "Restoring previous instance of preclear"
   . "$load_file"
+  if [ "$all_timer_diff" -eq 0 ]; then
+    debug "Resume failed, please start a new instance of preclear"
+    exit 1
+  fi
 fi
 
 syslog_to_debug $theDisk &
@@ -1723,6 +1757,7 @@ append all_files 'cmp_out'       "${all_files[dir]}/cmp_out"
 append all_files 'blkpid'        "${all_files[dir]}/blkpid"
 append all_files 'fifo'          "${all_files[dir]}/fifo"
 append all_files 'pause'         "${all_files[dir]}/pause"
+append all_files 'queued'        "${all_files[dir]}/queued"
 append all_files 'verify_errors' "${all_files[dir]}/verify_errors"
 append all_files 'pid'           "${all_files[dir]}/pid"
 append all_files 'stat'          "/tmp/preclear_stat_${disk_properties[name]}"

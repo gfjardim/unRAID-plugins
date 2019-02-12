@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2019.02.12a">
+<!ENTITY version   "2019.02.12b">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,11 @@
 
 <CHANGES>
 ##&name;
+
+###2019.02.12b
+- Fix: queue persistent across reboots
+- Fix: better enqueue handling (script 1.0.3)
+- Fix: exiting on bad resume file
 
 ###2019.02.12
 - Add: preclear queue
@@ -552,6 +557,11 @@ find /boot/config/plugins/&name;/ -type f -iname "&name;*.txz" ! -iname "*&versi
 find /boot/config/plugins/&name;/ -type f -iname "&name;*.md5" ! -iname "*&version;*" -delete
 find /boot/config/plugins/&name;/ -type f -iname "tor-*.txz" -delete
 
+# Start diskinfo
+/etc/rc.d/rc.diskinfo --quit &amp;&gt;/dev/null
+rm -f /var/local/emhttp/plugins/diskinfo/diskinfo.json &amp;&gt;/dev/null
+echo "sleep 5 ; /etc/rc.d/rc.diskinfo --daemon &amp;&gt;/dev/null" | at now &amp;&gt;/dev/null
+
 echo ""
 echo "-----------------------------------------------------------"
 echo " &name; has been installed."
@@ -560,11 +570,6 @@ echo " Copyright 2015-2017, gfjardim"
 echo " Version: &version;"
 echo "-----------------------------------------------------------"
 echo ""
-
-# Start diskinfo
-/etc/rc.d/rc.diskinfo --quit &amp;&gt;/dev/null
-rm -f /var/local/emhttp/plugins/diskinfo/diskinfo.json &amp;&gt;/dev/null
-echo "sleep 5 ; /etc/rc.d/rc.diskinfo --daemon &amp;&gt;/dev/null" | at now &amp;&gt;/dev/null
 </INLINE>
 </FILE>
 
@@ -574,6 +579,11 @@ The 'remove' script.
 <FILE Run="/bin/bash" Method="remove">
 <INLINE>
 
+# kill all tmux sessions
+for session in $(tmux ls | grep preclear | cut -d':' -f1); do 
+  tmux kill-session -t "${session}" >/dev/null 2>&amp;1
+done
+
 find /var/log/packages -type f -iname "&name;-*" -delete
 
 # Remove plugin related files
@@ -582,8 +592,7 @@ rm -rf /boot/config/plugins/&name; \
        /var/state/&name; \
        /boot/.preclear/ \
        /tmp/.preclear \
-       rm /var/run/preclear_queue.pid \
-       rm /var/state/preclear_queue
+       rm /var/run/preclear_queue.pid
 
 # Remove diskinfo
 rm /etc/cron.d/diskinfo

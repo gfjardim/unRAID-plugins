@@ -315,7 +315,7 @@ class Preclear
       $size2 .= "<option value='".($x*16*65536)."'>{$x}M</option>";
     }
 
-    $queued = is_file("/var/state/preclear_queue") ? trim(file_get_contents("/var/state/preclear_queue")) : 0;
+    $queued = is_file("/boot/config/plugins/preclear.disk/queue") ? trim(file_get_contents("/boot/config/plugins/preclear.disk/queue")) : 0;
     for ($i=0; $i <= 20; $i++)
     {
       $selected = ($i == $queued) ? "selected" : "";
