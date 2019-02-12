@@ -477,7 +477,7 @@ switch ($_GET['action']) {
     break;
 
   case 'get_log':
-    $session = $_GET['session'];
+    $session = urldecode($_GET['session']);
     $file = file("/var/log/preclear.disk.log", FILE_IGNORE_NEW_LINES);
     $output = preg_grep("/${session}/i",$file);
     $tmpfile = "/tmp/${session}.txt";
