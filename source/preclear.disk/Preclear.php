@@ -378,6 +378,32 @@ switch ($_POST['action'])
     {
       unlink($file);
     }
+    break;
+
+
+  case 'set_queue':
+    $queue_session = "preclear_queue";
+    $queue = $_POST["queue"];
+    $session = TMUX::hasSession($queue_session);
+    $pid_file = "/var/run/preclear_queue.pid";
+    $pid = is_file($pid_file) ? file_get_contents($pid_file) : 0;
+
+    if ($session)
+    {
+      if ($pid > 0)
+      {
+        @unlink($pid_file);
+        foreach (range(0, 10) as $i) if (! posix_kill($pid, 0)) break; else sleep(1);
+      }
+      TMUX::killSession( $queue_session );
+    }
+
+    if ($queue > 0)
+    {
+      TMUX::NewSession( $queue_session );
+      TMUX::sendCommand( $queue_session, "/usr/local/emhttp/plugins/${plugin}/script/preclear_queue.sh $queue");
+    }
+    break;
 }
 
 
@@ -448,6 +474,27 @@ switch ($_GET['action']) {
 
   case 'get_csrf_token':
     echo json_encode(["csrf_token" => $var['csrf_token']]);
+    break;
+
+  case 'get_log':
+    $session = $_GET['session'];
+    $file = file("/var/log/preclear.disk.log", FILE_IGNORE_NEW_LINES);
+    $output = preg_grep("/${session}/i",$file);
+    $tmpfile = "/tmp/${session}.txt";
+
+    file_put_contents($tmpfile, implode("\r\n", $output));
+
+    header('Content-Description: File Transfer');
+    header('Content-Type: application/octet-stream');
+    header('Content-Disposition: attachment; filename='.basename($tmpfile));
+    header('Content-Transfer-Encoding: binary');
+    header('Expires: 0');
+    header('Cache-Control: must-revalidate');
+    header('Pragma: public');
+    header('Content-Length: ' . filesize($tmpfile));
+    readfile($tmpfile);
+
+    unlink($tmpfile);
     break;
 }
 

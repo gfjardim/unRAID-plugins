@@ -598,6 +598,49 @@ function getResumablePreclear(serial)
   }, "json");
 }
 
+
+function setPreclearQueue()
+{
+  preclear_dialog = $( "#preclear-dialog" );
+  preclear_dialog.html("");
+  preclear_dialog.append($("#preclear-set-queue-defaults").html());
+
+  swal(
+  {
+    title: "Set Queue Limit",
+    text:  preclear_dialog.html(),
+    type:  "info",
+    html:  true,
+    closeOnConfirm: false,
+    showCancelButton: true,
+    confirmButtonText:"Set",
+    cancelButtonText:"Cancel"
+  }, function(result)
+  {
+    if (result)
+    {
+
+      var opts = new Object();
+      popup = $(".sweet-alert.showSweetAlert > p:first");
+      
+      opts["action"] = "set_queue";
+      opts["queue"] = getVal(popup, "queue");
+
+      $.post(PreclearURL, opts).always(function(data)
+              {
+                window.location=window.location.pathname+window.location.hash;
+              }
+            );
+      swal.close();
+    }
+    else
+    {
+      swal.close();
+    }
+  });
+}
+
+
 function resumePreclear(disk)
 {
   $.post(PreclearURL,{action:'resume_preclear', disk:disk}, function(data)

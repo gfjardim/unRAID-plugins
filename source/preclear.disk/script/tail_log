@@ -12,7 +12,8 @@
  */
 ?>
 <?
-echo "<p style='text-align:center'><span class='error label'>Error</span><span class='warn label'>Warning</span><span class='system label'>System</span><span class='array label'>Array</span><span class='login label'>Login</span></p>\n";
+echo "<p style='text-align:center'><span class='error label'>Error</span><span class='warn label'>Warning</span><span class='system label'>System</span><span class='array label'>Array</span><span class='login label'>Login</span></p>";
+echo "<p style='text-align:center'><button onclick=\"window.location = '/plugins/preclear.disk/Preclear.php?action=get_log&session=<?=$argv[1];?>'\">Download</button></p>";
 
 $docroot = $docroot ?? $_SERVER['DOCUMENT_ROOT'] ?: '/usr/local/emhttp';
 require_once "$docroot/webGui/include/ColorCoding.php";

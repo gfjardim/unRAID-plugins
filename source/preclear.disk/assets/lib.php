@@ -314,6 +314,13 @@ class Preclear
       $x=pow(2,$i);
       $size2 .= "<option value='".($x*16*65536)."'>{$x}M</option>";
     }
+
+    $queued = is_file("/var/state/preclear_queue") ? trim(file_get_contents("/var/state/preclear_queue")) : 0;
+    for ($i=0; $i <= 20; $i++)
+    {
+      $selected = ($i == $queued) ? "selected" : "";
+      $queue .= ($i == 0) ? "<option value='$i' $selected>disable</option>" : "<option value='$i' $selected>$i</option>";
+    }
     $scripts = $this->scriptFiles();
     $capabilities = array_key_exists("joel", $scripts) ? $this->scriptCapabilities($scripts["joel"]) : [];
     ?>
@@ -455,6 +462,18 @@ class Preclear
               <input type="checkbox" name="--test" class="switch" >
             </dd>
           </div>
+        </dl>
+      </div>
+
+      <div id="preclear-set-queue-defaults" style="display:none;">
+        <dl>If you set a queue limit, only the first N sessions will run concurrently; all other preclear sessions will be paused until a session finishes.<br><br></dl>
+        <dl class="dl-dialog">
+          <dt>Concurrent sessions: </dt>
+          <dd>
+            <select name="queue">
+                <?=$queue;?>
+              </select>
+          </dd>
         </dl>
       </div>
     <?

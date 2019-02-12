@@ -106,6 +106,12 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
   $(function(){
     addButtonTab('<a class="tooltip-toggle" style="cursor:pointer" onclick="getlog(this)" title="Download Log"><i class="fa fa-download"></i></a>', "Preclear Disk", true, true);
     addButtonTab('<a class="tooltip-toggle" style="cursor:pointer" onclick="openWindow(\'/webGui/scripts/tail_log&arg1=preclear.disk.log\',\'Log Information\',600,900);"title="Show Log"><i class="fa fa-file-text-o"></i></a>', "Preclear Disk", true, true);
+
+    <?if(is_file("/var/run/preclear_queue.pid") && posix_kill(file_get_contents("/var/run/preclear_queue.pid"), 0)):?>
+    addButtonTab('<a class="tooltip-toggle" style="cursor:pointer;color:#00BE37;" onclick="setPreclearQueue();" title="Set Preclear Queue"><i class="fa fa-tachometer"></i></a>', "Preclear Disk", true, true);
+    <?else:?>
+    addButtonTab('<a class="tooltip-toggle" style="cursor:pointer" onclick="setPreclearQueue();" title="Set Preclear Queue"><i class="fa fa-tachometer"></i></a>', "Preclear Disk", true, true);
+    <?endif;?>
   });
 
 
