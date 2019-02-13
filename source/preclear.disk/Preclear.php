@@ -417,6 +417,13 @@ switch ($_POST['action'])
       TMUX::NewSession( $queue_session );
       TMUX::sendCommand( $queue_session, "/usr/local/emhttp/plugins/${plugin}/script/preclear_queue.sh $queue");
     }
+    else
+    {
+      foreach (glob("/tmp/.preclear/*/queued") as $file)
+      {
+        @unlink($file);
+      }
+    }
     break;
 }
 

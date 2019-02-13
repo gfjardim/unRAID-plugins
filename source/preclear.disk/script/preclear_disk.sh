@@ -509,15 +509,19 @@ write_disk(){
     if [ -f "$pause" -a "$paused_file" != "y" ]; then
       kill -TSTP $dd_pid
       paused_file=y
+      debug "Paused"
     elif [ -f "$queued_file" -a "$queued" != "y" ]; then
       kill -TSTP $dd_pid
       queued=y
+      debug "Enqueued"
     elif [ ! -f "$pause" -a "$paused_file" == "y" ]; then
       kill -CONT $dd_pid
       paused_file=n
+      debug "Resumed"
     elif [ ! -f "$queued_file" -a "$queued" == "y" ]; then
       kill -CONT $dd_pid
       queued=n
+      debug "Resumed"
     fi
 
     # Pause if a 'smartctl' command is taking too much time to complete
@@ -1768,7 +1772,7 @@ append all_files 'form_out'      "${all_files[dir]}/form_out"
 append all_files 'resume_file'   "/boot/config/plugins/preclear.disk/${disk_properties[serial]}.resume"
 
 mkdir -p "${all_files[dir]}"
-# trap "rm -rf ${all_files[dir]}" EXIT;
+trap "rm -rf ${all_files[dir]}" EXIT;
 if [ ! -p "${all_files[fifo]}" ]; then
   mkfifo "${all_files[fifo]}" || exit
 fi
