@@ -166,7 +166,7 @@ switch ($_POST['action'])
         }
         
         $disks_o .= "<tr class='$odd'>
-                      <td><img src='/webGui/images/${disk_icon}'><a href='/Tools/New?name=$disk_name'> $disk_name</a></td>
+                      <td><img src='/webGui/images/${disk_icon}'><a href='/Tools/Preclear/New?name=$disk_name'> $disk_name</a></td>
                       <td>${title}${report_files}</td>
                       <td>{$temp}</td>
                       <td><span>${disk['SIZE_H']}</span></td>
@@ -272,13 +272,17 @@ switch ($_POST['action'])
     // Enabling queue
     $queue_file="/boot/config/plugins/${plugin}/queue";
     $queue = is_file($queue_file) ? (is_numeric(file_get_contents($queue_file)) ? file_get_contents($queue_file) : 0 ) : 0;
+    $queue_running = is_file("/var/run/preclear_queue.pid") && posix_kill(file_get_contents("/var/run/preclear_queue.pid"), 0);
     if ($queue > 0)
     {
       if (! TMUX::hasSession("preclear_queue"))
       {
         TMUX::NewSession("preclear_queue");
       }
-      TMUX::sendCommand("preclear_queue", "/usr/local/emhttp/plugins/${plugin}/script/preclear_queue.sh $queue");
+      if (! $queue_running)
+      {
+        TMUX::sendCommand("preclear_queue", "/usr/local/emhttp/plugins/${plugin}/script/preclear_queue.sh $queue");
+      }
     }
 
     TMUX::killSession( $session );

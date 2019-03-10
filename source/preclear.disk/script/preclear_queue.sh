@@ -31,12 +31,14 @@ do_clean()
   done
   rm /var/run/preclear_queue.pid 2>/dev/null
   debug "Stopped"
+  tmux kill-window -t 'preclear_queue' 2>/dev/null
 }
 
 queue=${1-1};
+timer=$(date '+%s')
 
 echo $$ > /var/run/preclear_queue.pid
-debug "Start queue with $queue slots"
+[ $queue -gt 1 ] && debug "Start queue with $queue slots" || debug "Start queue with $queue slot"
 
 trap "do_clean;" exit
 
@@ -55,6 +57,11 @@ while [ -f /var/run/preclear_queue.pid ]; do
       fi
     fi
     i=$(( $i + 1 ))
+    timer=$(date '+%s')
   done
+  if [ "$i" -eq "0" ] && [[  $(( $(date '+%s') - $timer )) -gt 60 ]]; then
+    debug "No active jobs, stopping queue manager"
+    break
+  fi
   sleep 1
 done

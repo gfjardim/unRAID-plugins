@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2019.02.12c">
+<!ENTITY version   "2019.03.10">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,11 @@
 
 <CHANGES>
 ##&name;
+
+###2019.03.10
+- Fix: diskinfo causing high cpu usage.
+- Fix: start/stop queue on demand.
+- Fix: remove leftover packages
 
 ###2019.02.12b
 - Fix: queue persistent across reboots
@@ -445,6 +450,7 @@ The 'packages-install' script.
 download_install() {
   local dest="/boot/config/plugins/&name;/${2}"
   local src="&gitURL;/source/packages/${2}"
+  local pkg=$(echo ${2} | grep -Po "(^.*)(?=-\d+\.\d+)")
   local md5=$1
   if [ ! -f "${dest}" ]; then
     curl --location --silent --fail "${src}" --output "${dest}"
@@ -455,7 +461,7 @@ download_install() {
     rm "${dest}"
     exit 1
   else
-    /sbin/installpkg "$dest"
+    /sbin/installpkg "$dest" &amp;&amp; find /boot/config/plugins/preclear.disk/ -type f -iname "${pkg}*.txz" -a ! -iname "${2}" -delete
   fi
 }
 

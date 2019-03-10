@@ -13,7 +13,7 @@ set_exception_handler( "log_exception" );
 ######  DEAMON SECTION  ######
 ##############################
 $debug = FALSE;
-$version = "0.1.1";
+$version = "0.1.2";
 
 $prog      = pathinfo(__FILE__, PATHINFO_BASENAME);
 $prog_name = "Disk Info Daemon";
@@ -510,7 +510,7 @@ class Disks
       if (strlen($part['MOUNTPOINT']))
       {
         $part['USED'] = intval(trim($this->benchmark("shell_exec", "df --exclude-type=devtmpfs --block-size=1 --output=used,source ${part['DEVICE']} 2>/dev/null|tail -n +2|awk '{print $1}'")));
-        $part['OPENFILES'] = trim($this->benchmark("shell_exec", "lsof +L -Fk '${part['MOUNTPOINT']}' 2>/dev/null | wc -l"));
+        $part['OPENFILES'] = trim($this->benchmark("shell_exec", "lsof -- '${part['MOUNTPOINT']}' 2>/dev/null | tail -n +2 | wc -l"));
       }
       else
       {
