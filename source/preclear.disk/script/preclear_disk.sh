@@ -1694,7 +1694,7 @@ append diskop 'current_op' ""
 append diskop 'current_pos' ""
 append diskop 'current_timer' ""
 append diskop 'last_update' 0
-append diskop 'update_interval' "60"
+append diskop 'update_interval' "900"
 
 # Disk properties
 append disk_properties 'device'      "$theDisk"
