@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="1.0.3"
+version="1.0.4"
 
 # PID
 script_pid=$BASHPID
@@ -32,8 +32,9 @@ else
 fi
 
 # Redirect errors to log
-exec 2> >(while read err; do echo "$(date +"%b %d %T" ) ${log_prefix} ${err}" >> /var/log/preclear.disk.log; echo "${err}"; done; >&2)
+exec 2> >(while read err; do echo "$(date +"%b %d %T") ${log_prefix} ${err}" >> /var/log/preclear.disk.log; echo "${err}"; done; >&2)
 
+# Send debug messages to log
 debug() {
   local msg="$*"
   if [ -z "$msg" ]; then
@@ -487,7 +488,8 @@ write_disk(){
     fi
 
     # Save current status
-    save_current_status "$write_type" "$bytes_wrote" $(( $(date '+%s') - $time_start ))
+    diskop+=([current_op]="$write_type" [current_pos]="$bytes_wrote" [current_timer]=$(( $(date '+%s') - $time_start )) )
+    save_current_status
 
     let percent_wrote=($bytes_wrote*100/$total_bytes)
     if [ ! -z "${bytes_wrote##*[!0-9]*}" ]; then
@@ -640,7 +642,9 @@ write_disk(){
     debug "${write_type_s}: dd command failed, exit code [$dd_exit_code]."
     while read l; do debug "${write_type_s}: dd output: ${l}"; done < <(tail -n20 "$dd_output")
 
-    save_current_status "$write_type" "$bytes_wrote" $(( $(date '+%s') - $time_start ))
+    diskop+=([current_op]="$write_type" [current_pos]="$bytes_wrote" [current_timer]=$(( $(date '+%s') - $time_start )) )
+    save_current_status
+
     exit_code=1
   else
     debug "${write_type_s}: dd exit code - $dd_exit_code"
@@ -696,10 +700,11 @@ is_numeric() {
 }
 
 save_current_status() {
-  local current_op=$1
-  local current_pos=$2
-  local current_timer=$3
-  local tmp_resume="${all_files[resume_file]}.tmp"
+
+  local current_op=${diskop[current_op]}
+  local current_pos=${diskop[current_pos]}
+  local current_timer=${diskop[current_timer]}
+  local tmp_resume="${all_files[resume_temp]}.tmp"
 
   echo -e "current_op=$current_op" > "$tmp_resume"
   echo -e "current_pos=$current_pos" >> "$tmp_resume"
@@ -727,7 +732,16 @@ save_current_status() {
   echo -e "postread_average='$postread_average'" >> "$tmp_resume"
   echo -e "postread_speed='$postread_speed'" >> "$tmp_resume"
   echo -e "no_prompt=$no_prompt" >> "$tmp_resume"
-  mv -f "$tmp_resume" "${all_files[resume_file]}"
+  mv -f "$tmp_resume" "${all_files[resume_temp]}"
+
+  local last_updated=$(( $(timer) - ${diskop[last_update]} ))
+ 
+  if [ "$1" = "1" ] || [ "$last_updated" -gt "${diskop[update_interval]}" ]; then
+    cp "${all_files[resume_temp]}" "${all_files[resume_file]}.tmp"
+    mv "${all_files[resume_file]}.tmp" "${all_files[resume_file]}"
+    diskop[last_update]=$(timer)
+  fi
+
 }
 
 read_entire_disk() { 
@@ -946,7 +960,8 @@ read_entire_disk() {
     fi
 
     # Save current status
-    save_current_status "$read_type" "$bytes_read" $(( $(date '+%s') - $time_start ))
+    diskop+=([current_op]="$read_type" [current_pos]="$bytes_read" [current_timer]=$(( $(date '+%s') - $time_start )) )
+    save_current_status
 
     time_current=$(timer)
 
@@ -1104,7 +1119,9 @@ read_entire_disk() {
   if test "$dd_exit_code" -ne 0; then
     debug "${read_type_s}: dd command failed, exit code [$dd_exit_code]."
     while read l; do debug "${read_type_s}: dd output: ${l}"; done < <(tail -n20 "$dd_output")
-    save_current_status "$read_type" "$bytes_read" $(( $(date '+%s') - $time_start ))
+
+    diskop+=([current_op]="$read_type" [current_pos]="$bytes_read" [current_timer]=$(( $(date '+%s') - $time_start )) )
+    save_current_status
     return 1
   else
     debug "${read_type_s}: dd exit code - $dd_exit_code"
@@ -1279,6 +1296,7 @@ display_status(){
     # echo "π" >> $out
     tput cup $(( $height + $hpos + 2 )) 0 >> $out
   fi
+  # echo -e "\n$TERM\n" >> $out
   cat $out
 }
 
@@ -1671,6 +1689,13 @@ syslog_to_debug $theDisk &
 ##                                                  ##
 ######################################################
 
+# Operation variables
+append diskop 'current_op' ""
+append diskop 'current_pos' ""
+append diskop 'current_timer' ""
+append diskop 'last_update' 0
+append diskop 'update_interval' "60"
+
 # Disk properties
 append disk_properties 'device'      "$theDisk"
 append disk_properties 'size'        $(blockdev --getsize64 ${disk_properties[device]} 2>/dev/null)
@@ -1770,9 +1795,12 @@ append all_files 'smart_final'   "${all_files[dir]}/smart_final"
 append all_files 'smart_out'     "${all_files[dir]}/smart_out"
 append all_files 'form_out'      "${all_files[dir]}/form_out"
 append all_files 'resume_file'   "/boot/config/plugins/preclear.disk/${disk_properties[serial]}.resume"
+append all_files 'resume_temp'   "/tmp/.preclear/${disk_properties[serial]}.resume"
 
 mkdir -p "${all_files[dir]}"
-trap "rm -rf ${all_files[dir]}" EXIT;
+
+trap "rm -rf ${all_files[dir]}; save_current_status 1;" EXIT;
+
 if [ ! -p "${all_files[fifo]}" ]; then
   mkfifo "${all_files[fifo]}" || exit
 fi
@@ -2031,7 +2059,8 @@ for cycle in $(seq $cycles); do
       display_status "Pre-Read in progress ..." ''
 
       # Saving progress  
-      save_current_status "preread" "$start_bytes" "$start_timer"
+      diskop+=([current_op]="preread" [current_pos]="$start_bytes" [current_timer]="$start_timer" )
+      save_current_status
 
       while [[ true ]]; do
         read_entire_disk no-verify preread start_bytes start_timer preread_average preread_speed
@@ -2079,7 +2108,8 @@ for cycle in $(seq $cycles); do
       fi
 
       display_status "Erasing in progress ..." ''
-      save_current_status "erase" "$start_bytes" "$start_timer"
+      diskop+=([current_op]="erase" [current_pos]="$start_bytes" [current_timer]="$start_timer" )
+      save_current_status
 
       # Erase the disk
       while [[ true ]]; do
@@ -2126,7 +2156,9 @@ for cycle in $(seq $cycles); do
     fi
 
     display_status "${title_write} in progress ..." ''
-    save_current_status "$write_op" "$start_bytes" "$start_timer"
+    diskop+=([current_op]="$write_op" [current_pos]="$start_bytes" [current_timer]="$start_timer" )
+    save_current_status
+
     while [[ true ]]; do
       write_disk $write_op start_bytes start_timer write_average write_speed
       ret_val=$?
@@ -2161,7 +2193,8 @@ for cycle in $(seq $cycles); do
       if is_current_op "write_mbr"; then
 
         display_status "Writing unRAID's Preclear signature to the disk ..." ''
-        save_current_status "write_mbr" "0" "0"
+        diskop+=([current_op]="write_mbr" [current_pos]="0" [current_timer]="0" )
+        save_current_status
         echo "${disk_properties[name]}|NN|Writing unRAID's Preclear signature|$$" > ${all_files[stat]}
         write_signature 64
         # sleep 10
@@ -2177,7 +2210,8 @@ for cycle in $(seq $cycles); do
       # Check current operation if restoring a previous preclear instance
       if is_current_op "read_mbr"; then
         display_status "Verifying unRAID's signature on the MBR ..." ""
-        save_current_status "read_mbr" "0" "0"
+        diskop+=([current_op]="read_mbr" [current_pos]="0" [current_timer]="0" )
+        save_current_status
         echo "${disk_properties[name]}|NN|Verifying unRAID's signature on the MBR|$$" > ${all_files[stat]}
         if verify_mbr $theDisk; then
           append display_step "Verifying unRAID's Preclear signature:|***SUCCESS*** "
@@ -2219,7 +2253,8 @@ for cycle in $(seq $cycles); do
       fi
 
       display_status "Post-Read in progress ..." ""
-      save_current_status "postread" "$start_bytes" "$start_timer"
+      diskop+=([current_op]="postread" [current_pos]="$start_bytes" [current_timer]="$start_timer" )
+      save_current_status
       while [[ true ]]; do
         read_entire_disk verify postread start_bytes start_timer postread_average postread_speed
         ret_val=$?

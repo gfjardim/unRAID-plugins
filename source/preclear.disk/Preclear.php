@@ -201,17 +201,19 @@ switch ($_POST['action'])
     $serial  = $Preclear->diskSerial($device);
     $session = "preclear_disk_{$serial}";
     $op      = (isset($_POST['op']) && $_POST['op'] != "0") ? urldecode($_POST['op']) : "";
+    $file    = (isset($_POST['file'])) ? urldecode($_POST['file']) : "";
     $scope   = $_POST['scope'];
     $script  = $script_files[$scope];
     $devname = basename($device);
 
     @file_put_contents("/tmp/preclear_stat_{$devname}","{$devname}|NN|Starting...");
 
-    if ( $op == "resume" && is_file("/boot/config/plugins/$plugin/${serial}.resume"))
+    if ( $op == "resume" && is_file($file))
     {
-      $cmd = "$script --load-file '/boot/config/plugins/$plugin/${serial}.resume' ${device}";
+      $cmd = "$script --load-file ".escapeshellarg($file)." ${device}";
     }
-    else if($op == "resume" && ! is_file("/boot/config/plugins/$plugin/${serial}.resume"))
+
+    else if($op == "resume" && ! is_file($file))
     {
       break;
     }
@@ -379,12 +381,18 @@ switch ($_POST['action'])
 
   case 'get_resumable':
     $serial  = urldecode($_POST['serial']);
-    if (is_file("/boot/config/plugins/$plugin/${serial}.resume"))
+    if (is_file("/tmp/.preclear/${serial}.resume"))
     {
-      echo json_encode(["resume" => true]);
+      echo json_encode(["resume" => "/tmp/.preclear/${serial}.resume"]);
+    }
+    else if (is_file("/boot/config/plugins/$plugin/${serial}.resume"))
+    {
+      echo json_encode(["resume" => "/boot/config/plugins/$plugin/${serial}.resume"]);
     }
     else
-      {echo json_encode(["resume" => false]);}
+    {
+      echo json_encode(["resume" => false]);
+    }
     break;
 
   case 'resume_preclear':

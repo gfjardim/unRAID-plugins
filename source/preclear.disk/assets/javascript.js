@@ -560,7 +560,7 @@ function getResumablePreclear(serial)
         closeOnConfirm: false,
         showCancelButton: true,
         confirmButtonText:"Resume",
-        cancelButtonText:"Cancel"
+        cancelButtonText:"Start New"
       }, function(result)
       {
         if (result)
@@ -572,6 +572,7 @@ function getResumablePreclear(serial)
           opts["serial"] = serial;
           opts["device"] = getDiskInfo(serial, 'DEVICE');
           opts["op"]     = "resume";
+          opts["file"]   = data.resume;
           opts["scope"]  = "gfjardim";
 
           $.post(PreclearURL, opts, function(data)
