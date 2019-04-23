@@ -4,16 +4,20 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2019.04.22a">
+<!ENTITY version   "2019.04.23">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
 ]>
 
-<PLUGIN name="&name;" author="&author;" launch="&launch;" version="&version;" pluginURL="&pluginURL;">
+<PLUGIN name="&name;" author="&author;" launch="&launch;" version="&version;" pluginURL="&pluginURL;" icon="icon-preclear">
 
 <CHANGES>
 ##&name;
+
+###019.04.23
+- Fix: reinstallation failing;
+- Fix: change between icon/image if needed.
 
 ###2019.04.22a
 - Fix: set correct time interval for resume write to flash drive.
@@ -468,7 +472,7 @@ download_install() {
     rm "${dest}"
     exit 1
   else
-    /sbin/installpkg "$dest" &amp;&amp; find /boot/config/plugins/preclear.disk/ -type f -iname "${pkg}*.txz" -a ! -iname "${2}" -delete
+    /sbin/upgradepkg --install-new "$dest" &amp;&amp; find /boot/config/plugins/preclear.disk/ -type f -iname "${pkg}*.txz" -a ! -iname "${2}" -delete
   fi
 }
 
@@ -578,6 +582,12 @@ find /boot/config/plugins/&name;/ -type f -iname "tor-*.txz" -delete
 rm -f /var/local/emhttp/plugins/diskinfo/diskinfo.json &amp;&gt;/dev/null
 echo "sleep 5 ; /etc/rc.d/rc.diskinfo --daemon &amp;&gt;/dev/null" | at now &amp;&gt;/dev/null
 
+# Change PNG icon to SVG icon if possible
+font_file="/usr/local/emhttp/webGui/styles/font-unraid.svg"
+if [ -f "$font_file" ] &amp;&amp; [ $(grep -c "preclear" "$font_file" 2>/dev/null) -eq 1 ]; then
+  sed -i -e 's/preclear.disk.png/icon-preclear/g' /usr/local/emhttp/plugins/&name;/Preclear.page
+fi
+
 echo ""
 echo "-----------------------------------------------------------"
 echo " &name; has been installed."
@@ -589,18 +599,33 @@ echo ""
 </INLINE>
 </FILE>
 
+<!-- 
+Run in the background
+-->
+<FILE Run="/usr/bin/at -M now 2>/dev/null ">
+<INLINE>
+#!/bin/bash
+sleep 5
+font_file="/usr/local/emhttp/webGui/styles/font-unraid.svg"
+if [ -f "$font_file" ] &amp;&amp; [ $(grep -c "preclear" "$font_file" 2>/dev/null) -eq 0 ]; then
+  sed -i -e 's/icon=\"icon-preclear\"//g' /boot/config/plugins/&name;.plg
+fi
+</INLINE>
+</FILE>
+
 <!--
 The 'remove' script.
 -->
 <FILE Run="/bin/bash" Method="remove">
 <INLINE>
 
+
 # kill all tmux sessions
 for session in $(tmux ls | grep preclear | cut -d':' -f1); do 
   tmux kill-session -t "${session}" >/dev/null 2>&amp;1
 done
 
-find /var/log/packages -type f -iname "&name;-*" -delete
+find /var/log/packages/ -type f -iname "&name;-*" -delete
 
 # Remove plugin related files
 rm -rf /boot/config/plugins/&name; \

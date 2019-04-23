@@ -1,6 +1,6 @@
 Menu="DiskUtilities"
 Title="Preclear Disk"
-Icon="icon-preclear"
+Icon="preclear.disk.png"
 ---
 <?
 $plugin = "preclear.disk";

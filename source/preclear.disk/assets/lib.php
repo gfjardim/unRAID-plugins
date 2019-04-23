@@ -466,7 +466,9 @@ class Preclear
       </div>
 
       <div id="preclear-set-queue-defaults" style="display:none;">
-        <dl>If you set a queue limit, only the first N sessions will run concurrently; all other preclear sessions will be paused until a session finishes.<br><br></dl>
+        <dl>
+          If you set a queue limit, all running preclear sessions above that limit will be paused and remain in the queue until a session finishes.<br><br>
+        </dl>
         <dl class="dl-dialog">
           <dt>Concurrent sessions: </dt>
           <dd>
