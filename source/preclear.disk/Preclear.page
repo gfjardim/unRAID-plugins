@@ -113,6 +113,4 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
     addButtonTab('<a class="tooltip-toggle" style="cursor:pointer" onclick="setPreclearQueue();" title="Set Preclear Queue"><i class="fa fa-tachometer"></i></a>', "Preclear Disk", true, true);
     <?endif;?>
   });
-
-
 </script>

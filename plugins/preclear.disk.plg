@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2019.04.23">
+<!ENTITY version   "2019.04.23a">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,9 @@
 
 <CHANGES>
 ##&name;
+
+###2019.04.23a
+- Fix: Change image icon to font icon if possible
 
 ###019.04.23
 - Fix: reinstallation failing;
@@ -582,12 +585,6 @@ find /boot/config/plugins/&name;/ -type f -iname "tor-*.txz" -delete
 rm -f /var/local/emhttp/plugins/diskinfo/diskinfo.json &amp;&gt;/dev/null
 echo "sleep 5 ; /etc/rc.d/rc.diskinfo --daemon &amp;&gt;/dev/null" | at now &amp;&gt;/dev/null
 
-# Change PNG icon to SVG icon if possible
-font_file="/usr/local/emhttp/webGui/styles/font-unraid.svg"
-if [ -f "$font_file" ] &amp;&amp; [ $(grep -c "preclear" "$font_file" 2>/dev/null) -eq 1 ]; then
-  sed -i -e 's/preclear.disk.png/icon-preclear/g' /usr/local/emhttp/plugins/&name;/Preclear.page
-fi
-
 echo ""
 echo "-----------------------------------------------------------"
 echo " &name; has been installed."
@@ -600,15 +597,23 @@ echo ""
 </FILE>
 
 <!-- 
-Run in the background
+Change image icon to font icon if possible
 -->
 <FILE Run="/usr/bin/at -M now 2>/dev/null ">
 <INLINE>
 #!/bin/bash
-sleep 5
+
+# Change PNG icon to SVG icon if possible
 font_file="/usr/local/emhttp/webGui/styles/font-unraid.svg"
-if [ -f "$font_file" ] &amp;&amp; [ $(grep -c "preclear" "$font_file" 2>/dev/null) -eq 0 ]; then
-  sed -i -e 's/icon=\"icon-preclear\"//g' /boot/config/plugins/&name;.plg
+if [ -f "$font_file" ]; then
+  icon_exists=$(grep -c "preclear" "$font_file" 2>/dev/null)
+  if [ "$icon_exists" -eq 1 ]; then
+    sed -i -e 's/preclear.disk.png/icon-preclear/g' /usr/local/emhttp/plugins/&name;/Preclear.page
+    sed -i -e '/^---/i Tag=\"icon-preclear\"' /usr/local/emhttp/plugins/&name;/Preclear.page
+  elif [ "$icon_exists" -eq 0 ]; then
+    sleep 5
+    sed -i -e 's/icon=\"icon-preclear\"//g' /boot/config/plugins/&name;.plg
+  fi
 fi
 </INLINE>
 </FILE>
