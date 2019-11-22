@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2019.04.23a">
+<!ENTITY version   "2019.11.22">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,13 @@
 
 <CHANGES>
 ##&name;
+
+###2019.11.22
+- Fix: script version 1.0.5
+- Fix: 4kn disk drives not formating
+- Fix: exporting errors and messages to syslog
+- Fix: starting all partitions at sector 64 (avoid partition missalignment)
+- Fix: open reports at a new tab
 
 ###2019.04.23a
 - Fix: Change image icon to font icon if possible

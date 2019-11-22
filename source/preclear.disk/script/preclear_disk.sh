@@ -5,14 +5,16 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="1.0.4"
+version="1.0.5"
 
 # PID
 script_pid=$BASHPID
 
 # Serial
+cmd_disk=""
 for arg in "$@"; do
   if [ -b "$arg" ]; then
+    cmd_disk=$arg
     attrs=$(udevadm info --query=property --name="${arg}")
     serial_number=$(echo -e "$attrs" | awk -F'=' '/ID_SCSI_SERIAL/{print $2}')
     if [ -z "$serial_number" ]; then
@@ -26,13 +28,15 @@ done
 
 # Log prefix
 if [ -n "$serial_number" ]; then
+  syslog_prefix="preclear_disk_${serial_number}"
   log_prefix="preclear_disk_${serial_number}_${script_pid}:"
+elif [[ -n "$cmd_disk" ]]; then
+  syslog_prefix="preclear_disk_${cmd_disk}"
+  log_prefix="preclear_disk_${script_pid}:"
 else
+  syslog_prefix="preclear_disk"
   log_prefix="preclear_disk_${script_pid}:"
 fi
-
-# Redirect errors to log
-exec 2> >(while read err; do echo "$(date +"%b %d %T") ${log_prefix} ${err}" >> /var/log/preclear.disk.log; echo "${err}"; done; >&2)
 
 # Send debug messages to log
 debug() {
@@ -41,7 +45,11 @@ debug() {
     read msg;
   fi
   cat <<< "$(date +"%b %d %T" ) ${log_prefix} $msg" >> /var/log/preclear.disk.log
+  logger --id="$$" -t "${syslog_prefix}" "${msg}" 
 }
+
+# Redirect errors to log
+exec 2> >(while read err; do debug "${err}"; echo "${err}"; done; >&2)
 
 # Let's make sure some features are supported by BASH
 BV=$(echo $BASH_VERSION|tr '.' "\n"|grep -Po "^\d+"|xargs printf "%.2d\n"|tr -d '\040\011\012\015')
@@ -310,7 +318,7 @@ write_signature() {
   if [ $disk_blocks -ge $max_mbr_blocks ]; then
     size1=$(printf "%d" "0x00020000")
     size2=$(printf "%d" "0xFFFFFF00")
-    start_sector=1
+    start_sector=64
     partition_size=$(printf "%d" 0xFFFFFFFF)
   fi
 
@@ -320,13 +328,25 @@ write_signature() {
   echo -ne "\0252" | dd bs=1 count=1 seek=511 of=$disk >/dev/null 2>&1
   echo -ne "\0125" | dd bs=1 count=1 seek=510 of=$disk >/dev/null 2>&1
 
-  for var in $size1 $size2 $start_sector $partition_size ; do
-    for hex in $(tac <(fold -w2 <(printf "%08x\n" $var) )); do
-      sig="${sig}\\x${hex}"
-      # sig="${sig}$(printf '\\x%02x' "0x${hex}")"
-    done
-  done
-  printf $sig| dd seek=446 bs=1 count=16 of=$disk >/dev/null 2>&1
+  awk 'BEGIN{
+  printf ("%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c",
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[1]),7,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[1]),5,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[1]),3,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[1]),1,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[2]),7,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[2]),5,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[2]),3,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[2]),1,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[3]),7,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[3]),5,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[3]),3,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[3]),1,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[4]),7,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[4]),5,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[4]),3,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[4]),1,2)))
+  }' $size1 $size2 $start_sector $partition_size | dd seek=446 bs=1 count=16 of=$disk >/dev/null 2>&1
 }
 
 maxExecTime() {
@@ -1274,7 +1294,7 @@ display_status(){
     fi
     echo "${canvas[smart]}" >> $out
 
-    line="S.M.A.R.T. Status $type"
+    line="S.M.A.R.T. Status (device type: $type)"
     line_num=$(echo "$line"|tr -d "${bold}"|tr -d "${norm}"|tr -d "${ul}"|tr -d "${noul}"|wc -m)
     let l=($init + 2)
     tput cup $(($l)) $(( $width/2 - $line_num/2 )) >> $out
@@ -1679,7 +1699,7 @@ if [ -f "$load_file" ] && $(bash -n "$load_file"); then
   fi
 fi
 
-syslog_to_debug $theDisk &
+# syslog_to_debug $theDisk &
 
 # diff /tmp/.init <(set -o >/dev/null; set)
 # exit 0
@@ -2334,7 +2354,7 @@ else
   if [ "$disable_smart" != "y" ]; then
     echo -e "\n--> ATTENTION: Please take a look into the SMART report above for drive health issues.\n" >>$report
   fi
-  echo -e "--> RESULT: ${op_title} Finished Successfully!.\n\n" >>$report
+  echo -e "--> RESULT: ${op_title} Finished Successfully!\n\n" >>$report
   report_tmux="preclear_disk_report_${disk_properties[name]}"
 
   tmux new-session -d -x 140 -y 200 -s "${report_tmux}"

@@ -136,7 +136,7 @@ switch ($_POST['action'])
             $report_files .= "<div style='margin:4px 0px 4px 0px;'>
                                 <i class='fa fa-list-alt hdd'></i>
                                 <span style='margin:7px;'></span>
-                                <a href='${report}'>".pathinfo($report, PATHINFO_FILENAME)."</a>
+                                <a href='${report}' target='_blank'>".pathinfo($report, PATHINFO_FILENAME)."</a>
                                 <a class='exec' title='Remove Report' style='color:#CC0000;font-weight:bold;' onclick='rmReport(\"{$report}\", this);'>
                                   &nbsp;<i class='fa fa-times hdd'></i>
                                 </a>
