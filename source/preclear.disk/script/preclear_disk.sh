@@ -45,7 +45,7 @@ debug() {
     read msg;
   fi
   cat <<< "$(date +"%b %d %T" ) ${log_prefix} $msg" >> /var/log/preclear.disk.log
-  logger --id="$$" -t "${syslog_prefix}" "${msg}" 
+  logger --id="${script_pid}" -t "${syslog_prefix}" "${msg}" 
 }
 
 # Redirect errors to log
@@ -210,25 +210,32 @@ array_enumerate() {
   done
 }
 
+array_enumerate2() {
+  local i _column z
+  for z in $@; do
+    debug "array '$z'"
+    eval "_column="";for i in \"\${!$z[@]}\"; do debug \"\$i -> \${$z[\$i]}\"; done"
+  done
+}
+
 array_content() { local _arr=$(eval "declare -p $1") && echo "${_arr#*=}"; }
 
 read_mbr() {
   # called read_mbr [variable] "/dev/sdX" 
-  local result=$1 disk=$2 i
+  local disk=$1 i
+  local mbr
+
   # verify MBR boot area is clear
   append mbr `dd bs=446 count=1 if=$disk 2>/dev/null        |sum|awk '{print $1}'`
-  array_enumerate mbr
+
   # verify partitions 2,3, & 4 are cleared
   append mbr `dd bs=1 skip=462 count=48 if=$disk 2>/dev/null|sum|awk '{print $1}'`
-  array_enumerate mbr
+
   # verify partition type byte is clear
   append mbr `dd bs=1 skip=450 count=1 if=$disk  2>/dev/null|sum|awk '{print $1}'`
-  array_enumerate mbr
 
   # verify MBR signature bytes are set as expected
   append mbr `dd bs=1 count=1 skip=511 if=$disk 2>/dev/null |sum|awk '{print $1}'`
-  array_enumerate mbr
-
   append mbr `dd bs=1 count=1 skip=510 if=$disk 2>/dev/null |sum|awk '{print $1}'`
 
   for i in $(seq 446 461); do
@@ -262,12 +269,14 @@ verify_mbr() {
     partition_size=$disk_blocks
   fi
 
-  array=$(read_mbr sectors "$disk")
+  array=$(read_mbr "$disk")
   eval "declare -A sectors="${array#*=}
 
   for i in $(seq 0 $((${#patterns[@]}-1)) ); do
     if [ "${sectors[$i]}" != "${patterns[$i]}" ]; then
-      echo "Failed test 1: MBR signature is not valid. [${sectors[$i]}] != [${patterns[$i]}]"
+      echo "Failed test 1: MBR signature is not valid, byte $i [${sectors[$i]}] != [${patterns[$i]}]"
+      debug "Failed test 1: MBR signature is not valid, byte $i [${sectors[$i]}] != [${patterns[$i]}]"
+      array_enumerate2 sectors
       return 1
     fi
   done
@@ -284,29 +293,33 @@ verify_mbr() {
   mbr_blocks=$(printf "%d" "0x${mbr_blocks}")
 
   case "$start_sector" in
-    63) 
-      let partition_size=($disk_blocks - $start_sector)
-      ;;
-    64)
-      let partition_size=($disk_blocks - $start_sector)
+    63|64)
+      if [ "$over_mbr_size" != "y" ]; then
+        let partition_size=($disk_blocks - $start_sector)
+      fi
       ;;
     1)
       if [ "$over_mbr_size" != "y" ]; then
         echo "Failed test 2: GPT start sector [$start_sector] is wrong, should be [1]."
+        debug "Failed test 2: GPT start sector [$start_sector] is wrong, should be [1]."
+        array_enumerate2 sectors
         return 1
       fi
       ;;
     *)
       echo "Failed test 3: start sector is different from those accepted by unRAID."
+      debug "Failed test 3: start sector is different from those accepted by unRAID."
+      array_enumerate2 sectors
       ;;
   esac
   if [ $partition_size -ne $mbr_blocks ]; then
     echo "Failed test 4: physical size didn't match MBR declared size. [$partition_size] != [$mbr_blocks]"
+    debug "Failed test 4: physical size didn't match MBR declared size. [$partition_size] != [$mbr_blocks]"
+    array_enumerate2 sectors
     return 1
   fi
   return 0
 }
-
 
 write_signature() {
   local disk=${disk_properties[device]}
@@ -322,7 +335,6 @@ write_signature() {
     partition_size=$(printf "%d" 0xFFFFFFFF)
   fi
 
-  dd if=/dev/zero bs=512 seek=1 of=$disk  count=4096 2>/dev/null
   dd if=/dev/zero bs=1 seek=462 count=48 of=$disk >/dev/null 2>&1
   dd if=/dev/zero bs=446 count=1 of=$disk  >/dev/null 2>&1
   echo -ne "\0252" | dd bs=1 count=1 seek=511 of=$disk >/dev/null 2>&1
@@ -487,7 +499,7 @@ write_disk(){
   debug "${write_type_s}: dd pid [$dd_pid]"
 
   # if we are interrupted, kill the background zeroing of the disk.
-  trap 'kill -9 $dd_pid 2>/dev/null;exit' EXIT
+  trap 'debug "killing dd with pid $dd_pid"; kill -9 $dd_pid 2>/dev/null;exit' EXIT
 
   # Send initial notification
   if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 3 ] ; then
@@ -929,7 +941,7 @@ read_entire_disk() {
   fi
 
   # if we are interrupted, kill the background reading of the disk.
-  trap 'kill -9 $dd_pid 2>/dev/null;exit' 2
+  trap 'debug "killing dd with pid $dd_pid";kill -9 $dd_pid 2>/dev/null;exit' 2
 
   while kill -0 $dd_pid >/dev/null 2>&1; do
 
@@ -1699,8 +1711,6 @@ if [ -f "$load_file" ] && $(bash -n "$load_file"); then
   fi
 fi
 
-# syslog_to_debug $theDisk &
-
 # diff /tmp/.init <(set -o >/dev/null; set)
 # exit 0
 ######################################################
@@ -1798,6 +1808,8 @@ for type in "" scsi ata auto sat,auto sat,12 usbsunplus usbcypress usbjmicron us
   fi
 done
 
+array_enumerate2 disk_properties
+
 # Used files
 append all_files 'dir'           "/tmp/.preclear/${disk_properties[name]}"
 append all_files 'dd_out'        "${all_files[dir]}/dd_output"
@@ -1819,7 +1831,7 @@ append all_files 'resume_temp'   "/tmp/.preclear/${disk_properties[serial]}.resu
 
 mkdir -p "${all_files[dir]}"
 
-trap "rm -rf ${all_files[dir]}; save_current_status 1;" EXIT;
+trap "rm -rf ${all_files[dir]}; save_current_status 1; debug 'SIGTERM received, exiting...'" EXIT;
 
 if [ ! -p "${all_files[fifo]}" ]; then
   mkfifo "${all_files[fifo]}" || exit
@@ -2100,7 +2112,6 @@ for cycle in $(seq $cycles); do
           echo -e "--> FAIL: Result: Pre-Read failed.\n\n"
           save_report "No - Pre-read $diskName ($theDisk) failed." "$preread_speed" "$postread_speed" "$write_speed"
           debug_smart $theDisk "$smart_type"
-          debug_syslog $theDisk
           # rm "${all_files[resume_file]}"
           exit 1
         fi
@@ -2150,7 +2161,6 @@ for cycle in $(seq $cycles); do
           echo -e "--> FAIL: Result: Erasing the disk failed.\n\n"
           save_report "No - Erasing the disk failed." "$preread_speed" "$postread_speed" "$write_speed"
           debug_smart $theDisk "$smart_type"
-          debug_syslog $theDisk
           # rm "${all_files[resume_file]}"
           exit 1
         fi
@@ -2196,7 +2206,6 @@ for cycle in $(seq $cycles); do
         echo -e "--> FAIL: Result: ${title_write} $diskName ($theDisk) failed.\n\n"
         save_report "No - ${title_write} the disk failed." "$preread_speed" "$postread_speed" "$write_speed"
         debug_smart $theDisk "$smart_type"
-        debug_syslog $theDisk
         # rm "${all_files[resume_file]}"
         exit 1
       fi
@@ -2246,7 +2255,6 @@ for cycle in $(seq $cycles); do
           save_report  "No - Invalid unRAID's MBR signature." "$preread_speed" "$postread_speed" "$write_speed"
           rm "${all_files[resume_file]}"
           debug_smart $theDisk "$smart_type"
-          debug_syslog $theDisk
           exit 1
         fi
       else
@@ -2294,7 +2302,6 @@ for cycle in $(seq $cycles); do
           send_mail "FAIL! Post-Read $diskName ($theDisk) failed" "FAIL! Post-Read $diskName ($theDisk) failed." "Post-Read $diskName ($theDisk) failed - Aborted" "" "alert"
           save_report "No - Post-Read verification failed" "$preread_speed" "$postread_speed" "$write_speed"
           debug_smart $theDisk "$smart_type"
-          debug_syslog $theDisk
           # rm "${all_files[resume_file]}"
           exit 1
         fi
@@ -2329,9 +2336,6 @@ for cycle in $(seq $cycles); do
     send_mail "Disk $diskName ($theDisk) PASSED cycle ${cycle}!" "${op_title}: Disk $diskName ($theDisk) PASSED cycle ${cycle}!" "$report_out"
   fi
 done
-
-# Save syslog messages to log file
-debug_syslog $theDisk
 
 echo "${disk_properties[name]}|NN|${op_title} Finished Successfully!|$$" > ${all_files[stat]};
 
