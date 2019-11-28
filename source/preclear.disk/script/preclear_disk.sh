@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="1.0.5"
+version="1.0.6"
 
 # PID
 script_pid=$BASHPID
@@ -181,23 +181,26 @@ send_mail() {
 }
 
 append() {
-  local _array=$1 _key;
-  eval "local x=\${${1}+x}"
+  local _array=$1 _array_keys="${1}_keys" _k _key;
+  eval "local x=\${$_array+x}"
   if [ -z $x ]; then
-    declare -g -A $1
+    eval "declare -g -A $_array"
+    eval "declare -g -a $_array_keys"
   fi
   if [ "$#" -eq "3" ]; then
-    el=$(printf "[$2]='%s'" "${@:3}")
+    _key=$2
+    el=$(printf "[$_key]='%s'" "${@:3}")
   else
     for (( i = 0; i < 1000; i++ )); do
-      eval "_key=\${$_array[$i]+x}"
-      if [ -z "$_key" ] ; then
+      eval "_k=\${$_array[$i]+x}"
+      if [ -z "$_k" ] ; then
         break
       fi
     done
-    el="[$i]=\"${@:2}\""
+    _key=$i
+    el="[$_key]=\"${@:2}\""
   fi
-  eval "$_array+=($el)"; 
+  eval "$_array+=($el);$_array_keys+=($_key)";
 }
 
 array_enumerate() {
@@ -255,7 +258,7 @@ verify_mbr() {
   local over_mbr_size
   local partition_size
   local patterns
-  declare sectors
+  local -a sectors
   local start_sector 
   local patterns=("00000" "00000" "00000" "00170" "00085")
   local max_mbr_blocks=$(printf "%d" 0xFFFFFFFF)
@@ -269,8 +272,22 @@ verify_mbr() {
     partition_size=$disk_blocks
   fi
 
-  array=$(read_mbr "$disk")
-  eval "declare -A sectors="${array#*=}
+  # verify MBR boot area is clear
+  sectors+=(`dd bs=446 count=1 if=$disk 2>/dev/null        |sum|awk '{print $1}'`)
+
+  # verify partitions 2,3, & 4 are cleared
+  sectors+=(`dd bs=1 skip=462 count=48 if=$disk 2>/dev/null|sum|awk '{print $1}'`)
+
+  # verify partition type byte is clear
+  sectors+=(`dd bs=1 skip=450 count=1 if=$disk  2>/dev/null|sum|awk '{print $1}'`)
+
+  # verify MBR signature bytes are set as expected
+  sectors+=(`dd bs=1 count=1 skip=511 if=$disk 2>/dev/null |sum|awk '{print $1}'`)
+  sectors+=(`dd bs=1 count=1 skip=510 if=$disk 2>/dev/null |sum|awk '{print $1}'`)
+
+  for i in $(seq 446 461); do
+    sectors+=(`dd bs=1 count=1 skip=$i if=$disk 2>/dev/null|sum|awk '{print $1}'`)
+  done
 
   for i in $(seq 0 $((${#patterns[@]}-1)) ); do
     if [ "${sectors[$i]}" != "${patterns[$i]}" ]; then
@@ -294,9 +311,7 @@ verify_mbr() {
 
   case "$start_sector" in
     63|64)
-      if [ "$over_mbr_size" != "y" ]; then
-        let partition_size=($disk_blocks - $start_sector)
-      fi
+      let partition_size=($disk_blocks - $start_sector)
       ;;
     1)
       if [ "$over_mbr_size" != "y" ]; then
@@ -331,7 +346,7 @@ write_signature() {
   if [ $disk_blocks -ge $max_mbr_blocks ]; then
     size1=$(printf "%d" "0x00020000")
     size2=$(printf "%d" "0xFFFFFF00")
-    start_sector=64
+    start_sector=1
     partition_size=$(printf "%d" 0xFFFFFFFF)
   fi
 
@@ -359,6 +374,27 @@ write_signature() {
   strtonum("0x" substr(sprintf( "%08x\n", ARGV[4]),3,2)),
   strtonum("0x" substr(sprintf( "%08x\n", ARGV[4]),1,2)))
   }' $size1 $size2 $start_sector $partition_size | dd seek=446 bs=1 count=16 of=$disk >/dev/null 2>&1
+
+  local sig=$(awk 'BEGIN{
+  printf ("%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c",
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[1]),7,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[1]),5,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[1]),3,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[1]),1,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[2]),7,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[2]),5,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[2]),3,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[2]),1,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[3]),7,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[3]),5,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[3]),3,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[3]),1,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[4]),7,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[4]),5,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[4]),3,2)),
+  strtonum("0x" substr(sprintf( "%08x\n", ARGV[4]),1,2)))
+  }' $size1 $size2 $start_sector $partition_size | od -An -vtu1 )
+  debug "Writing signature: ${sig}"
 }
 
 maxExecTime() {
@@ -499,7 +535,7 @@ write_disk(){
   debug "${write_type_s}: dd pid [$dd_pid]"
 
   # if we are interrupted, kill the background zeroing of the disk.
-  trap 'debug "killing dd with pid $dd_pid"; kill -9 $dd_pid 2>/dev/null;exit' EXIT
+  all_files[dd_pid]=$dd_pid
 
   # Send initial notification
   if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 3 ] ; then
@@ -646,7 +682,7 @@ write_disk(){
       let next_notify=($next_notify + 25)
     fi
 
-    if (( $percent_wrote % 5 == 0 )) && [ "$last_progress" -ne $percent_wrote ]; then
+    if (( $percent_wrote % 10 == 0 )) && [ "$last_progress" -ne $percent_wrote ]; then
       debug "${write_type_s}: progress - ${percent_wrote}% $write_type_v"
       last_progress=$percent_wrote
     fi
@@ -941,7 +977,7 @@ read_entire_disk() {
   fi
 
   # if we are interrupted, kill the background reading of the disk.
-  trap 'debug "killing dd with pid $dd_pid";kill -9 $dd_pid 2>/dev/null;exit' 2
+  all_files[dd_pid]=$dd_pid
 
   while kill -0 $dd_pid >/dev/null 2>&1; do
 
@@ -1116,7 +1152,7 @@ read_entire_disk() {
       paused_sync=n
     fi
 
-    if (( $percent_read  % 5 == 0 )) && [ "$last_progress" -ne $percent_read ]; then
+    if (( $percent_read  % 10 == 0 )) && [ "$last_progress" -ne $percent_read ]; then
       debug "${read_type_s}: progress - ${percent_read}% $read_type_v"
       last_progress=$percent_read
     fi
@@ -1214,7 +1250,9 @@ display_status(){
   local out="${all_files[dir]}/display_out"
 
   eval "local -A prev=$(array_content display_step)"
+  eval "local -a prev_keys=$(array_content display_step_keys)"
   eval "local -A title=$(array_content display_title)"
+  eval "local -a title_keys=$(array_content display_title_keys)"
 
   echo "" > $out
 
@@ -1227,7 +1265,7 @@ display_status(){
   fi
   echo "${canvas[info]}" >> $out
 
-  for (( i = 0; i <= ${#title[@]}; i++ )); do
+  for (( i = 0; i <= ${#title_keys[@]}; i++ )); do
     line=${title[$i]}
     line_num=$(echo "$line"|tr -d "${bold}"|tr -d "${norm}"|tr -d "${ul}"|tr -d "${noul}"|wc -m)
     tput cup $(($i+2+$hpos)) $(( $width/2 - $line_num/2  )) >> $out
@@ -1236,7 +1274,7 @@ display_status(){
 
   l=$((${#title[@]}+4+$hpos))
 
-  for i in "${!prev[@]}"; do
+  for i in "${!prev_keys[@]}"; do
     if [ -n "${prev[$i]}" ]; then
       line=${prev[$i]}
       stat=""
@@ -1627,6 +1665,34 @@ syslog_to_debug()
   done < <(tail -f -n0 /var/log/syslog 2>&1)
 }
 
+do_exit()
+{ 
+  case "$1" in
+    0)
+      debug 'SIGTERM received, exiting...'
+      kill -9 ${all_files[dd_pid]} 2>/dev/null
+      save_current_status 1;
+      exit 0
+      ;;
+    1)
+      debug 'error encountered, exiting...'
+      trap '' EXIT
+      kill -9 $(cat ${all_files[dd_pid]}) 2>/dev/null
+      rm -f "${all_files[resume_file]}"
+      rm -f "${all_files[resume_temp]}"
+      rm -rf ${all_files[dir]};
+      exit 1
+      ;;
+    *)
+      trap '' EXIT
+      rm -rf ${all_files[dir]};
+      rm -f "${all_files[resume_file]}"
+      rm -f "${all_files[resume_temp]}"
+      exit 0
+      ;;
+  esac
+}
+
 ######################################################
 ##                                                  ##
 ##                  PARSE OPTIONS                   ##
@@ -1808,12 +1874,17 @@ for type in "" scsi ata auto sat,auto sat,12 usbsunplus usbcypress usbjmicron us
   fi
 done
 
-array_enumerate2 disk_properties
+debug "Disk size: ${disk_properties[size]}"
+debug "Disk blocks: ${disk_properties[blocks]}"
+debug "Blocks (512 byte): ${disk_properties[blocks_512]}"
+debug "Block size: ${disk_properties[block_sz]}"
+debug "Start sector: ${disk_properties[start_sector]}"
 
 # Used files
 append all_files 'dir'           "/tmp/.preclear/${disk_properties[name]}"
 append all_files 'dd_out'        "${all_files[dir]}/dd_output"
 append all_files 'dd_exit'       "${all_files[dir]}/dd_exit_code"
+append all_files 'dd_pid'        "${all_files[dir]}/dd_pid"
 append all_files 'cmp_out'       "${all_files[dir]}/cmp_out"
 append all_files 'blkpid'        "${all_files[dir]}/blkpid"
 append all_files 'fifo'          "${all_files[dir]}/fifo"
@@ -1831,7 +1902,7 @@ append all_files 'resume_temp'   "/tmp/.preclear/${disk_properties[serial]}.resu
 
 mkdir -p "${all_files[dir]}"
 
-trap "rm -rf ${all_files[dir]}; save_current_status 1; debug 'SIGTERM received, exiting...'" EXIT;
+trap "do_exit 0" EXIT;
 
 if [ ! -p "${all_files[fifo]}" ]; then
   mkfifo "${all_files[fifo]}" || exit
@@ -1905,7 +1976,7 @@ if ! is_preclear_candidate $theDisk; then
   list_device_names
   echo -e "\n"
   debug "Disk $theDisk is part of unRAID array. Aborted."
-  exit 1
+  do_exit 1
 fi
 
 ######################################################
@@ -1936,9 +2007,7 @@ if [ "$verify_disk_mbr" == "y" ]; then
     if [ "$notify_channel" -gt 0 ]; then
       send_mail "FAIL! $diskName ($theDisk) DOESN'T have a valid unRAID MBR signature!!!" "$diskName ($theDisk) DOESN'T have a valid unRAID MBR signature!!!" "$diskName ($theDisk) DOESN'T have a valid unRAID MBR signature!!!" "" "alert"
     fi
-    # Remove resume information
-    rm "${all_files[resume_file]}"
-    exit 1
+    do_exit 1
   fi
   if [ "$max_steps" -eq "2" ]; then
     display_status "Verifying if disk is zeroed ..." ""
@@ -1957,9 +2026,7 @@ if [ "$verify_disk_mbr" == "y" ]; then
       if [ "$notify_channel" -gt 0 ]; then
         send_mail "FAIL! $diskName ($theDisk) IS NOT zeroed!!!" "FAIL! $diskName ($theDisk) IS NOT zeroed!!!" "FAIL! $diskName ($theDisk) IS NOT zeroed!!!" "" "alert"
       fi
-      # Remove resume information
-      rm "${all_files[resume_file]}"
-      exit 1
+      do_exit 1
     fi
   fi
   if [ "$notify_channel" -gt 0 ]; then
@@ -1967,9 +2034,7 @@ if [ "$verify_disk_mbr" == "y" ]; then
   fi
   echo "${disk_properties[name]}|NN|The disk is Precleared!|$$" > ${all_files[stat]}
   echo -e "--> RESULT: SUCCESS! Disk ${disk_properties['serial']} is precleared!\n\n"
-  # Remove resume information
-  rm "${all_files[resume_file]}"
-  exit 0
+  do_exit
 fi
 
 ######################################################
@@ -2112,8 +2177,8 @@ for cycle in $(seq $cycles); do
           echo -e "--> FAIL: Result: Pre-Read failed.\n\n"
           save_report "No - Pre-read $diskName ($theDisk) failed." "$preread_speed" "$postread_speed" "$write_speed"
           debug_smart $theDisk "$smart_type"
-          # rm "${all_files[resume_file]}"
-          exit 1
+
+          do_exit 1
         fi
       done
     else
@@ -2161,8 +2226,8 @@ for cycle in $(seq $cycles); do
           echo -e "--> FAIL: Result: Erasing the disk failed.\n\n"
           save_report "No - Erasing the disk failed." "$preread_speed" "$postread_speed" "$write_speed"
           debug_smart $theDisk "$smart_type"
-          # rm "${all_files[resume_file]}"
-          exit 1
+
+          do_exit 1
         fi
       done
     else
@@ -2206,8 +2271,8 @@ for cycle in $(seq $cycles); do
         echo -e "--> FAIL: Result: ${title_write} $diskName ($theDisk) failed.\n\n"
         save_report "No - ${title_write} the disk failed." "$preread_speed" "$postread_speed" "$write_speed"
         debug_smart $theDisk "$smart_type"
-        # rm "${all_files[resume_file]}"
-        exit 1
+
+        do_exit 1
       fi
     done
   else
@@ -2253,9 +2318,8 @@ for cycle in $(seq $cycles); do
           echo "${disk_properties[name]}|NY|unRAID's signature on the MBR failed - Aborted|$$" > ${all_files[stat]}
           send_mail "FAIL! Invalid unRAID's MBR signature on $diskName ($theDisk)" "FAIL! Invalid unRAID's MBR signature on $diskName ($theDisk)." "Invalid unRAID's MBR signature on $diskName ($theDisk) - Aborted" "" "alert"
           save_report  "No - Invalid unRAID's MBR signature." "$preread_speed" "$postread_speed" "$write_speed"
-          rm "${all_files[resume_file]}"
           debug_smart $theDisk "$smart_type"
-          exit 1
+          do_exit 1
         fi
       else
         append display_step "Verifying unRAID's Preclear signature:|***SUCCESS*** "
@@ -2302,8 +2366,7 @@ for cycle in $(seq $cycles); do
           send_mail "FAIL! Post-Read $diskName ($theDisk) failed" "FAIL! Post-Read $diskName ($theDisk) failed." "Post-Read $diskName ($theDisk) failed - Aborted" "" "alert"
           save_report "No - Post-Read verification failed" "$preread_speed" "$postread_speed" "$write_speed"
           debug_smart $theDisk "$smart_type"
-          # rm "${all_files[resume_file]}"
-          exit 1
+          do_exit 1
         fi
       done
     fi
@@ -2348,7 +2411,7 @@ echo -e "--> RESULT: ${op_title} Finished Successfully!.\n\n"
 report="${all_files[dir]}/report"
 
 # Remove resume information
-rm "${all_files[resume_file]}"
+rm -f ${all_files[resume_file]}
 
 tmux_window="preclear_disk_${disk_properties[serial]}"
 if [ "$(tmux ls 2>/dev/null | grep -c "${tmux_window}")" -gt 0 ]; then
@@ -2400,9 +2463,6 @@ if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 1 ]; then
   send_mail "${op_title}: PASS! Preclearing Disk $diskName ($theDisk) Finished!!!" "${op_title}: PASS! Preclearing Disk $diskName ($theDisk) Finished!!! Cycle ${cycle} of ${cycles}" "${report_out}"
 fi
 
-# debug
-# debug "dd_out:\n $(cat ${all_files[dd_out]})"
-# debug "dd_out:\n $(cat ${all_files[cmp_out]})"
-
 save_report "Yes" "$preread_speed" "$postread_speed" "$write_speed"
 
+do_exit
