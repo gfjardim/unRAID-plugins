@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2019.11.28">
+<!ENTITY version   "2020.01.10">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,9 @@
 
 <CHANGES>
 ##&name;
+
+###2020.01.10
+- Fix: Unraid 6.8.0 package update
 
 ###2019.11.28
 - Fix: script version 1.0.6
@@ -515,13 +518,17 @@ elif is_unraid_version '&gt;=' '6.6.3' &amp;&amp; is_unraid_version '&lt;' '6.7'
   download_install a4a7fdd5ff9910bee3477a2aa0e5fa25 tmux-2.7-x86_64-1.txz            
   download_install aed1f39d4a5acddb225b542145e0eeaf utempter-1.1.6-x86_64-2.txz      
 
-elif is_unraid_version '&gt;=' '6.7'; then
+elif is_unraid_version '&gt;=' '6.7' &amp;&amp; is_unraid_version '&lt;' '6.8.0-rc1'; then
 #  download_install 007c068e334c2358621d3d1ea959da80 ncurses-6.1_20190112-x86_64-1.txz   
   download_install 4e76295aad8c9bf8c98301a9b7ec2e64 libevent-2.1.8-x86_64-3.txz         
   download_install 00d6b305ad4f01504a9419dd959e8cce openssl10-solibs-1.0.2o-x86_64-1.txz
   download_install a40eef8aa01885ff6ea592a7e8e6b2da tmux-2.8-x86_64-1.txz               
-  download_install 1af347c4d9feff774320d9c1e7920ac3 utempter-1.1.6-x86_64-3.txz         
-
+  download_install 1af347c4d9feff774320d9c1e7920ac3 utempter-1.1.6-x86_64-3.txz
+  
+elif is_unraid_version '&gt;=' '6.8.0-b1' &amp;&amp; is_unraid_version '&lt;' '6.8.1'; then
+  download_install 7dabee590ed5b5e47b17480dec367636  tmux-3.0a-x86_64-1.txz
+  download_install 4e76295aad8c9bf8c98301a9b7ec2e64  libevent-2.1.8-x86_64-3.txz
+  download_install 1af347c4d9feff774320d9c1e7920ac3  utempter-1.1.6-x86_64-3.txz
 else
   echo "unRAID version ($version) not supported."
   exit 1;
