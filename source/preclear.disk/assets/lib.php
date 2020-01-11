@@ -336,6 +336,16 @@ class Preclear
         <dl class="dl-dialog"><dt>Firmware Version:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>{firmware}</span></dd></dl>
         <dl class="dl-dialog"><dt>Size:</dt><dd style='margin-bottom:0px;'><span style='color:#EF3D47;font-weight:bold;'>{size_h}</span></dd></dl>
       </div>
+      <div id="dialog-multiple-defaults" style="display:none;">
+        <dl class="dl-dialog">
+          <dt>Select Disks: </dt>
+          <dd style='margin-bottom:0px;'>
+              <select id="multiple_preclear" name="disks" multiple class='chosen swal' data-placeholder="Select Your Options">
+                {0}
+              </select>
+          </dd>
+        </dl>
+      </div>
       <div id="joel-start-defaults" style="display:none;">
         <dl class="dl-dialog">
           <dt>Operation: </dt>
@@ -357,7 +367,7 @@ class Preclear
           </div>
           <?if ( array_key_exists("notifications", $capabilities) && $capabilities["notifications"] ):?>
           <div class="notify_options">
-            <dt>Notifications:</dt>
+            <dt>Notifications: </dt>
             <dd style="font-weight: normal;">
               <input type="checkbox" name="preclear_notify1" onchange="toggleFrequency(this, '-M');">Browser &nbsp;
               <input type="checkbox" name="preclear_notify2" onchange="toggleFrequency(this, '-M');">Email &nbsp;

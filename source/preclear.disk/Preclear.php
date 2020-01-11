@@ -103,6 +103,9 @@ switch ($_POST['action'])
     debug("Starting get_content: ".(time() - $start_time),'DEBUG');
     // shell_exec("/etc/rc.d/rc.diskinfo --daemon &>/dev/null");
     $disks = Misc::get_json($diskinfo);
+    foreach ($disks as $disk => $attibutes) {
+      $disks[$disk]["PRECLEARING"] = $Preclear->isRunning($attibutes["DEVICE"]);
+    }
     $all_status = array();
 
     if ( count($disks) )
@@ -197,117 +200,121 @@ switch ($_POST['action'])
 
 
   case 'start_preclear':
-    $device  = urldecode($_POST['device']);
-    $serial  = $Preclear->diskSerial($device);
-    $session = "preclear_disk_{$serial}";
-    $op      = (isset($_POST['op']) && $_POST['op'] != "0") ? urldecode($_POST['op']) : "";
-    $file    = (isset($_POST['file'])) ? urldecode($_POST['file']) : "";
-    $scope   = $_POST['scope'];
-    $script  = $script_files[$scope];
-    $devname = basename($device);
+    $devices = is_array($_POST['device']) ? $_POST['device'] : [$_POST['device']];
 
-    @file_put_contents("/tmp/preclear_stat_{$devname}","{$devname}|NN|Starting...");
+    foreach ($devices as $device) {
+      $serial  = $Preclear->diskSerial($device);
+      $session = "preclear_disk_{$serial}";
+      $op      = (isset($_POST['op']) && $_POST['op'] != "0") ? urldecode($_POST['op']) : "";
+      $file    = (isset($_POST['file'])) ? urldecode($_POST['file']) : "";
+      $scope   = $_POST['scope'];
+      $script  = $script_files[$scope];
+      $devname = basename($device);
 
-    if ( $op == "resume" && is_file($file))
-    {
-      $cmd = "$script --load-file ".escapeshellarg($file)." ${device}";
-    }
+      @file_put_contents("/tmp/preclear_stat_{$devname}","{$devname}|NN|Starting...");
 
-    else if($op == "resume" && ! is_file($file))
-    {
-      break;
-    }
-
-    else if ($scope == "gfjardim")
-    {
-      $notify    = (isset($_POST['--notify']) && $_POST['--notify'] > 0) ? " --notify ".urldecode($_POST['--notify']) : "";
-      $frequency = (isset($_POST['--frequency']) && $_POST['--frequency'] > 0 && intval($_POST['--notify']) > 0) ? " --frequency ".urldecode($_POST['--frequency']) : "";
-      $cycles    = (isset($_POST['--cycles'])) ? " --cycles ".urldecode($_POST['--cycles']) : "";
-      $pre_read  = (isset($_POST['--skip-preread']) && $_POST['--skip-preread'] == "on") ? " --skip-preread" : "";
-      $post_read = (isset($_POST['--skip-postread']) && $_POST['--skip-postread'] == "on") ? " --skip-postread" : "";
-      $test      = (isset($_POST['--test']) && $_POST['--test'] == "on") ? " --test" : "";
-      $noprompt  = " --no-prompt";
-
-      $cmd = "$script {$op}${notify}${frequency}{$cycles}{$pre_read}{$post_read}{$noprompt}{$test} $device";
-      
-    }
-
-    else
-    {
-      $notify    = (isset($_POST['-o']) && $_POST['-o'] > 0) ? " -o ".urldecode($_POST['-o']) : "";
-      $mail      = (isset($_POST['-M']) && $_POST['-M'] > 0 && intval($_POST['-o']) > 0) ? " -M ".urldecode($_POST['-M']) : "";
-      $passes    = isset($_POST['-c']) ? " -c ".urldecode($_POST['-c']) : "";
-      $read_sz   = (isset($_POST['-r']) && $_POST['-r'] != 0) ? " -r ".urldecode($_POST['-r']) : "";
-      $write_sz  = (isset($_POST['-w']) && $_POST['-w'] != 0) ? " -w ".urldecode($_POST['-w']) : "";
-      $pre_read  = (isset($_POST['-W']) && $_POST['-W'] == "on") ? " -W" : "";
-      $post_read = (isset($_POST['-X']) && $_POST['-X'] == "on") ? " -X" : "";
-      $fast_read = (isset($_POST['-f']) && $_POST['-f'] == "on") ? " -f" : "";
-      $confirm   = (! $op || $op == " -z" || $op == " -V") ? TRUE : FALSE;
-      $test      = (isset($_POST['-s']) && $_POST['-s'] == "on") ? " -s" : "";
-
-      $capable  = array_key_exists("joel", $script_files) ? $Preclear->scriptCapabilities($script_files["joel"]) : [];
-      $noprompt = (array_key_exists("noprompt", $capable) && $capable["noprompt"]) ? " -J" : "";
-      
-      if ( $post_read && $pre_read )
+      if ( $op == "resume" && is_file($file))
       {
-        $post_read = " -n";
-        $pre_read = "";
-      }
-      
-      if (! $op )
-      {
-        $cmd = "$script {$op}{$mail}{$notify}{$passes}{$read_sz}{$write_sz}{$pre_read}{$post_read}{$fast_read}{$noprompt}{$test} $device";
+        $cmd = "$script --load-file ".escapeshellarg($file)." ${device}";
       }
 
-      else if ( $op == "-V" )
+      else if($op == "resume" && ! is_file($file))
       {
-        $cmd = "$script {$op}{$fast_read}{$mail}{$notify}{$read_sz}{$write_sz}{$noprompt}{$test} $device";
+        break;
+      }
+
+      else if ($scope == "gfjardim")
+      {
+        $notify    = (isset($_POST['--notify']) && $_POST['--notify'] > 0) ? " --notify ".urldecode($_POST['--notify']) : "";
+        $frequency = (isset($_POST['--frequency']) && $_POST['--frequency'] > 0 && intval($_POST['--notify']) > 0) ? " --frequency ".urldecode($_POST['--frequency']) : "";
+        $cycles    = (isset($_POST['--cycles'])) ? " --cycles ".urldecode($_POST['--cycles']) : "";
+        $pre_read  = (isset($_POST['--skip-preread']) && $_POST['--skip-preread'] == "on") ? " --skip-preread" : "";
+        $post_read = (isset($_POST['--skip-postread']) && $_POST['--skip-postread'] == "on") ? " --skip-postread" : "";
+        $test      = (isset($_POST['--test']) && $_POST['--test'] == "on") ? " --test" : "";
+        $noprompt  = " --no-prompt";
+
+        $cmd = "$script {$op}${notify}${frequency}{$cycles}{$pre_read}{$post_read}{$noprompt}{$test} $device";
+        
       }
 
       else
       {
-        $cmd = "$script {$op}{$noprompt} $device";
-        @unlink("/tmp/preclear_stat_{$devname}");
-      }
-    }
+        $notify    = (isset($_POST['-o']) && $_POST['-o'] > 0) ? " -o ".urldecode($_POST['-o']) : "";
+        $mail      = (isset($_POST['-M']) && $_POST['-M'] > 0 && intval($_POST['-o']) > 0) ? " -M ".urldecode($_POST['-M']) : "";
+        $passes    = isset($_POST['-c']) ? " -c ".urldecode($_POST['-c']) : "";
+        $read_sz   = (isset($_POST['-r']) && $_POST['-r'] != 0) ? " -r ".urldecode($_POST['-r']) : "";
+        $write_sz  = (isset($_POST['-w']) && $_POST['-w'] != 0) ? " -w ".urldecode($_POST['-w']) : "";
+        $pre_read  = (isset($_POST['-W']) && $_POST['-W'] == "on") ? " -W" : "";
+        $post_read = (isset($_POST['-X']) && $_POST['-X'] == "on") ? " -X" : "";
+        $fast_read = (isset($_POST['-f']) && $_POST['-f'] == "on") ? " -f" : "";
+        $confirm   = (! $op || $op == " -z" || $op == " -V") ? TRUE : FALSE;
+        $test      = (isset($_POST['-s']) && $_POST['-s'] == "on") ? " -s" : "";
 
-    // Enabling queue
-    $queue_file="/boot/config/plugins/${plugin}/queue";
-    $queue = is_file($queue_file) ? (is_numeric(file_get_contents($queue_file)) ? file_get_contents($queue_file) : 0 ) : 0;
-    $queue_running = is_file("/var/run/preclear_queue.pid") && posix_kill(file_get_contents("/var/run/preclear_queue.pid"), 0);
-    if ($queue > 0)
-    {
-      if (! TMUX::hasSession("preclear_queue"))
-      {
-        TMUX::NewSession("preclear_queue");
-      }
-      if (! $queue_running)
-      {
-        TMUX::sendCommand("preclear_queue", "/usr/local/emhttp/plugins/${plugin}/script/preclear_queue.sh $queue");
-      }
-    }
-
-    TMUX::killSession( $session );
-    TMUX::NewSession( $session );
-    TMUX::sendCommand($session, $cmd);
-
-    if ( $confirm && ! $noprompt )
-    {
-      foreach( range(0, 5) as $x )
-      {
-        if ( strpos(TMUX::getSession($session), "Answer Yes to continue") )
+        $capable  = array_key_exists("joel", $script_files) ? $Preclear->scriptCapabilities($script_files["joel"]) : [];
+        $noprompt = (array_key_exists("noprompt", $capable) && $capable["noprompt"]) ? " -J" : "";
+        
+        if ( $post_read && $pre_read )
         {
-          sleep(1);
-          TMUX::sendCommand($session, "Yes");
-          break;
+          $post_read = " -n";
+          $pre_read = "";
+        }
+        
+        if (! $op )
+        {
+          $cmd = "$script {$op}{$mail}{$notify}{$passes}{$read_sz}{$write_sz}{$pre_read}{$post_read}{$fast_read}{$noprompt}{$test} $device";
+        }
+
+        else if ( $op == "-V" )
+        {
+          $cmd = "$script {$op}{$fast_read}{$mail}{$notify}{$read_sz}{$write_sz}{$noprompt}{$test} $device";
         }
 
         else
         {
-          sleep(1);
+          $cmd = "$script {$op}{$noprompt} $device";
+          @unlink("/tmp/preclear_stat_{$devname}");
+        }
+      }
+
+      // Enabling queue
+      $queue_file="/boot/config/plugins/${plugin}/queue";
+      $queue = is_file($queue_file) ? (is_numeric(file_get_contents($queue_file)) ? file_get_contents($queue_file) : 0 ) : 0;
+      $queue_running = is_file("/var/run/preclear_queue.pid") && posix_kill(file_get_contents("/var/run/preclear_queue.pid"), 0);
+      if ($queue > 0)
+      {
+        if (! TMUX::hasSession("preclear_queue"))
+        {
+          TMUX::NewSession("preclear_queue");
+        }
+        if (! $queue_running)
+        {
+          TMUX::sendCommand("preclear_queue", "/usr/local/emhttp/plugins/${plugin}/script/preclear_queue.sh $queue");
+        }
+      }
+
+      TMUX::killSession( $session );
+      TMUX::NewSession( $session );
+      TMUX::sendCommand($session, $cmd);
+
+      if ( $confirm && ! $noprompt )
+      {
+        foreach( range(0, 5) as $x )
+        {
+          if ( strpos(TMUX::getSession($session), "Answer Yes to continue") )
+          {
+            sleep(1);
+            TMUX::sendCommand($session, "Yes");
+            break;
+          }
+
+          else
+          {
+            sleep(1);
+          }
         }
       }
     }
+
 
     break;
 

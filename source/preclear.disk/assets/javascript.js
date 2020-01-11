@@ -25,21 +25,23 @@ function () {
     return str;
 };
 
-$('body').on('mouseenter', '.tooltip:not(.tooltipstered), .tooltip-toggle:not(.tooltipstered)', function()
+$('body').on('mouseenter', '.tooltip, .tooltip-toggle', function()
 {
   onClose = {click:true, scroll:true, mouseleave:true, tap:true};
   if ( $(this).hasClass("tooltip-toggle") )
   {
     onClose.click = false;
   }
-  $(this).tooltipster(
-  {
-    delay:100,
-    zIndex:999,
-    trigger:'custom',
-    triggerOpen:{mouseenter:true, touchstart:true},
-    triggerClose:onClose,
-  }).tooltipster('open');
+  if (!$(this).hasClass("tooltipstered")) {
+    $(this).tooltipster(
+    {
+      delay:100,
+      zIndex:999,
+      trigger:'custom',
+      triggerOpen:{mouseenter:true, touchstart:true},
+      triggerClose:onClose,
+    }).tooltipster('open');
+  }
 });
 
 
@@ -134,7 +136,7 @@ function openPreclear(serial)
   var top     = (screen.height-height)/2;
   var left    = (screen.width-width)/2;
   var options = 'resizeable=yes,scrollbars=yes,height='+height+',width='+width+',top='+top+',left='+left;
-  window.open('/plugins/'+plugin+'/Preclear.php?action=show_preclear&serial='+serial, 'Preclear', options);
+  window.open('/plugins/'+plugin+'/Preclear.php?action=show_preclear&serial='+serial, '_blank', options);
 }
 
 
@@ -146,7 +148,7 @@ function toggleScript(el, serial)
 }
 
 
-function startPreclear(serial)
+function startPreclear(serial, multiple = "no")
 {
   if (typeof(serial) === 'undefined')
   {
@@ -155,18 +157,47 @@ function startPreclear(serial)
 
   preclear_dialog = $( "#preclear-dialog" );
 
-  var opts = {
-    family:       getDiskInfo(serial, 'FAMILY'),
-    model:        getDiskInfo(serial, 'MODEL'),
-    serial_short: getDiskInfo(serial, 'SERIAL_SHORT'),
-    firmware:     getDiskInfo(serial, 'FIRMWARE'),
-    size_h:       getDiskInfo(serial, 'SIZE_H')
-    };
+  if (multiple == "no")
+  {
+    var opts = {
+      family:       getDiskInfo(serial, 'FAMILY'),
+      model:        getDiskInfo(serial, 'MODEL'),
+      serial_short: getDiskInfo(serial, 'SERIAL_SHORT'),
+      firmware:     getDiskInfo(serial, 'FIRMWARE'),
+      size_h:       getDiskInfo(serial, 'SIZE_H')
+      };
+  
+    var header = $("#dialog-header-defaults").html();
+  
+    preclear_dialog.html( header.formatUnicorn(opts) );
+    preclear_dialog.append("<hr style='margin-left:12px;'>");
+  }
+  else
+  {
+    var header = $("#dialog-multiple-defaults").html();
+    var options = "";
 
-  var header = $("#dialog-header-defaults").html();
+    for(key in disksInfo)
+    {
+      disk = disksInfo[key];
+      if(disk.hasOwnProperty('SERIAL_SHORT'))
+      {
+        var disk_serial = disk['SERIAL_SHORT'];
+        var opts = {
+          device:       getDiskInfo(disk_serial, 'DEVICE'),
+          model:        getDiskInfo(disk_serial, 'MODEL'),
+          serial_short: disk_serial,
+          size_h:       getDiskInfo(disk_serial, 'SIZE_H'),
+          disabled:     disk['PRECLEARING'] ? "disabled" : ""
+          };
+        option = "<option value='{serial_short}' {disabled}>{serial_short} ({size_h})</option>";
+        options += option.formatUnicorn(opts);
+      }
+    }
 
-  preclear_dialog.html( header.formatUnicorn(opts) );
-  preclear_dialog.append("<hr style='margin-left:12px;'>");
+    preclear_dialog.html( header.formatUnicorn(options) );
+    preclear_dialog.append("<hr style='margin-left:12px;'>");
+  }
 
   if (typeof(scripts) !== 'undefined')
   {
@@ -174,7 +205,7 @@ function startPreclear(serial)
 
     if (size)
     {
-      var options = "<dl class='dl-dialog'><dt>Script<st><dd><select onchange='toggleScript(this,\""+serial+"\");'>";
+      var options = "<dl class='dl-dialog'><dt>Script:<st><dd><select onchange='toggleScript(this,\""+serial+"\");'>";
       $.each( scripts, function( key, value )
         {
           var sel = ( key == scope ) ? "selected" : "";
@@ -204,12 +235,25 @@ function startPreclear(serial)
     {
        // $('button:eq(0)',$('#dialog_id').dialog.buttons).button('disable');
       // $(e.target).attr('disabled', true);
+
       var opts       = new Object();
+      opts["device"] = [];
+      if(serial)
+      {
+        opts["device"].push(getDiskInfo(serial, 'DEVICE'));
+      }
       popup = $(".sweet-alert.showSweetAlert > p:first");
       opts["action"] = "start_preclear";
-      opts["device"] = getDiskInfo(serial, 'DEVICE');
       opts["op"]     = getVal(popup, "op");
       opts["scope"]  = scope;
+
+      if ($('.showSweetAlert').find('#multiple_preclear :selected').length)
+      {
+        opts["device"] = [];
+        $('.showSweetAlert').find('#multiple_preclear :selected').each( function(){
+          opts["device"].push(getDiskInfo(this.value, 'DEVICE'));
+        });
+      }
 
       if (scope == "joel")
       {
@@ -237,15 +281,21 @@ function startPreclear(serial)
         opts["--test"]          = getVal(popup, "--test");      
       }
 
-      $.post(PreclearURL, opts, function(data)
-              {
-                openPreclear(serial);
-              }
-            ).always(function(data)
-              {
-                window.location=window.location.pathname+window.location.hash;
-              }
-            ).fail(updateCsrfToken);
+      if (opts.device.length > 0)
+      {
+        $.post(PreclearURL, opts, function(data)
+                {
+                  for (var i = 0; i < opts.device.length; i++) {
+                    key = opts.device[i].split("/").pop();
+                    openPreclear(disksInfo[key]["SERIAL_SHORT"]);
+                  }
+                }
+              ).always(function(data)
+                {
+                  window.location=window.location.pathname+window.location.hash;
+                }
+              ).fail(updateCsrfToken);
+      }
 
       swal.close();
 
@@ -255,6 +305,10 @@ function startPreclear(serial)
       swal.close();
     }
   });
+  // allow dropdown overflow
+  $('.showSweetAlert').css('overflow', 'visible');
+  $('.showSweetAlert').find('.chosen.swal').chosen({ width: '55%', allow_single_deselect: false });
+  $("#multiple_preclear_chosen > .chosen-choices").css("min-height", "27px");
 }
 
 

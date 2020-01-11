@@ -22,6 +22,9 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
 <? if (file_exists("/plugins/${plugin}/assets/style-${display['theme']}.css")): ?>
 <link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/style-<?=$display['theme'];?>.css">
 <? endif;?>
+<link rel="stylesheet" type="text/css" href="/plugins/<?=$plugin;?>/assets/chosen.min.css">
+<script type="text/javascript" src="/plugins/<?=$plugin;?>/assets/chosen.jquery.min.js"></script>
+
 <script type="text/javascript">
 
   <?=$Preclear->Script();?>
@@ -112,5 +115,6 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
     <?else:?>
     addButtonTab('<a class="tooltip-toggle" style="cursor:pointer" onclick="setPreclearQueue();" title="Set Preclear Queue"><i class="fa fa-tachometer"></i></a>', "Preclear Disk", true, true);
     <?endif;?>
+      addButtonTab('<a class="tooltip-toggle" style="cursor:pointer" onclick="startPreclear(\'\', \'yes\');" title="Start Multiple Sessions"><i class="icon-preclear"></i></a>', "Preclear Disk", true, true);
   });
 </script>
