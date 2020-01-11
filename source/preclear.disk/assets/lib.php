@@ -232,7 +232,14 @@ class Preclear
           
           if ($running)
           {
-            $status .= "<span style='color:#00BE37;'>{$stat[2]}</span>";
+            if (preg_match("#PAUSED|QUEUED#", $stat[2]))
+            {
+              $status .= "<span style='color:#ccb800;'>{$stat[2]}</span>";
+            }
+            else
+            {
+              $status .= "<span style='color:#00BE37;'>{$stat[2]}</span>";
+            }
           }
 
           else
