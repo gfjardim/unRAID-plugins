@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2020.01.11b">
+<!ENTITY version   "2020.01.12">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,9 @@
 
 <CHANGES>
 ##&name;
+
+###2020.01.12
+- Fix: properly handle unsupported state
 
 ###2020.01.11b
 - Fix: add Unraid 6.8.1 support
@@ -485,10 +488,14 @@ The 'packages-install' script.
 -->
 <FILE Run="/bin/bash">
 <INLINE>
+unsupported="/var/state/&name;/unsupported"
+
 download_install() {
   local dest="/boot/config/plugins/&name;/${2}"
   local src="&gitURL;/source/packages/${2}"
-  local pkg=$(echo ${2} | grep -Po "(^.*)(?=-\d+\.\d+)")
+  local pkg=$(echo "${2}" | rev | cut -f 3- -d '-' | cut -d '-' -f2- | rev)
+  local ver=$(echo "${2}" | rev | cut -f 3- -d '-' | cut -d '-' -f1 | rev)
+ 
   local md5=$1
   if [ ! -f "${dest}" ]; then
     curl --location --silent --fail "${src}" --output "${dest}"
@@ -498,8 +505,28 @@ download_install() {
     echo "Wrong '${2}' package md5 hash."
     rm "${dest}"
     exit 1
+  fi
+
+  while read p; do
+    local _pkg=$(echo "$p" | rev | cut -f 3- -d '-' | cut -d '-' -f2- | rev)
+    if [ "$pkg" == "$_pkg" ]; then
+      local ipkg=$_pkg
+      local iver=$(echo "$p" | rev | cut -f 3- -d '-' | cut -d '-' -f1 | rev)
+      break
+    fi
+  done &lt; &lt;(find /var/lib/pkgtools/packages/ -type f -printf '%P\n')
+
+  if [ -n "$ipkg" ]; then
+    if php -r "exit((version_compare('$ver','$iver', '&gt;=') ) ? 0 : 1);"; then
+      echo "$pkg version $ver is greater or equal than instaled version ($iver), installing..."
+      /sbin/upgradepkg --install-new "$dest"
+    else
+      echo "$pkg version $ver is lower than the installed version ($iver), aborting..."
+      touch "$unsupported"
+    fi
   else
-    /sbin/upgradepkg --install-new "$dest" &amp;&amp; find /boot/config/plugins/preclear.disk/ -type f -iname "${pkg}*.txz" -a ! -iname "${2}" -delete
+    echo "installing package $pkg version $ver...."
+    /sbin/upgradepkg --install-new "$dest"
   fi
 }
 
@@ -511,6 +538,10 @@ is_unraid_version() {
   fi
   return $( php -r "echo ( version_compare('$version','$2', '$1') ) ? 0 : 1;" )
 }
+
+if [ -f "$unsupported" ]; then
+  rm "$unsupported"
+fi
 
 if is_unraid_version '&gt;=' '6.5.3' &amp;&amp; is_unraid_version '&lt;' '6.6.3'; then
 #  download_install c04358fd7d7cb0b5ca67f215871f3692 ncurses-6.0-x86_64-3.txz   
@@ -536,14 +567,14 @@ elif is_unraid_version '&gt;=' '6.8.0-b1' &amp;&amp; is_unraid_version '&lt;' '6
   download_install 4e76295aad8c9bf8c98301a9b7ec2e64  libevent-2.1.8-x86_64-3.txz
   download_install 1af347c4d9feff774320d9c1e7920ac3  utempter-1.1.6-x86_64-3.txz
 
-elif is_unraid_version '&gt;=' '6.8.1' &amp;&amp; is_unraid_version '&lt;=' '6.8.2'; then
+elif is_unraid_version '&gt;=' '6.8.1'; then
   download_install 7dabee590ed5b5e47b17480dec367636  tmux-3.0a-x86_64-1.txz
   download_install a6e7015c850fcfc5a56f42b740c0a4ba  libevent-2.1.11-x86_64-1.txz
   download_install 1af347c4d9feff774320d9c1e7920ac3  utempter-1.1.6-x86_64-3.txz
 
 else
   echo "unRAID version ($version) not supported."
-  exit 0;
+  touch "$unsupported"
 fi
 
 # Verify and install plugin package
@@ -557,7 +588,6 @@ if [ "${sum1:0:32}" != "${sum2:0:32}" ]; then
 else
   upgradepkg --install-new /boot/config/plugins/&name;/&name;-&version;.txz
 fi
-
 
 </INLINE>
 </FILE>
@@ -619,6 +649,9 @@ find /boot/config/plugins/&name;/ -type f -iname "tor-*.txz" -delete
 rm -f /var/local/emhttp/plugins/diskinfo/diskinfo.json &amp;&gt;/dev/null
 echo "sleep 5 ; /etc/rc.d/rc.diskinfo --daemon &amp;&gt;/dev/null" | at now &amp;&gt;/dev/null
 
+$ Plugin version
+echo "&version;" &gt; /var/state/preclear.disk/version
+
 echo ""
 echo "-----------------------------------------------------------"
 echo " &name; has been installed."
@@ -640,7 +673,7 @@ Change image icon to font icon if possible
 font_file="/usr/local/emhttp/webGui/styles/font-unraid.svg"
 if [ -f "$font_file" ]; then
   icon_exists=$(grep -c "preclear" "$font_file" 2>/dev/null)
-  if [ "$icon_exists" -eq 1 ]; then
+  if [ "$icon_exists" -gt 0 ]; then
     sed -i -e 's/preclear.disk.png/icon-preclear/g' /usr/local/emhttp/plugins/&name;/Preclear.page
     sed -i -e '/^---/i Tag=\"icon-preclear\"' /usr/local/emhttp/plugins/&name;/Preclear.page
   elif [ "$icon_exists" -eq 0 ]; then

@@ -6,9 +6,10 @@ if (!isset($var)) {
   $var = @parse_ini_file("$docroot/state/var.ini");
 }
 
-$state_file = "/var/state/{$plugin}/state.ini";
-$log_file   = "/var/log/{$plugin}.log";
+$state_file = "/var/state/preclear.disk/state.ini";
+$log_file   = "/var/log/preclear.disk.log";
 $diskinfo   = "/var/local/emhttp/plugins/diskinfo/diskinfo.json";
+$unsupported = "/var/state/preclear.disk/unsupported";
 
 class TMUX
 {
@@ -187,9 +188,15 @@ class Preclear
 
   public function Link($disk, $type)
   {
+    global $unsupported;
     $serial = $this->diskSerial($disk);
     $icon   = "<a title='Start Preclear' class='exec tooltip' onclick='getResumablePreclear(\"{$serial}\")'><img src='/plugins/".$this->plugin."/icons/precleardisk.png'></a>";
     $text   = "<a title='Start Preclear' class='exec' onclick='getResumablePreclear(\"{$serial}\")'>Start Preclear</a>";
+    if (is_file($unsupported))
+    {
+      $icon   = "<a title='Start Preclear' class='exec'><img src='/plugins/".$this->plugin."/icons/precleardisk.png' style='-webkit-filter: grayscale(100%); filter: grayscale(100%);'></a>";
+      $text   = "Start Preclear";
+    } 
     return ($type == "text") ? $text : $icon;
   }
 
