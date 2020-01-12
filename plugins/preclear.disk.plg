@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2020.01.12a">
+<!ENTITY version   "2020.01.12b">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -490,7 +490,8 @@ The 'packages-install' script.
 <INLINE>
 unsupported="/var/state/&name;/unsupported"
 
-mkdir -p $(dirname $unsupported)
+# Creating some directories
+mkdir -p /tmp/.preclear/ /usr/local/bin/ /var/state/&name;/
 
 download_install() {
   local dest="/boot/config/plugins/&name;/${2}"
@@ -583,6 +584,9 @@ if [ "${sum1:0:32}" != "${sum2:0:32}" ]; then
   rm /boot/config/plugins/&name;/&name;-&version;.md5
   exit 1
 else
+  for old in $(find /var/lib/pkgtools/packages/ -iname "preclear.disk-*"); do
+    removepkg "$old"
+  done
   upgradepkg --install-new /boot/config/plugins/&name;/&name;-&version;.txz
 fi
 
@@ -598,9 +602,6 @@ The 'post-install' script.
 if [[ ! -e /root/mdcmd ]]; then
   ln -sf /usr/local/sbin/mdcmd /root/mdcmd
 fi
-
-# Creating some directories
-mkdir -p /tmp/.preclear/ /usr/local/bin/
 
 #dismissed="/boot/config/plugins/statistics.sender/dismissed"
 #version_dismiss="/boot/config/plugins/&name;/statistics.sender.dismissed-&version;"
@@ -646,7 +647,7 @@ find /boot/config/plugins/&name;/ -type f -iname "tor-*.txz" -delete
 rm -f /var/local/emhttp/plugins/diskinfo/diskinfo.json &amp;&gt;/dev/null
 echo "sleep 5 ; /etc/rc.d/rc.diskinfo --daemon &amp;&gt;/dev/null" | at now &amp;&gt;/dev/null
 
-$ Plugin version
+# Plugin version
 echo "&version;" &gt; /var/state/preclear.disk/version
 
 echo ""
@@ -687,28 +688,34 @@ The 'remove' script.
 <FILE Run="/bin/bash" Method="remove">
 <INLINE>
 
-
 # kill all tmux sessions
 for session in $(tmux ls | grep preclear | cut -d':' -f1); do 
   tmux kill-session -t "${session}" >/dev/null 2>&amp;1
 done
 
-find /var/log/packages/ -type f -iname "&name;-*" -delete
-
-# Remove plugin related files
-rm -rf /boot/config/plugins/&name; \
-       /usr/local/emhttp/plugins/&name; \
-       /var/state/&name; \
-       /boot/.preclear/ \
-       /tmp/.preclear \
-       rm /var/run/preclear_queue.pid
+# Remove plugin
+removepkg &name;-&version;
 
 # Remove diskinfo
 rm /etc/cron.d/diskinfo
 sleep 1
 /etc/rc.d/rc.diskinfo --quit
 rm /var/local/emhttp/plugins/diskinfo/diskinfo.json \
-   /etc/rc.d/rc.diskinfo
+   /etc/rc.d/rc.diskinfo \
+   /etc/udev/rules.d/99_diskinfo.rules
+udevadm control --reload-rules
+
+# Remove plugin related files
+rm /usr/local/bin/preclear \
+   /var/run/preclear_queue.pid \
+   /var/log/preclear.disk.log
+
+# Remove plugin related directories
+rm -rf /boot/config/plugins/&name; \
+       /usr/local/emhttp/plugins/&name; \
+       /var/state/&name; \
+       /boot/.preclear \
+       /tmp/.preclear
 
 echo ""
 echo "-----------------------------------------------------------"
