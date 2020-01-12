@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2020.01.11a">
+<!ENTITY version   "2020.01.11b">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,9 @@
 
 <CHANGES>
 ##&name;
+
+###2020.01.11b
+- Fix: add Unraid 6.8.1 support
 
 ###2020.01.11
 - Add: start multiple preclear sessions 
@@ -532,9 +535,15 @@ elif is_unraid_version '&gt;=' '6.8.0-b1' &amp;&amp; is_unraid_version '&lt;' '6
   download_install 7dabee590ed5b5e47b17480dec367636  tmux-3.0a-x86_64-1.txz
   download_install 4e76295aad8c9bf8c98301a9b7ec2e64  libevent-2.1.8-x86_64-3.txz
   download_install 1af347c4d9feff774320d9c1e7920ac3  utempter-1.1.6-x86_64-3.txz
+
+elif is_unraid_version '&gt;=' '6.8.1' &amp;&amp; is_unraid_version '&lt;=' '6.8.2'; then
+  download_install 7dabee590ed5b5e47b17480dec367636  tmux-3.0a-x86_64-1.txz
+  download_install a6e7015c850fcfc5a56f42b740c0a4ba  libevent-2.1.11-x86_64-1.txz
+  download_install 1af347c4d9feff774320d9c1e7920ac3  utempter-1.1.6-x86_64-3.txz
+
 else
   echo "unRAID version ($version) not supported."
-  exit 1;
+  exit 0;
 fi
 
 # Verify and install plugin package
@@ -613,8 +622,7 @@ echo "sleep 5 ; /etc/rc.d/rc.diskinfo --daemon &amp;&gt;/dev/null" | at now &amp
 echo ""
 echo "-----------------------------------------------------------"
 echo " &name; has been installed."
-echo " This plugin requires Dynamix webGui to operate"
-echo " Copyright 2015-2017, gfjardim"
+echo " Copyright 2015-2020, gfjardim"
 echo " Version: &version;"
 echo "-----------------------------------------------------------"
 echo ""
@@ -676,7 +684,7 @@ echo ""
 echo "-----------------------------------------------------------"
 echo " &name; has been uninstalled."
 echo " Please reboot your server to complete uninstall this plugin."
-echo " Copyright 2015-2018, gfjardim"
+echo " Copyright 2015-2020, gfjardim"
 echo " Version: &version;"
 echo "-----------------------------------------------------------"
 echo ""
