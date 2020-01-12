@@ -518,7 +518,7 @@ download_install() {
 
   if [ -n "$ipkg" ]; then
     if php -r "exit((version_compare('$ver','$iver', '&gt;=') ) ? 0 : 1);"; then
-      echo "$pkg version $ver is greater or equal than instaled version ($iver), installing..."
+      echo "$pkg version $ver is greater or equal than the installed version ($iver), installing..."
       /sbin/upgradepkg --install-new "$dest"
     else
       echo "$pkg version $ver is lower than the installed version ($iver), aborting..."
