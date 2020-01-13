@@ -211,6 +211,13 @@ switch ($_POST['action'])
       $script  = $script_files[$scope];
       $devname = basename($device);
 
+      # Verify if the disk is suitable to preclear
+      if ( $Preclear->isRunning($device) || (array_key_exists($devname, $Preclear->allDisks) && $Preclear->allDisks[$devname]["MOUNTED"] ))
+      {
+        debug("Disk ${serial} not suitable for preclear.");
+        continue;
+      }
+
       @file_put_contents("/tmp/preclear_stat_{$devname}","{$devname}|NN|Starting...");
 
       if ( $op == "resume" && is_file($file))

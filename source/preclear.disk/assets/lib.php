@@ -210,7 +210,16 @@ class Preclear
     }
     else
     {
-      return is_file("/tmp/preclear_stat_{$disk}");
+      $file = "/tmp/preclear_stat_{$disk}";
+      if (is_file($file))
+      {
+        $stat = explode("|", file_get_contents($file));
+        return count($stat) == 4 ? file_exists( "/proc/".trim($stat[3])) : true;
+      }
+      else
+      {
+        return false;
+      }
     }
   }
 

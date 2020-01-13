@@ -188,7 +188,7 @@ function startPreclear(serial, multiple = "no")
           model:        getDiskInfo(disk_serial, 'MODEL'),
           serial_short: disk_serial,
           size_h:       getDiskInfo(disk_serial, 'SIZE_H'),
-          disabled:     disk['PRECLEARING'] ? "disabled" : ""
+          disabled:     (disk['PRECLEARING'] || disk['MOUNTED']) ? "disabled" : ""
           };
         option = "<option value='{serial_short}' {disabled}>{serial_short} ({size_h})</option>";
         options += option.formatUnicorn(opts);

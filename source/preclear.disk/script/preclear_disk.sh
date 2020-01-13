@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="1.0.6"
+version="1.0.7"
 
 # PID
 script_pid=$BASHPID
@@ -1978,6 +1978,8 @@ if ! is_preclear_candidate $theDisk; then
   debug "Disk $theDisk is part of unRAID array. Aborted."
   do_exit 1
 fi
+
+echo "${disk_properties[name]}|NN|Starting...|${script_pid}" > "/tmp/preclear_stat_${disk_properties[name]}"
 
 ######################################################
 ##              VERIFY PRECLEAR STATUS              ##

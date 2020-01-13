@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2020.01.12b">
+<!ENTITY version   "2020.01.13">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,10 @@
 
 <CHANGES>
 ##&name;
+
+###2020.01.13
+- Fix: prevent mounted disks from appearing at "Start Multiple Sessions"
+- Fix: prevent mounted or preclearing disks from being precleared by accident
 
 ###2020.01.12
 - Fix: properly handle unsupported state
@@ -706,9 +710,9 @@ rm /var/local/emhttp/plugins/diskinfo/diskinfo.json \
 udevadm control --reload-rules
 
 # Remove plugin related files
-rm /usr/local/bin/preclear \
-   /var/run/preclear_queue.pid \
-   /var/log/preclear.disk.log
+rm -f /usr/local/bin/preclear \
+      /var/run/preclear_queue.pid \
+      /var/log/preclear.disk.log
 
 # Remove plugin related directories
 rm -rf /boot/config/plugins/&name; \
