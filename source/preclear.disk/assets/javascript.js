@@ -186,11 +186,12 @@ function startPreclear(serial, multiple = "no")
         var opts = {
           device:       getDiskInfo(disk_serial, 'DEVICE'),
           model:        getDiskInfo(disk_serial, 'MODEL'),
+          name:         getDiskInfo(disk_serial, 'NAME'),
           serial_short: disk_serial,
           size_h:       getDiskInfo(disk_serial, 'SIZE_H'),
           disabled:     (disk['PRECLEARING'] || disk['MOUNTED']) ? "disabled" : ""
           };
-        option = "<option value='{serial_short}' {disabled}>{serial_short} ({size_h})</option>";
+        option = "<option value='{serial_short}' {disabled}>{name} - {serial_short} ({size_h})</option>";
         options += option.formatUnicorn(opts);
       }
     }
@@ -307,7 +308,7 @@ function startPreclear(serial, multiple = "no")
   });
   // allow dropdown overflow
   $('.showSweetAlert').css('overflow', 'visible');
-  $('.showSweetAlert').find('.chosen.swal').chosen({ width: '55%', allow_single_deselect: false });
+  $('.showSweetAlert').find('.chosen.swal').chosen({ width: '58%', allow_single_deselect: false });
   $("#multiple_preclear_chosen > .chosen-choices").css("min-height", "27px");
 }
 
