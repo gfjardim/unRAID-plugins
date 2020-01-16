@@ -57,17 +57,21 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
 </script>
 <style>
   table.preclear {padding:0px;border-collapse:collapse;white-space:nowrap;}
+  table.preclear thead tr:first-child td{font-size:1.1rem;text-transform:uppercase;letter-spacing:1px;background-color:#e8e8e8}
+  table.preclear thead tr:last-child{border-bottom:1px solid #e3e3e3}
+  
   table.preclear thead tr>td{text-align:left;vertical-align:top;width:8%;padding-left:12px;}
-  table.preclear thead tr>td+td{text-align:left;width:auto;padding-left:12px;}
-  table.preclear thead tr>td+td+td{text-align:center;}
-  table.preclear thead tr>td+td+td+td{text-align:right;}
+  table.preclear thead tr>td+td{text-align:left;padding-left:12px;width: 45%}
+  table.preclear thead tr>td+td+td{text-align:center;width:5%;}
+  /*table.preclear thead tr>td+td+td+td+td{text-align:center;width:8%;}*/
+  table.preclear thead tr>td+td+td+td+td+td{text-align:right;width:35%;}
 
-  table.preclear tr>td{vertical-align:top;text-align:left;width:8%;padding-left:12px;padding-right:0;white-space:nowrap;}
-  table.preclear tr>td+td{width:450px;}
-  table.preclear tr>td+td+td{width:8%;text-align: center;}
-  table.preclear tr>td+td+td+td{text-align:right;width:8%;padding-left:15px;}
-  table.preclear tr>td+td+td+td+td{text-align:center;width:8%;padding-left:15px;}
-  table.preclear tr>td+td+td+td+td+td{text-align:right;padding-left:0;padding-right:12px;width: 5em;}
+  table.preclear tbody tr:nth-child(even){background-color:#ededed}
+  table.preclear tbody tr>td{vertical-align:top;text-align:left;padding-left:12px;padding-right:0;white-space:nowrap;}
+  table.preclear tbody tr>td+td+td{text-align: center;}
+  table.preclear tbody tr>td+td+td+td{text-align:right;padding-left:15px;}
+  table.preclear tbody tr>td+td+td+td+td{text-align:center;padding-left:15px;}
+  table.preclear tbody tr>td+td+td+td+td+td{text-align:right;padding-left:0;padding-right:12px;}
 
   button[type=button] {margin:0px 14px 0 14px;}
   i.fa{margin:0px 5px 0 5px;}
@@ -77,7 +81,7 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
   i.fa-append{margin:0px;font-size: 0.8em;position: relative; left:-0.5em;top:0.6em;}
 </style>
 <?=$Preclear->html();?>
-<table class='disk_status preclear custom_head'>
+<table class=' preclear custom_head'>
   <thead>
     <tr>
       <td>Device</td>
@@ -103,7 +107,6 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
   <p>Click on the <strong>'Download Log'</strong> button to download a compressed log of Preclear Disk plugin.</p>
 </blockquote>
 <script type="text/javascript">
-  var display = <?=json_encode($display);?>;
   <?if (isset($_GET['disk']) && ! $Preclear->isRunning($_GET['disk']) ) echo "startDisk = '{$_GET[disk]}';";?>
 
   $(function(){
@@ -116,5 +119,10 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
     addButtonTab('<a class="tooltip-toggle" style="cursor:pointer" onclick="setPreclearQueue();" title="Set Preclear Queue"><i class="fa fa-tachometer"></i></a>', "Preclear Disk", true, true);
     <?endif;?>
       addButtonTab('<a class="tooltip-toggle" style="cursor:pointer" onclick="startPreclear(\'\', \'yes\');" title="Start Multiple Sessions"><i class="icon-preclear"></i></a>', "Preclear Disk", true, true);
+    addButtonTab('<a class="tooltip-toggle" style="cursor:pointer;" onclick="preclearResetSorting()" title="Reset sorting"><i class="fa fa-th-list"></i></a>', "Preclear Disk", true, true);
+    addButtonTab('<a class="tooltip-toggle" style="cursor:pointer;" onclick="preclearResumeAll()" title="Resume all Sessions"><i class="fa fa-play green-text"></i></a>', "Preclear Disk", true, true);
+    addButtonTab('<a class="tooltip-toggle" style="cursor:pointer;" onclick="preclearPauseAll()" title="Pause all Sessions"><i class="fa fa-pause yellow-orb"></i></a>', "Preclear Disk", true, true);
+    addButtonTab('<a class="tooltip-toggle" style="cursor:pointer;" onclick="preclearStopAll()" title="Stop all Sessions"><i class="fa fa-stop red-text"></i></a>', "Preclear Disk", true, true);
+    preclearSetSorting();
   });
 </script>

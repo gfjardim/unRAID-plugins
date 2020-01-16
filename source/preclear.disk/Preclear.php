@@ -107,15 +107,19 @@ switch ($_POST['action'])
       $disks[$disk]["PRECLEARING"] = $Preclear->isRunning($attibutes["DEVICE"]);
     }
     $all_status = array();
+    $all_disks_o = [];
+
+    $sort = array_flip(is_file($sort_file) ? file($sort_file,FILE_IGNORE_NEW_LINES) : []);
 
     if ( count($disks) )
     {
       $odd="odd";
+      $counter = 9999;
       foreach ($disks as $disk)
       {
         $disk_name = $disk['NAME'];
         $disk_icon = ($disk['RUNNING']) ? "green-on.png" : "green-blink.png";
-        $serial    = $disk['SERIAL'];
+        $serial    = trim($disk['SERIAL']);
         $temp      = $disk['TEMP'] ? my_temp($disk['TEMP']) : "*";
         $mounted   = $disk["MOUNTED"];
         $reports   = is_dir("/boot/preclear_reports") ? glob("/boot/preclear_reports/*.txt") : [];
@@ -168,7 +172,7 @@ switch ($_POST['action'])
           $status  = $mounted ? "Disk mounted" : $Preclear->Link($disk_name, "text");
         }
         
-        $disks_o .= "<tr class='$odd'>
+        $output = "<tr class='$odd sortable' device='${disk_name}'>
                       <td><img src='/webGui/images/${disk_icon}'><a href='/Tools/Preclear/New?name=$disk_name'> $disk_name</a></td>
                       <td>${title}${report_files}</td>
                       <td>{$temp}</td>
@@ -176,17 +180,23 @@ switch ($_POST['action'])
                       <td><a href=\"#\" title=\"Disk Log Information\" onclick=\"openBox('/webGui/scripts/disk_log&amp;arg1=$disk_name','Disk Log Information',600,900,false);return false\"><i class=\"fa fa-file-text-o icon\"></i></a></td>
                       <td>{$status}</td>
                     </tr>";
-        $disks_o .= $report_files;
+        $disks_o .= "${output}${report_files}";
+        $pos = array_key_exists($disk_name, $sort) ? $sort[$disk_name] : $counter;
+        $sort[$disk_name] = $pos;
+        $all_disks_o[$disk_name] = "${output}${report_files}";
         $odd = ($odd == "odd") ? "even" : "odd";
+        $counter++;
       }
     }
 
     else 
     {
-      $disks_o .= "<tr><td colspan='12' style='text-align:center;font-weight:bold;'>No unassigned disks available.</td></tr>";
+      $all_disks_o[] = "<tr><td colspan='12' style='text-align:center;font-weight:bold;'>No unassigned disks available.</td></tr>";
     }
     debug("get_content Finished: ".(time() - $start_time),'DEBUG');
-    echo json_encode(array("disks" => $disks_o, "info" => json_encode($disks), "status" => $all_status));
+    $sort = array_flip($sort);
+    sort($sort, SORT_NUMERIC);
+    echo json_encode(array("disks" => $all_disks_o, "info" => json_encode($disks), "status" => $all_status, "sort" => $sort));
     break;
 
 
@@ -199,8 +209,10 @@ switch ($_POST['action'])
     break;
 
 
+
   case 'start_preclear':
     $devices = is_array($_POST['device']) ? $_POST['device'] : [$_POST['device']];
+    $success = true;
 
     foreach ($devices as $device) {
       $serial  = $Preclear->diskSerial($device);
@@ -299,9 +311,16 @@ switch ($_POST['action'])
         }
       }
 
-      TMUX::killSession( $session );
-      TMUX::NewSession( $session );
-      TMUX::sendCommand($session, $cmd);
+      if (! TMUX::hasSession( $session ))
+      {
+        TMUX::NewSession( $session );
+        usleep( 500 * 1000 );
+        TMUX::sendCommand($session, $cmd);
+      }
+      else
+      {
+        $success = false;
+      }
 
       if ( $confirm && ! $noprompt )
       {
@@ -322,17 +341,69 @@ switch ($_POST['action'])
       }
     }
 
-
+    echo json_encode(["success" => $success]);
     break;
 
 
+
   case 'stop_preclear':
-    $serial = urldecode($_POST['serial']);
-    $device = basename($Preclear->serialDisk($serial));
-    TMUX::killSession("preclear_disk_{$serial}");
-    @unlink("/tmp/preclear_stat_{$device}");
-    reload_partition($serial);
-    echo "<script>parent.location=parent.location;</script>";
+    $serials = is_array($_POST['serial']) ? $_POST['serial'] : [$_POST['serial']];
+    foreach ($serials as $serial)
+    {
+      $device = basename($Preclear->serialDisk($serial));
+      
+      TMUX::sendKeys("preclear_disk_{$serial}", "C-c");
+      
+      $file = "/tmp/preclear_stat_{$device}";
+      if (is_file($file))
+      {
+        $stat = explode("|", file_get_contents($file));
+        $pid  = count($stat) == 4 ? trim($stat[3]) : "";
+        foreach (range(0, 30) as $num)
+        {
+          if (! file_exists( "/proc/$pid/exe")) break;
+          usleep( 500 * 1000 );
+        }
+        # make sure all children are killed
+        shell_exec("kill $(ps -s '$pid' -o pid=) &>/dev/null");
+      }
+
+      TMUX::killSession("preclear_disk_{$serial}");
+      if (is_file("/tmp/preclear_stat_{$device}")) @unlink("/tmp/preclear_stat_{$device}");
+      if (is_file("/tmp/.preclear/{$device}/pid")) @unlink("/tmp/.preclear/{$device}/pid");
+
+      reload_partition($serial);
+    }
+
+    echo json_encode(["success" => true]);
+    break;
+    
+
+
+  case 'stop_all_preclear':
+    exec("/usr/bin/tmux ls 2>/dev/null|grep 'preclear_disk_'|cut -d: -f1", $sessions);
+    foreach ($sessions as $session) {
+      $serial = str_replace("preclear_disk_", "", $session);
+      $device = basename($Preclear->serialDisk($serial));
+      $file = "/tmp/preclear_stat_{$device}";
+      TMUX::sendKeys($session, "C-c");
+      if (is_file($file))
+      {
+        $stat = explode("|", file_get_contents($file));
+        $pid  = count($stat) == 4 ? trim($stat[3]) : "";
+        foreach (range(0, 30) as $num)
+        {
+          if (! file_exists( "/proc/$pid/exe")) break;
+          usleep( 500 * 1000 );
+        }
+        # make sure all children are killed
+        shell_exec("kill $(ps -s '$pid' -o pid=) &>/dev/null");
+      }
+      TMUX::killSession($session);
+      @unlink("/tmp/preclear_stat_{$device}");
+      reload_partition($serial);
+    }
+    echo json_encode(["success" => true]);
     break;
 
 
@@ -354,7 +425,7 @@ switch ($_POST['action'])
     }
     $content = preg_replace("#root@[^:]*:.*#", "", TMUX::getSession($session));
     $output .= "<pre>".preg_replace("#\n{5,}#", "<br>", $content)."</pre>";
-    if ( strpos($content, "Answer Yes to continue") )
+    if ( strpos($content, "Answer Yes to continue") || strpos($content, "Type Yes to proceed") )
     {
       $output .= "<br><center><button onclick='hit_yes(\"{$serial}\")'>Answer Yes</button></center>";
     }
@@ -409,6 +480,7 @@ switch ($_POST['action'])
     }
     break;
 
+
   case 'resume_preclear':
     $disk = $_POST['disk'];
     $file = "/tmp/.preclear/${disk}/pause";
@@ -451,6 +523,39 @@ switch ($_POST['action'])
       }
     }
     break;
+
+
+  case 'save_sort':
+    $devices = $_POST["devices"];
+    file_put_contents($sort_file, implode(PHP_EOL, $devices));
+    break;
+
+
+  case 'reset_sort':
+    if (is_file($sort_file)) unlink($sort_file);
+    break;
+
+
+  case 'resume_all':
+    $paused = glob("/tmp/.preclear/*/pause");
+    if ($paused)
+    {
+      foreach ($paused as $file) {
+        unlink($file);
+      }
+    }
+    break;;
+
+
+  case 'pause_all':
+    $sessions = glob("/tmp/.preclear/*/");
+    if ($sessions)
+    {
+      foreach ($sessions as $session) {
+        file_put_contents("${session}pause", "");
+      }
+    }
+    break;;
 }
 
 

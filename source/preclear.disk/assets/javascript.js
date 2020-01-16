@@ -48,7 +48,7 @@ $('body').on('mouseenter', '.tooltip, .tooltip-toggle', function()
 function getPreclearContent()
 {
   clearTimeout(timers.preclear);
-  $.post(PreclearURL,{action:'get_content',display:display},function(data)
+  $.post(PreclearURL,{action:'get_content'},function(data)
   {
     var hovered = $( ".tooltip:hover" ).map(function(){return this.id;}).get();
     if ( $('#preclear-table-body').length )
@@ -56,7 +56,12 @@ function getPreclearContent()
       var target = $( '#preclear-table-body' );
       currentScroll  = $(window).scrollTop();
       currentToggled = getToggledReports();
-      target.html( data.disks );
+      target.empty();
+      $.each(data.sort, function(i,v)
+      {
+        target.append(data.disks[v]);
+      });
+      // target.html( data.disks );
       toggleReports(currentToggled);
       $(window).scrollTop(currentScroll);
     }
@@ -87,6 +92,10 @@ function getPreclearContent()
             instance.content($(helper.origin).attr("data"));
           }
         });
+      }
+      else
+      {
+        $("#preclear-footer").empty();
       }
       content = $("<div>").append(v.footer);
       content.find("a[id^='preclear_rm_']").attr("id", "preclear_footer_rm_" + i);
@@ -229,7 +238,8 @@ function startPreclear(serial, multiple = "no")
     closeOnConfirm: false,
     showCancelButton: true,
     confirmButtonText:"Start",
-    cancelButtonText:"Cancel"
+    cancelButtonText:"Cancel",
+    showLoaderOnConfirm: true
   }, function(result)
   {
     if (result)
@@ -285,20 +295,31 @@ function startPreclear(serial, multiple = "no")
       if (opts.device.length > 0)
       {
         $.post(PreclearURL, opts, function(data)
-                {
-                  for (var i = 0; i < opts.device.length; i++) {
-                    key = opts.device[i].split("/").pop();
-                    openPreclear(disksInfo[key]["SERIAL_SHORT"]);
-                  }
-                }
-              ).always(function(data)
-                {
-                  window.location=window.location.pathname+window.location.hash;
-                }
-              ).fail(updateCsrfToken);
+        {
+          if (data.success)
+          {
+            swal({title:"Success!",type:"success"},function()
+            {
+              setTimeout("swal.close();", 1000);
+            });
+          }
+          else
+          {
+            swal({title:"Fail!",type:"error"},function()
+            {
+              setTimeout("swal.close();", 1000);
+            });
+          }
+          if (opts.device.length == 1)
+          {
+            key = opts.device[0].split("/").pop();
+            openPreclear(disksInfo[key]["SERIAL_SHORT"]);
+          }
+        },"json").always(function(data)
+        {
+          setTimeout("window.location=window.location.pathname+window.location.hash;", 1500);
+        }).fail(updateCsrfToken);
       }
-
-      swal.close();
 
     }
     else
@@ -313,31 +334,63 @@ function startPreclear(serial, multiple = "no")
 }
 
 
-function stopPreclear(serial, ask)
+function stopPreclear(serial, ask, multiple = 'no')
 {
   var title = 'Stop Preclear';
-  var exec  = '$.post(PreclearURL,{action:"stop_preclear",serial:"'+serial+'"}).always(function(){window.location=window.location.pathname+window.location.hash}).fail(updateCsrfToken);'
 
   if (ask != "ask")
   {
-    eval(exec);
-    ;
+    $.post(PreclearURL,{action:"stop_preclear",'serial':serial}).always(function()
+    {
+      window.location=window.location.pathname+window.location.hash;
+    }).fail(updateCsrfToken);
     return true;
   }
 
   preclear_dialog = $( "#preclear-dialog" );
 
-  var opts = {
-    family:       getDiskInfo(serial, 'FAMILY'),
-    model:        getDiskInfo(serial, 'MODEL'),
-    serial_short: getDiskInfo(serial, 'SERIAL_SHORT'),
-    firmware:     getDiskInfo(serial, 'FIRMWARE'),
-    size_h:       getDiskInfo(serial, 'SIZE_H')
-    };
+  if (multiple == "no")
+  {
+    var opts = {
+      family:       getDiskInfo(serial, 'FAMILY'),
+      model:        getDiskInfo(serial, 'MODEL'),
+      serial_short: getDiskInfo(serial, 'SERIAL_SHORT'),
+      firmware:     getDiskInfo(serial, 'FIRMWARE'),
+      size_h:       getDiskInfo(serial, 'SIZE_H')
+      };
+  
+    var header = $("#dialog-header-defaults").html();
+  
+    preclear_dialog.html( header.formatUnicorn(opts) );
+    preclear_dialog.append("<hr style='margin-left:12px;'>");
+  }
+  else
+  {
+    var header = $("#dialog-multiple-defaults").html();
+    var options = "";
 
-  var header = $("#dialog-header-defaults").html();
+    for(key in disksInfo)
+    {
+      disk = disksInfo[key];
+      if(disk.hasOwnProperty('SERIAL_SHORT'))
+      {
+        var disk_serial = disk['SERIAL_SHORT'];
+        var opts = {
+          device:       getDiskInfo(disk_serial, 'DEVICE'),
+          model:        getDiskInfo(disk_serial, 'MODEL'),
+          name:         getDiskInfo(disk_serial, 'NAME'),
+          serial_short: disk_serial,
+          size_h:       getDiskInfo(disk_serial, 'SIZE_H'),
+          disabled:     ( ! disk['PRECLEARING'] || disk['MOUNTED']) ? "disabled" : ""
+          };
+        option = "<option value='{serial_short}' {disabled}>{name} - {serial_short} ({size_h})</option>";
+        options += option.formatUnicorn(opts);
+      }
+    }
 
-  preclear_dialog.html("<div>" + header.formatUnicorn(opts) + "");
+    preclear_dialog.html( header.formatUnicorn(options) );
+    preclear_dialog.append("<hr style='margin-left:12px;'>");
+  }
 
   swal(
   {
@@ -348,15 +401,50 @@ function stopPreclear(serial, ask)
     closeOnConfirm: false,
     showCancelButton: true,
     confirmButtonText:"Stop",
-    cancelButtonText:"Cancel"
+    cancelButtonText:"Cancel",
+    showLoaderOnConfirm: true
   }, function(result)
   {
     if (result)
     {
-      eval(exec);
+      var opts       = new Object();
+      opts["serial"] = [];
+      if(serial)
+      {
+        opts["serial"].push(serial, 'DEVICE');
+      }
+      popup = $(".sweet-alert.showSweetAlert > p:first");
+      opts["action"] = "stop_preclear";
+
+      if ($('.showSweetAlert').find('#multiple_preclear :selected').length)
+      {
+        opts["serial"] = [];
+        $('.showSweetAlert').find('#multiple_preclear :selected').each( function(){
+          opts["serial"].push(this.value);
+        });
+      }
+
+      if (opts.serial.length > 0)
+      {
+        $.post(PreclearURL, opts, function(data)
+        {
+          if (data.success)
+          {
+            swal({title:"Success!",type:"success"},function()
+            {
+              setTimeout("swal.close();", 1000);
+            });
+          }
+          setTimeout("window.location=window.location.pathname+window.location.hash;", 1000);
+        },'json').fail(updateCsrfToken);
+      }
     }
-    swal.close();
+    // swal.close();
   });
+  // allow dropdown overflow
+  $('.showSweetAlert').css('overflow', 'visible');
+  $('.showSweetAlert').find('.chosen.swal').chosen({ width: '58%', allow_single_deselect: false });
+  $("#multiple_preclear_chosen > .chosen-choices").css("min-height", "27px");
 }
 
 
@@ -638,20 +726,20 @@ function getResumablePreclear(serial)
                   {
                     window.location=window.location.pathname+window.location.hash;
                   }
-                );
+                ).fail(updateCsrfToken);
         }
         else
         {
           swal.close();
           setTimeout(startPreclear, 300, serial);
         }
-      }).fail(updateCsrfToken);
+      });
     }
     else
     {
       startPreclear(serial);
     }
-  }, "json");
+  }, "json").fail(updateCsrfToken);
 }
 
 
@@ -703,4 +791,109 @@ function resumePreclear(disk)
   {
     getPreclearContent();
   }).fail(updateCsrfToken);
+}
+
+
+function preclearPauseAll()
+{
+  $.post(PreclearURL,{action:'pause_all'}, function(data)
+  {
+    getPreclearContent();
+  }).fail(updateCsrfToken);
+}
+
+
+function preclearResumeAll()
+{
+  $.post(PreclearURL,{action:'resume_all'}, function(data)
+  {
+    getPreclearContent();
+  }).fail(updateCsrfToken);
+}
+
+
+function preclearStopAll()
+{
+  swal(
+  {
+    title: "Stop Preclear Sessions",
+    text:  "Do you want to stop all running preclear sessions?",
+    type:  "warning",
+    html:  true,
+    closeOnConfirm: false,
+    showCancelButton: true,
+    confirmButtonText:"Stop",
+    cancelButtonText:"Cancel",
+    showLoaderOnConfirm: true
+  }, function(result)
+  {
+    if (result)
+    {
+      $.post(PreclearURL,{action:'stop_all_preclear'}, function(data)
+      {
+        if (data.success)
+        {
+          swal({title:"Success!",type:"success"});
+        }
+        else
+        {
+          swal({title:"Fail!",type:"error"});
+        }
+        setTimeout("swal.close();", 1000);
+        getPreclearContent();
+      }, "json").fail(updateCsrfToken);
+    }
+  });
+}
+
+
+var preclearSortableHelper = function(e,i)
+{
+  i.toggleClass("even odd");
+  i.children().each(function(){
+    $(this).width($(this).width());
+  });
+  return i;
+};
+
+
+var preclearStartSorting = function(e,i)
+{
+  clearTimeout(timers.preclear);
+  $(i.item).find("div[class*=toggle-]:visible").prev().addClass("sortable_toggled");
+  $(i.item).find("div[class*=toggle-]:visible").prev().trigger("click");
+  // $(i.item).height($(i.item).find("span.toggle-reports").first().height());
+};
+
+var preclearStopSorting = function(e,i)
+{
+  timers.preclear = setTimeout('getPreclearContent()', 15000);
+  $(i.item).find(".sortable_toggled").trigger("click").removeClass("sortable_toggled");
+};
+
+
+var preclearUpdateSorting = function(e,i)
+{
+  var devices = [];
+  $('#preclear-table-body').find("tr").each(function()
+  {
+    devices.push($(this).attr("device"));
+  });
+  $.post(PreclearURL ,{'action':'save_sort', 'devices':devices}, function(data)
+  {
+    getPreclearContent();
+  });
+};
+
+
+function preclearResetSorting()
+{
+  $.post(PreclearURL ,{'action':'reset_sort'}, function(data){getPreclearContent();});
+}
+
+
+function preclearSetSorting()
+{
+  $('#preclear-table-body').sortable({tolerance: "pointer",helper:preclearSortableHelper,items:'tr.sortable',cursor:'move',axis:'y',containment:'parent',cancel:'span.docker_readmore,input',delay:100,opacity:0.5,zIndex:9999,
+    update:preclearUpdateSorting,start:preclearStartSorting,stop:preclearStopSorting});
 }

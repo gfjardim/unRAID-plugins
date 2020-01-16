@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="1.0.7"
+version="1.0.8"
 
 # PID
 script_pid=$BASHPID
@@ -448,6 +448,7 @@ write_disk(){
   local last_progress=0
   local pause=${all_files[pause]}
   local paused_file=n
+  local paused_at=0
   local paused_smart=n
   local paused_sync=n
   local percent_wrote
@@ -544,90 +545,120 @@ write_disk(){
     next_notify=25
   fi
 
+  local timelapse=$(( $(timer) - 20 ))
+  local speedtime=$(( $(timer) ))
+  local speedbytes=0
+
+  sleep 1
+
   while kill -0 $dd_pid &>/dev/null; do
-    sleep 5 && kill -USR1 $dd_pid 2>/dev/null && sleep 5
-    # Calculate the current status
-    bytes_dd=$(awk 'END{print $1}' $dd_output|trim)
 
-    # Ensure bytes_wrote is a number
-    if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
-      bytes_wrote=$(($bytes_dd + $resume_seek))
-      bytes_dd_current=$bytes_dd
-    fi
+    if [ $(( $(timer) - $timelapse )) -gt 10 ]; then
 
-    # Save current status
-    diskop+=([current_op]="$write_type" [current_pos]="$bytes_wrote" [current_timer]=$(( $(date '+%s') - $time_start )) )
-    save_current_status
+      time_current=$(timer)
 
-    let percent_wrote=($bytes_wrote*100/$total_bytes)
-    if [ ! -z "${bytes_wrote##*[!0-9]*}" ]; then
+      kill -USR1 $dd_pid 2>/dev/null && sleep 1
+
+      # Calculate the current status
+      bytes_dd=$(awk 'END{print $1}' $dd_output|trim)
+
+      # Ensure bytes_wrote is a number
+      if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
+        bytes_wrote=$(($bytes_dd + $resume_seek))
+        bytes_dd_current=$bytes_dd
+      fi
+
       let percent_wrote=($bytes_wrote*100/$total_bytes)
+      if [ ! -z "${bytes_wrote##*[!0-9]*}" ]; then
+        let percent_wrote=($bytes_wrote*100/$total_bytes)
+      fi
+
+      average_speed=$(awk -F',' 'END{print $NF}' $dd_output|trim)
+      average_speed=$(( $bytes_wrote  / ($time_current - $time_start) / 1000000 ))
+
+      if [ -z "$current_speed" ]; then
+        current_speed=$average_speed
+      fi
+
+      if [ $(( $time_current - $speedtime )) -gt 30 ]; then
+        current_speed=$(( ($bytes_wrote - $speedbytes) / ($time_current - $speedtime) / 1000000 ))
+        speedtime=$(timer)
+        speedbytes=$bytes_wrote
+      fi
+
+      # Save current status
+      diskop+=([current_op]="$write_type" [current_pos]="$bytes_wrote" [current_timer]=$(( $(date '+%s') - $time_start )) )
+      save_current_status
+
+      # Pause if a 'smartctl' command is taking too much time to complete
+      maxSmartTime=$(maxExecTime "smartctl" "$disk_name" "60")
+      if [ "$maxSmartTime" -gt 30 -a "$paused_smart" != "y" ]; then
+        debug "dd[${dd_pid}]: Pausing (smartctl exec time: ${maxSmartTime}s)"
+        kill -TSTP $dd_pid && paused_at=$(timer)
+        paused_smart=y
+      elif [ "$maxSmartTime" -lt 30 -a "$paused_smart" == "y" ]; then
+        debug "dd[${dd_pid}]: resumed"
+        kill -CONT $dd_pid && time_start=$(($time_start + ($(timer) - $paused_at)))
+        paused_smart=n
+      fi
+
+      # Pause if a 'hdparm' command is taking too much time to complete
+      maxHdparmTime=$(maxExecTime "hdparm" "$disk_name" "60")
+      if [ "$maxHdparmTime" -gt 30 -a "$paused_hdparm" != "y" ]; then
+        debug "dd[${dd_pid}]: Pausing (hdparm exec time: ${maxHdparmTime}s)"
+        kill -TSTP $dd_pid && paused_at=$(timer)
+        paused_hdparm=y
+      elif [ "$maxHdparmTime" -lt 30 -a "$paused_hdparm" == "y" ]; then
+        debug "dd[${dd_pid}]: resumed"
+        kill -CONT $dd_pid && time_start=$(($time_start + ($(timer) - $paused_at)))
+        paused_hdparm=n
+      fi
+
+      # Pause if a sync command were issued
+      isSync=$(ps -e -o pid,command | grep -Po "\d+ [s]ync$|\d+ [s]6-sync$" | wc -l)
+      if [ "$isSync" -gt 0 -a "$paused_sync" != "y" ]; then
+        debug "dd[${dd_pid}]: Pausing (sync command issued)"
+        kill -TSTP $dd_pid && paused_at=$(timer)
+        paused_sync=y
+      elif [ "$isSync" -eq 0 -a "$paused_sync" == "y" ]; then
+        debug "dd[${dd_pid}]: resumed"
+        kill -CONT $dd_pid && time_start=$(($time_start + ($(timer) - $paused_at)))
+        paused_sync=n
+      fi
+
+      if (( $percent_wrote % 10 == 0 )) && [ "$last_progress" -ne $percent_wrote ]; then
+        debug "${write_type_s}: progress - ${percent_wrote}% $write_type_v"
+        last_progress=$percent_wrote
+      fi
+
+      timelapse=$(timer)
+
+    else
+      sleep 1
     fi
-    time_current=$(timer)
 
-    current_speed=$(awk -F',' 'END{print $NF}' $dd_output|trim)
-    average_speed=$(($bytes_wrote / ($time_current - $time_start) / 1000000 ))
-
-    status="Time elapsed: $(timer $time_start) | Write speed: $current_speed | Average speed: $average_speed MB/s"
+    status="Time elapsed: $(timer $time_start) | Write speed: $current_speed MB/s | Average speed: $average_speed MB/s"
     if [ "$cycles" -gt 1 ]; then
       cycle_disp=" ($cycle of $cycles)"
     fi
 
-    echo "$disk_name|NN|${write_type_s}${cycle_disp}: ${percent_wrote}% @ $current_speed ($(timer $time_start))|$$" >$stat_file
-
     # Pause if requested
     if [ -f "$pause" -a "$paused_file" != "y" ]; then
-      kill -TSTP $dd_pid
+      kill -TSTP $dd_pid && paused_at=$(timer)
       paused_file=y
       debug "Paused"
     elif [ -f "$queued_file" -a "$queued" != "y" ]; then
-      kill -TSTP $dd_pid
+      kill -TSTP $dd_pid && paused_at=$(timer)
       queued=y
       debug "Enqueued"
     elif [ ! -f "$pause" -a "$paused_file" == "y" ]; then
-      kill -CONT $dd_pid
+      kill -CONT $dd_pid && time_start=$(($time_start + ($(timer) - $paused_at)))
       paused_file=n
       debug "Resumed"
     elif [ ! -f "$queued_file" -a "$queued" == "y" ]; then
-      kill -CONT $dd_pid
+      kill -CONT $dd_pid && time_start=$(($time_start + ($(timer) - $paused_at)))
       queued=n
       debug "Resumed"
-    fi
-
-    # Pause if a 'smartctl' command is taking too much time to complete
-    maxSmartTime=$(maxExecTime "smartctl" "$disk_name" "60")
-    if [ "$maxSmartTime" -gt 30 -a "$paused_smart" != "y" ]; then
-      debug "dd[${dd_pid}]: Pausing (smartctl exec time: ${maxSmartTime}s)"
-      kill -TSTP $dd_pid
-      paused_smart=y
-    elif [ "$maxSmartTime" -lt 30 -a "$paused_smart" == "y" ]; then
-      debug "dd[${dd_pid}]: resumed"
-      kill -CONT $dd_pid
-      paused_smart=n
-    fi
-
-    # Pause if a 'hdparm' command is taking too much time to complete
-    maxHdparmTime=$(maxExecTime "hdparm" "$disk_name" "60")
-    if [ "$maxHdparmTime" -gt 30 -a "$paused_hdparm" != "y" ]; then
-      debug "dd[${dd_pid}]: Pausing (hdparm exec time: ${maxHdparmTime}s)"
-      kill -TSTP $dd_pid
-      paused_hdparm=y
-    elif [ "$maxHdparmTime" -lt 30 -a "$paused_hdparm" == "y" ]; then
-      debug "dd[${dd_pid}]: resumed"
-      kill -CONT $dd_pid
-      paused_hdparm=n
-    fi
-
-    # Pause if a sync command were issued
-    isSync=$(ps -e -o pid,command | grep -Po "\d+ [s]ync$|\d+ [s]6-sync$" | wc -l)
-    if [ "$isSync" -gt 0 -a "$paused_sync" != "y" ]; then
-      debug "dd[${dd_pid}]: Pausing (sync command issued)"
-      kill -TSTP $dd_pid
-      paused_sync=y
-    elif [ "$isSync" -eq 0 -a "$paused_sync" == "y" ]; then
-      debug "dd[${dd_pid}]: resumed"
-      kill -CONT $dd_pid
-      paused_sync=n
     fi
 
     if [ "$paused_file" == "y" -o "$paused_sync" == "y" -o "$paused_hdparm" == "y" -o "$paused_smart" == "y" ]; then
@@ -645,6 +676,7 @@ write_disk(){
       fi
       is_paused=y
     else
+      echo "$disk_name|NN|${write_type_s}${cycle_disp}: ${percent_wrote}% @ $current_speed MB/s ($(timer $time_start))|$$" >$stat_file
       # Display refresh
       if [ ! -e "/proc/${display_pid}/exe" ]; then
         display_status "${write_type_s} in progress:|###(${percent_wrote}% Done)###" "** $status" &
@@ -662,7 +694,7 @@ write_disk(){
     fi
 
     # Kill dd if hung
-    if [ "$dd_hang" -gt 30 ]; then
+    if [ "$dd_hang" -gt 60 ]; then
       eval "$initial_bytes='$bytes_wrote';"
       eval "$initial_timer='$(( $(date '+%s') - $time_start ))';"
       while read l; do debug "${write_type_s}: dd output: ${l}"; done < <(tail -n20 "$dd_output")
@@ -680,11 +712,6 @@ write_disk(){
       report_out+="Total Elapsed time: $(timer ${all_timer})"
       send_mail "${write_type_s} in progress on $disk_serial ($disk_name)" "${write_type_s} in progress on $disk_serial ($disk_name): ${percent_wrote}% @ ${current_speed}. Temp: ${disktemp}. Cycle ${cycle} of ${cycles}." "${report_out}"
       let next_notify=($next_notify + 25)
-    fi
-
-    if (( $percent_wrote % 10 == 0 )) && [ "$last_progress" -ne $percent_wrote ]; then
-      debug "${write_type_s}: progress - ${percent_wrote}% $write_type_v"
-      last_progress=$percent_wrote
     fi
 
   done
@@ -768,7 +795,7 @@ is_numeric() {
 }
 
 save_current_status() {
-
+  touch "${all_files[wait]}"
   local current_op=${diskop[current_op]}
   local current_pos=${diskop[current_pos]}
   local current_timer=${diskop[current_timer]}
@@ -781,25 +808,16 @@ save_current_status() {
   echo -e "all_timer_diff=$(( $(date '+%s') - $all_timer ))" >> "$tmp_resume"
   echo -e "cycle_timer_diff=$(( $(date '+%s') - $cycle_timer ))" >> "$tmp_resume"
 
-  echo -e "notify_freq=$notify_freq" >> "$tmp_resume"
-  echo -e "notify_channel=$notify_channel" >> "$tmp_resume"
-  echo -e "short_test=$short_test" >> "$tmp_resume"
-  echo -e "skip_preread=$skip_preread" >> "$tmp_resume"
-  echo -e "skip_postread=$skip_postread" >> "$tmp_resume"
-  echo -e "read_size=$read_size" >> "$tmp_resume"
-  echo -e "write_size=$write_size" >> "$tmp_resume"
-  echo -e "read_blocks=$read_blocks" >> "$tmp_resume"
-  echo -e "read_stress=$read_stress" >> "$tmp_resume"
-  echo -e "cycles=$cycles" >> "$tmp_resume"
-  echo -e "erase_disk=$erase_disk" >> "$tmp_resume"
-  echo -e "erase_preclear=$erase_preclear" >> "$tmp_resume"
+  for arg in "${!arguments[@]}"; do
+    echo "$arg=\"${arguments[$arg]}\"" >> "$tmp_resume"
+  done
+
   echo -e "preread_average='$preread_average'" >> "$tmp_resume"
   echo -e "preread_speed='$preread_speed'" >> "$tmp_resume"
   echo -e "write_average='$write_average'" >> "$tmp_resume"
   echo -e "write_speed='$write_speed'" >> "$tmp_resume"
   echo -e "postread_average='$postread_average'" >> "$tmp_resume"
   echo -e "postread_speed='$postread_speed'" >> "$tmp_resume"
-  echo -e "no_prompt=$no_prompt" >> "$tmp_resume"
   mv -f "$tmp_resume" "${all_files[resume_temp]}"
 
   local last_updated=$(( $(timer) - ${diskop[last_update]} ))
@@ -810,6 +828,7 @@ save_current_status() {
     diskop[last_update]=$(timer)
   fi
 
+  sleep 0.1 && rm -f "${all_files[wait]}"
 }
 
 read_entire_disk() { 
@@ -835,6 +854,7 @@ read_entire_disk() {
   local disk_serial=${disk_properties[serial]}
   local last_progress=0
   local pause=${all_files[pause]}
+  local paused_at=0
   local paused_file=n
   local paused_smart=n
   local paused_sync=n
@@ -979,6 +999,10 @@ read_entire_disk() {
   # if we are interrupted, kill the background reading of the disk.
   all_files[dd_pid]=$dd_pid
 
+  local timelapse=$(( $(timer) - 20 ))
+  local speedtime=$(( $(timer) ))
+  local speedbytes=0
+
   while kill -0 $dd_pid >/dev/null 2>&1; do
 
     # Stress the disk header
@@ -1014,33 +1038,92 @@ read_entire_disk() {
       kill -0 $skip_p5 2>/dev/null && wait $skip_p5
     fi
 
-    # Refresh dd status
-    sleep 5 && kill -USR1 $dd_pid 2>/dev/null && sleep 5
+    if [ $(( $(timer) - $timelapse )) -gt 10 ]; then
 
-    # Calculate the current status
-    bytes_dd=$(awk 'END{print $1}' $dd_output|trim)
+      time_current=$(timer)
 
-    # Ensure bytes_read is a number
-    if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
-      bytes_read=$(($bytes_dd + $resume_skip))
-      bytes_dd_current=$bytes_dd
-      let percent_read=($bytes_read*100/$total_bytes)
+      # Refresh dd status
+      kill -USR1 $dd_pid 2>/dev/null && sleep 1
+
+      # Calculate the current status
+      bytes_dd=$(awk 'END{print $1}' $dd_output|trim)
+
+      # Ensure bytes_read is a number
+      if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
+        bytes_read=$(($bytes_dd + $resume_skip))
+        bytes_dd_current=$bytes_dd
+        let percent_read=($bytes_read*100/$total_bytes)
+      fi
+
+      average_speed=$(awk -F',' 'END{print $NF}' $dd_output|trim)
+      average_speed=$(( $bytes_read  / ($time_current - $time_start) / 1000000 ))
+
+      if [ -z "$current_speed" ]; then
+        current_speed=$average_speed
+      fi
+
+      if [ $(( $time_current - $speedtime )) -gt 30 ]; then
+        current_speed=$(( ($bytes_read - $speedbytes) / ($time_current - $speedtime) / 1000000 ))
+        speedtime=$(timer)
+        speedbytes=$bytes_read
+      fi
+
+      # Save current status
+      diskop+=([current_op]="$read_type" [current_pos]="$bytes_read" [current_timer]=$(( $(date '+%s') - $time_start )) )
+      save_current_status
+
+      maxTimeout=15
+      
+      # Pause if a 'smartctl' command is taking too much time to complete
+      maxSmartTime=$(maxExecTime "smartctl" "$disk_name" "60")
+      if [ "$maxSmartTime" -gt "$maxTimeout" -a "$paused_smart" != "y" ]; then
+        debug "dd[${dd_pid}]: pausing (smartctl exec time: ${maxSmartTime}s)"
+        kill -TSTP $dd_pid && paused_at=$(timer)
+        paused_smart=y
+      elif [ "$maxSmartTime" -lt "$maxTimeout" -a "$paused_smart" == "y" ]; then
+        debug "dd[${dd_pid}]: resumed"
+        kill -CONT $dd_pid && time_start=$(($time_start + ($(timer) - $paused_at)))
+        paused_smart=n
+      fi
+
+      # Pause if a 'hdparm' command is taking too much time to complete
+      maxHdparmTime=$(maxExecTime "hdparm" "$disk_name" "60")
+      if [ "$maxHdparmTime" -gt "$maxTimeout" -a "$paused_hdparm" != "y" ]; then
+        debug "dd[${dd_pid}]: pausing (hdparm exec time: ${maxHdparmTime}s)"
+        kill -TSTP $dd_pid && paused_at=$(timer)
+        paused_hdparm=y
+      elif [ "$maxHdparmTime" -lt "$maxTimeout" -a "$paused_hdparm" == "y" ]; then
+        debug "dd[${dd_pid}]: resumed"
+        kill -CONT $dd_pid && time_start=$(($time_start + ($(timer) - $paused_at)))
+        paused_hdparm=n
+      fi
+
+      # Pause if a sync command were issued
+      isSync=$(ps -e -o pid,command | grep -Po "\d+ [s]ync$|\d+ [s]6-sync$" | wc -l)
+      if [ "$isSync" -gt 0 -a "$paused_sync" != "y" ]; then
+        debug "dd[${dd_pid}]: pausing (sync command issued)"
+        kill -TSTP $dd_pid && paused_at=$(timer)
+        paused_sync=y
+      elif [ "$isSync" -eq 0 -a "$paused_sync" == "y" ]; then
+        debug "dd[${dd_pid}]: resumed"
+        kill -CONT $dd_pid && time_start=$(($time_start + ($(timer) - $paused_at)))
+        paused_sync=n
+      fi
+
+      if (( $percent_read  % 10 == 0 )) && [ "$last_progress" -ne $percent_read ]; then
+        debug "${read_type_s}: progress - ${percent_read}% $read_type_v"
+        last_progress=$percent_read
+      fi
+
+      timelapse=$(timer)
+    else
+      sleep 1
     fi
 
-    # Save current status
-    diskop+=([current_op]="$read_type" [current_pos]="$bytes_read" [current_timer]=$(( $(date '+%s') - $time_start )) )
-    save_current_status
-
-    time_current=$(timer)
-
-    current_speed=$(awk -F',' 'END{print $NF}' $dd_output|trim)
-    average_speed=$(($bytes_read / ($time_current - $time_start) / 1000000 ))
-
-    status="Time elapsed: $(timer $time_start) | Current speed: $current_speed | Average speed: $average_speed MB/s"
+    status="Time elapsed: $(timer $time_start) | Current speed: $current_speed MB/s | Average speed: $average_speed MB/s"
     if [ "$cycles" -gt 1 ]; then
       cycle_disp=" ($cycle of $cycles)"
     fi
-    echo "$disk_name|NN|${read_type_s}${cycle_disp}: ${percent_read}% @ ${average_speed} MB/s ($(timer $time_start))|$$" > $stat_file
 
     if [ "$paused_file" == "y" -o "$paused_sync" == "y" -o "$paused_hdparm" == "y" -o "$paused_smart" == "y" ]; then
       echo "$disk_name|NN|${read_type_t}${cycle_disp} PAUSED|$$" >$stat_file
@@ -1057,6 +1140,7 @@ read_entire_disk() {
       fi
       is_paused=y
     else
+      echo "$disk_name|NN|${read_type_s}${cycle_disp}: ${percent_read}% @ ${average_speed} MB/s ($(timer $time_start))|$$" > $stat_file
       # Display refresh
       if [ ! -e "/proc/${display_pid}/exe" ]; then
         display_status "$read_type_t|###(${percent_read}% Done)###" "** $status" &
@@ -1074,7 +1158,7 @@ read_entire_disk() {
     fi
 
     # Kill dd if hung
-    if [ "$dd_hang" -gt 30 ]; then
+    if [ "$dd_hang" -gt 60 ]; then
       eval "$initial_bytes='"$bytes_read"';"
       eval "$initial_timer='$(( $(date '+%s') - $time_start ))';"
       while read l; do debug "${read_type_s}: dd output: ${l}"; done < <(tail -n20 "$dd_output")
@@ -1097,65 +1181,23 @@ read_entire_disk() {
 
     # Pause if requested
     if [ -f "$pause" -a "$paused_file" != "y" ]; then
-      kill -TSTP $dd_pid
+      kill -TSTP $dd_pid && paused_at=$(timer)
       paused_file=y
       debug "Paused"
     elif [ -f "$queued_file" -a "$queued" != "y" ]; then
-      kill -TSTP $dd_pid
+      kill -TSTP $dd_pid && paused_at=$(timer)
       queued=y
       debug "Enqueued"
     elif [ ! -f "$pause" -a "$paused_file" == "y" ]; then
-      kill -CONT $dd_pid
+      kill -CONT $dd_pid && time_start=$(($time_start + ($(timer) - $paused_at)))
       paused_file=n
       debug "Resumed"
     elif [ ! -f "$queued_file" -a "$queued" == "y" ]; then
-      kill -CONT $dd_pid
+      kill -CONT $dd_pid && time_start=$(($time_start + ($(timer) - $paused_at)))
       queued=n
       debug "Resumed"
     fi
 
-    maxTimeout=15
-    
-    # Pause if a 'smartctl' command is taking too much time to complete
-    maxSmartTime=$(maxExecTime "smartctl" "$disk_name" "60")
-    if [ "$maxSmartTime" -gt "$maxTimeout" -a "$paused_smart" != "y" ]; then
-      debug "dd[${dd_pid}]: pausing (smartctl exec time: ${maxSmartTime}s)"
-      kill -TSTP $dd_pid
-      paused_smart=y
-    elif [ "$maxSmartTime" -lt "$maxTimeout" -a "$paused_smart" == "y" ]; then
-      debug "dd[${dd_pid}]: resumed"
-      kill -CONT $dd_pid
-      paused_smart=n
-    fi
-
-    # Pause if a 'hdparm' command is taking too much time to complete
-    maxHdparmTime=$(maxExecTime "hdparm" "$disk_name" "60")
-    if [ "$maxHdparmTime" -gt "$maxTimeout" -a "$paused_hdparm" != "y" ]; then
-      debug "dd[${dd_pid}]: pausing (hdparm exec time: ${maxHdparmTime}s)"
-      kill -TSTP $dd_pid
-      paused_hdparm=y
-    elif [ "$maxHdparmTime" -lt "$maxTimeout" -a "$paused_hdparm" == "y" ]; then
-      debug "dd[${dd_pid}]: resumed"
-      kill -CONT $dd_pid
-      paused_hdparm=n
-    fi
-
-    # Pause if a sync command were issued
-    isSync=$(ps -e -o pid,command | grep -Po "\d+ [s]ync$|\d+ [s]6-sync$" | wc -l)
-    if [ "$isSync" -gt 0 -a "$paused_sync" != "y" ]; then
-      debug "dd[${dd_pid}]: pausing (sync command issued)"
-      kill -TSTP $dd_pid
-      paused_sync=y
-    elif [ "$isSync" -eq 0 -a "$paused_sync" == "y" ]; then
-      debug "dd[${dd_pid}]: resumed"
-      kill -CONT $dd_pid
-      paused_sync=n
-    fi
-
-    if (( $percent_read  % 10 == 0 )) && [ "$last_progress" -ne $percent_read ]; then
-      debug "${read_type_s}: progress - ${percent_read}% $read_type_v"
-      last_progress=$percent_read
-    fi
   done
 
   wait $dd_pid
@@ -1666,25 +1708,31 @@ syslog_to_debug()
 }
 
 do_exit()
-{ 
+{
+  trap '' EXIT 1 2 3 9 15;
+  while [ -f "${all_files[wait]}" ]; do 
+    sleep 0.1; 
+  done
+  
+  dd_pid=${all_files[dd_pid]}
+
   case "$1" in
     0)
-      debug 'SIGTERM received, exiting...'
-      kill -9 ${all_files[dd_pid]} 2>/dev/null
+      debug "$2 received, exiting..."
+      rm -f "${all_files[pid]}" "${all_files[pause]}" "${all_files[queued]}"
       save_current_status 1;
+      kill -9 $dd_pid 2>/dev/null
       exit 0
       ;;
     1)
       debug 'error encountered, exiting...'
-      trap '' EXIT
-      kill -9 $(cat ${all_files[dd_pid]}) 2>/dev/null
       rm -f "${all_files[resume_file]}"
       rm -f "${all_files[resume_temp]}"
       rm -rf ${all_files[dir]};
+      kill -9 $dd_pid 2>/dev/null
       exit 1
       ;;
     *)
-      trap '' EXIT
       rm -rf ${all_files[dir]};
       rm -f "${all_files[resume_file]}"
       rm -f "${all_files[resume_temp]}"
@@ -1692,6 +1740,26 @@ do_exit()
       ;;
   esac
 }
+
+trap_with_arg() {
+    func="$1" ; shift
+    for sig ; do
+        trap "$func $sig" "$sig"
+    done
+}
+
+is_current_op() {
+  if [ -n "$current_op" ] && [ "$current_op" == "$1" ]; then
+    current_op=""
+    return 0
+  elif [ -z "$current_op" ]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+keep_pid_updated(){ while [ -e "${all_files[dir]}" ]; do echo "$BASHPID" > "${all_files[pid]}"; sleep 2; done }
 
 ######################################################
 ##                                                  ##
@@ -1776,6 +1844,24 @@ if [ -f "$load_file" ] && $(bash -n "$load_file"); then
     exit 1
   fi
 fi
+
+append arguments 'notify_freq'       "$notify_freq"
+append arguments 'notify_channel'    "$notify_channel"
+append arguments 'skip_preread'      "$skip_preread"
+append arguments 'skip_postread'     "$skip_postread"
+append arguments 'read_size'         "$read_size"
+append arguments 'write_size'        "$write_size"
+append arguments 'read_blocks'       "$read_blocks"
+append arguments 'short_test'        "$short_test"
+append arguments 'read_stress'       "$read_stress"
+append arguments 'cycles'            "$cycles"
+append arguments 'verify_disk_mbr'   "$verify_disk_mbr"
+append arguments 'verify_zeroed'     "$verify_zeroed"
+append arguments 'no_prompt'         "$no_prompt"
+append arguments 'write_disk_mbr'    "$write_disk_mbr"
+append arguments 'format_html'       "$format_html"
+append arguments 'erase_disk'        "$erase_disk"
+append arguments 'erase_preclear'    "$erase_preclear"
 
 # diff /tmp/.init <(set -o >/dev/null; set)
 # exit 0
@@ -1899,10 +1985,11 @@ append all_files 'smart_out'     "${all_files[dir]}/smart_out"
 append all_files 'form_out'      "${all_files[dir]}/form_out"
 append all_files 'resume_file'   "/boot/config/plugins/preclear.disk/${disk_properties[serial]}.resume"
 append all_files 'resume_temp'   "/tmp/.preclear/${disk_properties[serial]}.resume"
+append all_files 'wait'          "${all_files[dir]}/wait"
 
 mkdir -p "${all_files[dir]}"
 
-trap "do_exit 0" EXIT;
+trap_with_arg "do_exit 0" INT TERM EXIT
 
 if [ ! -p "${all_files[fifo]}" ]; then
   mkfifo "${all_files[fifo]}" || exit
@@ -1963,11 +2050,13 @@ if [ -f "${all_files[pid]}" ]; then
     trap '' EXIT
     exit 1
   else
-    echo "$$" > ${all_files[pid]}
+    echo "$script_pid" > ${all_files[pid]}
   fi
 else
-  echo "$$" > ${all_files[pid]}
+  echo "$script_pid" > ${all_files[pid]}
 fi
+
+keep_pid_updated &
 
 if ! is_preclear_candidate $theDisk; then
   tput reset
@@ -1980,6 +2069,18 @@ if ! is_preclear_candidate $theDisk; then
 fi
 
 echo "${disk_properties[name]}|NN|Starting...|${script_pid}" > "/tmp/preclear_stat_${disk_properties[name]}"
+
+# reset timer
+all_timer=$(( $(date '+%s') - $all_timer_diff ))
+
+if [ -z "$current_op" ] || [ ! -f "${all_files[smart_prefix]}cycle_initial_start" ]; then
+  # Export initial SMART status
+  [ "$disable_smart" != "y" ] && save_smart_info $theDisk "$smart_type" "cycle_initial_start"
+fi
+
+# Add current SMART status to display_smart
+[ "$disable_smart" != "y" ] && compare_smart "cycle_initial_start"
+[ "$disable_smart" != "y" ] && output_smart $theDisk "$smart_type"
 
 ######################################################
 ##              VERIFY PRECLEAR STATUS              ##
@@ -1994,41 +2095,62 @@ if [ "$verify_disk_mbr" == "y" ]; then
   append display_title "${ul}unRAID Server: verifying Preclear State of disk ${noul} ${bold}${disk_properties['serial']}${norm}."
   append display_title "Verifying disk '${disk_properties['serial']}' for unRAID's Preclear State."
 
-  display_status "Verifying unRAID's signature on the MBR ..." ""
-  echo "${disk_properties[name]}|NN|Verifying unRAID's signature on the MBR...|$$" > ${all_files[stat]}
-  sleep 10
-  if verify_mbr $theDisk; then
+  if ! is_current_op "zeroed"; then
+
+    display_status "Verifying unRAID's signature on the MBR ..." ""
+    echo "${disk_properties[name]}|NN|Verifying unRAID's signature on the MBR...|$$" > ${all_files[stat]}
+    sleep 5
+
+    if verify_mbr $theDisk; then
+      append display_step "Verifying unRAID's Preclear MBR:|***SUCCESS***"
+      echo "${disk_properties[name]}|NN|Verifying unRAID's signature on the MBR successful|$$" > ${all_files[stat]}
+      display_status
+    else
+      append display_step "Verifying unRAID's signature:| ***FAIL***"
+      echo "${disk_properties[name]}|NY|Verifying unRAID's signature on the MBR failed|$$" > ${all_files[stat]}
+      display_status
+      echo -e "--> RESULT: FAIL! $theDisk DOESN'T have a valid unRAID MBR signature!!!\n\n"
+      if [ "$notify_channel" -gt 0 ]; then
+        send_mail "FAIL! $diskName ($theDisk) DOESN'T have a valid unRAID MBR signature!!!" "$diskName ($theDisk) DOESN'T have a valid unRAID MBR signature!!!" "$diskName ($theDisk) DOESN'T have a valid unRAID MBR signature!!!" "" "alert"
+      fi
+      do_exit 1
+    fi
+  else
     append display_step "Verifying unRAID's Preclear MBR:|***SUCCESS***"
     echo "${disk_properties[name]}|NN|Verifying unRAID's signature on the MBR successful|$$" > ${all_files[stat]}
     display_status
-  else
-    append display_step "Verifying unRAID's signature:| ***FAIL***"
-    echo "${disk_properties[name]}|NY|Verifying unRAID's signature on the MBR failed|$$" > ${all_files[stat]}
-    display_status
-    echo -e "--> RESULT: FAIL! $theDisk DOESN'T have a valid unRAID MBR signature!!!\n\n"
-    if [ "$notify_channel" -gt 0 ]; then
-      send_mail "FAIL! $diskName ($theDisk) DOESN'T have a valid unRAID MBR signature!!!" "$diskName ($theDisk) DOESN'T have a valid unRAID MBR signature!!!" "$diskName ($theDisk) DOESN'T have a valid unRAID MBR signature!!!" "" "alert"
-    fi
-    do_exit 1
   fi
+
   if [ "$max_steps" -eq "2" ]; then
     display_status "Verifying if disk is zeroed ..." ""
-    start_bytes=0
-    start_timer=0
-    if read_entire_disk verify zeroed start_bytes start_timer preread_average preread_speed; then
-      append display_step "Verifying if disk is zeroed:|${preread_average} ***SUCCESS***"
-      echo "${disk_properties[name]}|NN|Verifying if disk is zeroed: SUCCESS|$$" > ${all_files[stat]}
-      display_status
-      sleep 10
-    else
-      append display_step "Verifying if disk is zeroed:|***FAIL***"
-      echo "${disk_properties[name]}|NY|Verifying if disk is zeroed: FAIL|$$" > ${all_files[stat]}
-      display_status
-      echo -e "--> RESULT: FAIL! $diskName ($theDisk) IS NOT zeroed!!!\n\n"
-      if [ "$notify_channel" -gt 0 ]; then
-        send_mail "FAIL! $diskName ($theDisk) IS NOT zeroed!!!" "FAIL! $diskName ($theDisk) IS NOT zeroed!!!" "FAIL! $diskName ($theDisk) IS NOT zeroed!!!" "" "alert"
+
+    # Check current operation if restoring a previous preclear instance
+    if is_current_op "zeroed"; then
+
+      # Loading restored position
+      if [ -n "$current_pos" ]; then
+        start_bytes=$current_pos
+        start_timer=$current_timer
+        current_pos=0
+      else
+        start_bytes=0
+        current_timer=0
       fi
-      do_exit 1
+      if read_entire_disk verify zeroed start_bytes start_timer preread_average preread_speed; then
+        append display_step "Verifying if disk is zeroed:|${preread_average} ***SUCCESS***"
+        echo "${disk_properties[name]}|NN|Verifying if disk is zeroed: SUCCESS|$$" > ${all_files[stat]}
+        display_status
+        sleep 10
+      else
+        append display_step "Verifying if disk is zeroed:|***FAIL***"
+        echo "${disk_properties[name]}|NY|Verifying if disk is zeroed: FAIL|$$" > ${all_files[stat]}
+        display_status
+        echo -e "--> RESULT: FAIL! $diskName ($theDisk) IS NOT zeroed!!!\n\n"
+        if [ "$notify_channel" -gt 0 ]; then
+          send_mail "FAIL! $diskName ($theDisk) IS NOT zeroed!!!" "FAIL! $diskName ($theDisk) IS NOT zeroed!!!" "FAIL! $diskName ($theDisk) IS NOT zeroed!!!" "" "alert"
+        fi
+        do_exit 1
+      fi
     fi
   fi
   if [ "$notify_channel" -gt 0 ]; then
@@ -2060,28 +2182,6 @@ fi
 ##                 PRECLEAR THE DISK                ##
 ######################################################
 
-is_current_op() {
-  if [ -n "$current_op" ] && [ "$current_op" == "$1" ]; then
-    current_op=""
-    return 0
-  elif [ -z "$current_op" ]; then
-    return 0
-  else
-    return 1
-  fi
-}
-
-# reset timer
-all_timer=$(( $(date '+%s') - $all_timer_diff ))
-
-if [ -z "$current_op" ] || [ ! -f "${all_files[smart_prefix]}cycle_initial_start" ]; then
-  # Export initial SMART status
-  [ "$disable_smart" != "y" ] && save_smart_info $theDisk "$smart_type" "cycle_initial_start"
-fi
-
-# Add current SMART status to display_smart
-[ "$disable_smart" != "y" ] && compare_smart "cycle_initial_start"
-[ "$disable_smart" != "y" ] && output_smart $theDisk "$smart_type"
 
 if [ "$erase_disk" == "y" ]; then
   op_title="Erase"

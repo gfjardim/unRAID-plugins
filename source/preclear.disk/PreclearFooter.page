@@ -11,7 +11,6 @@ $Preclear = new Preclear;
 <? endif;?>
 <?=$Preclear->html();?>
 <script type="text/javascript">
-  var display = <?=json_encode($display);?>;
 
   <?=$Preclear->Script();?>
 
@@ -34,7 +33,9 @@ $Preclear = new Preclear;
   <? $unraid_version = @parse_ini_file("/etc/unraid-version")["version"];
      $plugin_version = trim(@file_get_contents("/var/state/preclear.disk/version"));
   ?>
-  addBannerWarning('<b>Preclear Plugin (<?=$plugin_version;?>):</b> unsupported Unraid version (<?=$unraid_version;?>). Please upgrade your OS/plugin or request proper support at the <a href="https://forums.unraid.net/topic/54648-preclear-plugin/" target="_blank">forum support thread</a>.', true, false);
+  if (typeof addBannerWarning === "function" ) {
+    addBannerWarning('<b>Preclear Plugin (<?=$plugin_version;?>):</b> unsupported Unraid version (<?=$unraid_version;?>). Please upgrade your OS/plugin or request proper support at the <a href="https://forums.unraid.net/topic/54648-preclear-plugin/" target="_blank">forum support thread</a>.', true, false);
+  }
   <?endif;?>
 </script>
 

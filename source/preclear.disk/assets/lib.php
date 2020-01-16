@@ -10,6 +10,7 @@ $state_file = "/var/state/preclear.disk/state.ini";
 $log_file   = "/var/log/preclear.disk.log";
 $diskinfo   = "/var/local/emhttp/plugins/diskinfo/diskinfo.json";
 $unsupported = "/var/state/preclear.disk/unsupported";
+$sort_file   = "/boot/config/plugins/preclear.disk/sort_order";
 
 class TMUX
 {
@@ -45,6 +46,12 @@ class TMUX
   public static function sendCommand($name, $cmd)
   {
     exec("/usr/bin/tmux send -t '$name' '$cmd' ENTER 2>/dev/null");
+  }
+
+
+  public static function sendKeys($name, $keys)
+  {
+    exec("/usr/bin/tmux send-keys -t '$name' '$keys' ENTER 2>/dev/null");
   }
 
 
