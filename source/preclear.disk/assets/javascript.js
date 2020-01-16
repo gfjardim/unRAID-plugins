@@ -93,14 +93,19 @@ function getPreclearContent()
           }
         });
       }
-      else
-      {
-        $("#preclear-footer").empty();
-      }
       content = $("<div>").append(v.footer);
       content.find("a[id^='preclear_rm_']").attr("id", "preclear_footer_rm_" + i);
       content.find("a[id^='preclear_open_']").attr("id", "preclear_footer_open_" + i);
       $(icon).tooltipster('content', content.html());
+    });
+
+    $("a[id*='preclear_footer_']").each(function(i,v)
+    {
+      id = $(v).attr("id").replace("preclear_footer_", "");
+      if (! (id in data.status))
+      {
+        $(v).remove();
+      }
     });
 
     $.each(hovered, function(k,v){ if(v.length) { $("#"+v).trigger("mouseenter");} });
@@ -223,7 +228,6 @@ function startPreclear(serial, multiple = "no")
         }
       );
       preclear_dialog.append(options+"</select></dd></dl>");
-
     }
   }
 
@@ -310,11 +314,11 @@ function startPreclear(serial, multiple = "no")
               setTimeout("swal.close();", 1000);
             });
           }
-          if (opts.device.length == 1)
-          {
-            key = opts.device[0].split("/").pop();
-            openPreclear(disksInfo[key]["SERIAL_SHORT"]);
-          }
+          // if (opts.device.length == 1)
+          // {
+          //   key = opts.device[0].split("/").pop();
+          //   openPreclear(disksInfo[key]["SERIAL_SHORT"]);
+          // }
         },"json").always(function(data)
         {
           setTimeout("window.location=window.location.pathname+window.location.hash;", 1500);
@@ -720,7 +724,7 @@ function getResumablePreclear(serial)
 
           $.post(PreclearURL, opts, function(data)
                   {
-                    openPreclear(serial);
+                    // openPreclear(serial);
                   }
                 ).always(function(data)
                   {

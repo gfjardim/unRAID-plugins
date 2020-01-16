@@ -1718,7 +1718,7 @@ do_exit()
 
   case "$1" in
     0)
-      debug "$2 received, exiting..."
+      debug "SIG${2} received, exiting..."
       rm -f "${all_files[pid]}" "${all_files[pause]}" "${all_files[queued]}"
       save_current_status 1;
       kill -9 $dd_pid 2>/dev/null
