@@ -546,8 +546,9 @@ write_disk(){
   fi
 
   local timelapse=$(( $(timer) - 20 ))
-  local speedtime=$(( $(timer) ))
-  local speedbytes=0
+  local current_speed_time=0
+  local current_speed_bytes=0
+  local current_dd_time=0
 
   sleep 1
 
@@ -573,17 +574,19 @@ write_disk(){
         let percent_wrote=($bytes_wrote*100/$total_bytes)
       fi
 
-      average_speed=$(awk -F',' 'END{print $NF}' $dd_output|trim)
-      average_speed=$(( $bytes_wrote  / ($time_current - $time_start) / 1000000 ))
+      if [ $(( $time_current - $time_start )) -gt 0 ]; then
+        average_speed=$(( $bytes_wrote  / ($time_current - $time_start) / 1000000 ))
+      fi
 
       if [ -z "$current_speed" ]; then
         current_speed=$average_speed
       fi
 
-      if [ $(( $time_current - $speedtime )) -gt 30 ]; then
-        current_speed=$(( ($bytes_wrote - $speedbytes) / ($time_current - $speedtime) / 1000000 ))
-        speedtime=$(timer)
-        speedbytes=$bytes_wrote
+      current_dd_time=$(awk -F',' 'END{print $3}' $dd_output | sed 's/[^0-9.]*//g');
+      if [ ! -z "${current_dd_time##*[!0-9.]*}" -a "$(echo $current_dd_time | cut -d '.' -f 1)" -gt "0" ]; then
+        current_speed=$(awk "BEGIN {printf \"%d\",(${bytes_dd_current} - ${current_speed_bytes})/(${current_dd_time} - ${current_speed_time})/1000000}")
+        current_speed_bytes=$bytes_dd_current
+        current_speed_time=$current_dd_time
       fi
 
       # Save current status
@@ -1000,8 +1003,9 @@ read_entire_disk() {
   all_files[dd_pid]=$dd_pid
 
   local timelapse=$(( $(timer) - 20 ))
-  local speedtime=$(( $(timer) ))
-  local speedbytes=0
+  local current_speed_time=0
+  local current_speed_bytes=0
+  local current_dd_time=0
 
   while kill -0 $dd_pid >/dev/null 2>&1; do
 
@@ -1055,17 +1059,19 @@ read_entire_disk() {
         let percent_read=($bytes_read*100/$total_bytes)
       fi
 
-      average_speed=$(awk -F',' 'END{print $NF}' $dd_output|trim)
-      average_speed=$(( $bytes_read  / ($time_current - $time_start) / 1000000 ))
+      if [ $(( $time_current - $time_start )) -gt 0 ]; then
+        average_speed=$(( $bytes_read  / ($time_current - $time_start) / 1000000 ))
+      fi
 
       if [ -z "$current_speed" ]; then
         current_speed=$average_speed
       fi
 
-      if [ $(( $time_current - $speedtime )) -gt 30 ]; then
-        current_speed=$(( ($bytes_read - $speedbytes) / ($time_current - $speedtime) / 1000000 ))
-        speedtime=$(timer)
-        speedbytes=$bytes_read
+      current_dd_time=$(awk -F',' 'END{print $3}' $dd_output | sed 's/[^0-9.]*//g');
+      if [ ! -z "${current_dd_time##*[!0-9.]*}" -a "$(echo $current_dd_time | cut -d '.' -f 1)" -gt "0" ]; then
+        current_speed=$(awk "BEGIN {printf \"%d\",(${bytes_dd_current} - ${current_speed_bytes})/(${current_dd_time} - ${current_speed_time})/1000000}")
+        current_speed_bytes=$bytes_dd_current
+        current_speed_time=$current_dd_time
       fi
 
       # Save current status
