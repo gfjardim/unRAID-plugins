@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2020.01.17">
+<!ENTITY version   "2020.01.17a">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -15,7 +15,7 @@
 <CHANGES>
 ##&name;
 
-###2020.01.17
+###2020.01.17a
 - Fix: division by zero on speed calculation 
 
 ###2020.01.16a

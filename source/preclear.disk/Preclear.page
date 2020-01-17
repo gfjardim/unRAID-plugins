@@ -54,6 +54,18 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
     
   }
 
+  function preclearFixHelp()
+  { 
+    $.each($("table.preclear"), function(i,v)
+    {
+      $(this).find('tr:first,dt:last').css("cursor","default").unbind();
+      help = $(this).next('.inline_help').attr("id");
+      console.log(help)
+      $.each($(this).find('tr:first > td,dt:last > dd').not( ":first" ), function(i,v){
+        $(this).css("cursor","help").bind("click", function(){$("#"+help).toggle('slow');})
+      });
+    });
+  }
 </script>
 <style>
   table.preclear {padding:0px;border-collapse:collapse;white-space:nowrap;}
@@ -84,7 +96,10 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
 <table class=' preclear custom_head'>
   <thead>
     <tr>
-      <td>Device</td>
+      <td>
+        <a class="tooltip-toggle" style="cursor:pointer;" onclick="preclearResetSorting()" title="Reset sorting"><i class="fa fa-th-list"></i></a>
+        Device
+      </td>
       <td>Identification</td>
       <td>Temp.</td>
       <td>Size</td>
@@ -119,10 +134,12 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
     addButtonTab('<a class="tooltip-toggle" style="cursor:pointer" onclick="setPreclearQueue();" title="Set Preclear Queue"><i class="fa fa-tachometer"></i></a>', "Preclear Disk", true, true);
     <?endif;?>
       addButtonTab('<a class="tooltip-toggle" style="cursor:pointer" onclick="startPreclear(\'\', \'yes\');" title="Start Multiple Sessions"><i class="icon-preclear"></i></a>', "Preclear Disk", true, true);
-    addButtonTab('<a class="tooltip-toggle" style="cursor:pointer;" onclick="preclearResetSorting()" title="Reset sorting"><i class="fa fa-th-list"></i></a>', "Preclear Disk", true, true);
     addButtonTab('<a class="tooltip-toggle" style="cursor:pointer;" onclick="preclearResumeAll()" title="Resume all Sessions"><i class="fa fa-play green-text"></i></a>', "Preclear Disk", true, true);
     addButtonTab('<a class="tooltip-toggle" style="cursor:pointer;" onclick="preclearPauseAll()" title="Pause all Sessions"><i class="fa fa-pause yellow-orb"></i></a>', "Preclear Disk", true, true);
     addButtonTab('<a class="tooltip-toggle" style="cursor:pointer;" onclick="preclearStopAll()" title="Stop all Sessions"><i class="fa fa-stop red-text"></i></a>', "Preclear Disk", true, true);
     preclearSetSorting();
+    setTimeout(preclearFixHelp,100);
   });
+
+
 </script>

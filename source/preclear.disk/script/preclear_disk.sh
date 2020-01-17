@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="1.0.8"
+version="1.0.9"
 
 # PID
 script_pid=$BASHPID
@@ -547,7 +547,7 @@ write_disk(){
 
   local timelapse=$(( $(timer) - 20 ))
   local current_speed_time=0
-  local current_speed_bytes=0
+  local current_speed_bytes=$(echo $resume_seek|trim)
   local current_dd_time=0
 
   sleep 1
@@ -582,11 +582,18 @@ write_disk(){
         current_speed=$average_speed
       fi
 
-      current_dd_time=$(awk -F',' 'END{print $3}' $dd_output | sed 's/[^0-9.]*//g');
-      if [ ! -z "${current_dd_time##*[!0-9.]*}" -a "$(echo $current_dd_time | cut -d '.' -f 1)" -gt "0" ]; then
-        current_speed=$(awk "BEGIN {printf \"%d\",(${bytes_dd_current} - ${current_speed_bytes})/(${current_dd_time} - ${current_speed_time})/1000000}")
-        current_speed_bytes=$bytes_dd_current
-        current_speed_time=$current_dd_time
+      current_dd_time=$(awk -F',' 'END{print $3}' $dd_output | sed 's/[^0-9.]*//g' | trim);
+      if [ ! -z "${current_dd_time##*[!0-9.]*}" ]; then
+        local bytes_diff=$(awk "BEGIN {printf \"%.2f\",${bytes_dd_current} - ${current_speed_bytes}}")
+        local time_diff=$(awk "BEGIN {printf \"%.2f\",${current_dd_time} - ${current_speed_time}}")
+        if [ "${time_diff//.}" -ne 0 ]; then    
+          current_speed=$(awk "BEGIN {printf \"%d\",(${bytes_diff}/${time_diff}/1000000)}")
+          current_speed_bytes=$bytes_dd_current
+          current_speed_time=$current_dd_time
+          if [ "$current_speed" -lt 0 ]; then
+            current_speed=$average_speed
+          fi
+        fi
       fi
 
       # Save current status
@@ -1067,11 +1074,18 @@ read_entire_disk() {
         current_speed=$average_speed
       fi
 
-      current_dd_time=$(awk -F',' 'END{print $3}' $dd_output | sed 's/[^0-9.]*//g');
-      if [ ! -z "${current_dd_time##*[!0-9.]*}" -a "$(echo $current_dd_time | cut -d '.' -f 1)" -gt "0" ]; then
-        current_speed=$(awk "BEGIN {printf \"%d\",(${bytes_dd_current} - ${current_speed_bytes})/(${current_dd_time} - ${current_speed_time})/1000000}")
-        current_speed_bytes=$bytes_dd_current
-        current_speed_time=$current_dd_time
+      current_dd_time=$(awk -F',' 'END{print $3}' $dd_output | sed 's/[^0-9.]*//g' | trim);
+      if [ ! -z "${current_dd_time##*[!0-9.]*}" ]; then
+        local bytes_diff=$(awk "BEGIN {printf \"%.2f\",${bytes_dd_current} - ${current_speed_bytes}}")
+        local time_diff=$(awk "BEGIN {printf \"%.2f\",${current_dd_time} - ${current_speed_time}}")
+        if [ "${time_diff//.}" -ne 0 ]; then    
+          current_speed=$(awk "BEGIN {printf \"%d\",(${bytes_diff}/${time_diff}/1000000)}")
+          current_speed_bytes=$bytes_dd_current
+          current_speed_time=$current_dd_time
+          if [ "$current_speed" -lt 0 ]; then
+            current_speed=$average_speed
+          fi
+        fi
       fi
 
       # Save current status

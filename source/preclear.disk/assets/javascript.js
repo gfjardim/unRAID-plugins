@@ -302,26 +302,23 @@ function startPreclear(serial, multiple = "no")
         {
           if (data.success)
           {
-            swal({title:"Success!",type:"success"},function()
-            {
-              setTimeout("swal.close();", 1000);
-            });
+            swal({title:"Success!",type:"success"});
+            setTimeout("swal.close();", 1500);
           }
           else
           {
-            swal({title:"Fail!",type:"error"},function()
-            {
-              setTimeout("swal.close();", 1000);
-            });
+            swal({title:"Fail!",type:"error"});
+            setTimeout("swal.close();", 1500);
           }
-          // if (opts.device.length == 1)
-          // {
-          //   key = opts.device[0].split("/").pop();
-          //   openPreclear(disksInfo[key]["SERIAL_SHORT"]);
-          // }
+          if (opts.device.length == 1)
+          {
+            key = opts.device[0].split("/").pop();
+            // openPreclear(disksInfo[key]["SERIAL_SHORT"]);
+          }
         },"json").always(function(data)
         {
-          setTimeout("window.location=window.location.pathname+window.location.hash;", 1500);
+          // setTimeout("window.location=window.location.pathname+window.location.hash;", 1500);
+          getPreclearContent();
         }).fail(updateCsrfToken);
       }
 
@@ -346,7 +343,8 @@ function stopPreclear(serial, ask, multiple = 'no')
   {
     $.post(PreclearURL,{action:"stop_preclear",'serial':serial}).always(function()
     {
-      window.location=window.location.pathname+window.location.hash;
+      // window.location=window.location.pathname+window.location.hash;
+      getPreclearContent();
     }).fail(updateCsrfToken);
     return true;
   }
@@ -434,12 +432,11 @@ function stopPreclear(serial, ask, multiple = 'no')
         {
           if (data.success)
           {
-            swal({title:"Success!",type:"success"},function()
-            {
-              setTimeout("swal.close();", 1000);
-            });
+            swal({title:"Success!",type:"success"});
+            setTimeout("swal.close();", 1500);
           }
-          setTimeout("window.location=window.location.pathname+window.location.hash;", 1000);
+          // setTimeout("window.location=window.location.pathname+window.location.hash;", 1000);
+          getPreclearContent();
         },'json').fail(updateCsrfToken);
       }
     }
@@ -728,7 +725,8 @@ function getResumablePreclear(serial)
                   }
                 ).always(function(data)
                   {
-                    window.location=window.location.pathname+window.location.hash;
+                    // window.location=window.location.pathname+window.location.hash;
+                    getPreclearContent();
                   }
                 ).fail(updateCsrfToken);
         }
@@ -776,7 +774,8 @@ function setPreclearQueue()
 
       $.post(PreclearURL, opts).always(function(data)
               {
-                window.location=window.location.pathname+window.location.hash;
+                // window.location=window.location.pathname+window.location.hash;
+                getPreclearContent();
               }
             );
       swal.close();
