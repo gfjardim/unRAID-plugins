@@ -556,6 +556,12 @@ switch ($_POST['action'])
       }
     }
     break;;
+
+
+  case 'clear_all_preclear':
+    shell_exec("/usr/local/emhttp/plugins/preclear.disk/script/clear_preclear.sh");
+    echo json_encode(["success" => true]);
+    break;;
 }
 
 

@@ -86,7 +86,7 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
   table.preclear tbody tr>td+td+td+td+td+td{text-align:right;padding-left:0;padding-right:12px;}
 
   button[type=button] {margin:0px 14px 0 14px;}
-  i.fa{margin:0px 5px 0 5px;}
+  i.fa{margin:0px 0px 0 0px;}
   i.hdd{margin:0px 0px;font-size: 1.3em}
   i.partition{margin-left: 18px;}
   .exec{cursor: pointer;}
@@ -127,16 +127,20 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
   $(function(){
     addButtonTab('<a class="tooltip-toggle" style="cursor:pointer" onclick="getlog(this)" title="Download Log"><i class="fa fa-download"></i></a>', "Preclear Disk", true, true);
     addButtonTab('<a class="tooltip-toggle" style="cursor:pointer" onclick="openWindow(\'/webGui/scripts/tail_log&arg1=preclear.disk.log\',\'Log Information\',600,900);"title="Show Log"><i class="fa fa-file-text-o"></i></a>', "Preclear Disk", true, true);
-
+    addButtonTab('|', "Preclear Disk", true, true);
+    addButtonTab('<a class="tooltip-toggle" style="cursor:pointer;" onclick="preclearClear()" title="Fix Preclear"><i class="fa fa-trash"></i></a>', "Preclear Disk", true, true);
+    addButtonTab('|', "Preclear Disk", true, true);
     <?if(is_file("/var/run/preclear_queue.pid") && posix_kill(file_get_contents("/var/run/preclear_queue.pid"), 0)):?>
     addButtonTab('<a class="tooltip-toggle" style="cursor:pointer;color:#00BE37;" onclick="setPreclearQueue();" title="Set Preclear Queue"><i class="fa fa-tachometer"></i></a>', "Preclear Disk", true, true);
     <?else:?>
     addButtonTab('<a class="tooltip-toggle" style="cursor:pointer" onclick="setPreclearQueue();" title="Set Preclear Queue"><i class="fa fa-tachometer"></i></a>', "Preclear Disk", true, true);
     <?endif;?>
-      addButtonTab('<a class="tooltip-toggle" style="cursor:pointer" onclick="startPreclear(\'\', \'yes\');" title="Start Multiple Sessions"><i class="icon-preclear"></i></a>', "Preclear Disk", true, true);
+    addButtonTab('|', "Preclear Disk", true, true);
     addButtonTab('<a class="tooltip-toggle" style="cursor:pointer;" onclick="preclearResumeAll()" title="Resume all Sessions"><i class="fa fa-play green-text"></i></a>', "Preclear Disk", true, true);
     addButtonTab('<a class="tooltip-toggle" style="cursor:pointer;" onclick="preclearPauseAll()" title="Pause all Sessions"><i class="fa fa-pause yellow-orb"></i></a>', "Preclear Disk", true, true);
     addButtonTab('<a class="tooltip-toggle" style="cursor:pointer;" onclick="preclearStopAll()" title="Stop all Sessions"><i class="fa fa-stop red-text"></i></a>', "Preclear Disk", true, true);
+      addButtonTab('<a class="tooltip-toggle" style="cursor:pointer" onclick="startPreclear(\'\', \'yes\');" title="Start Multiple Sessions"><i class="icon-preclear"></i></a>', "Preclear Disk", true, true);
+
     preclearSetSorting();
     setTimeout(preclearFixHelp,100);
   });

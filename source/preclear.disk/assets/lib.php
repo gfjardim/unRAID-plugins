@@ -239,9 +239,9 @@ class Preclear
     $serial  = $this->diskSerial($disk);
     $session = TMUX::hasSession("preclear_disk_{$serial}");
     $paused  = file_exists("/tmp/.preclear/${disk}/pause") ? "<a class='exec tooltip' style='margin-left:10px;color:#00BE37;' onclick='resumePreclear(\"${disk}\")' title='Resume'><i class='fa fa-play'></i></a>" : "";
-    $rm      = "<a id='preclear_rm_{$disk}' class='exec tooltip' style='color:#CC0000;font-weight:bold;margin-left:5px;' title='%s' onclick='stopPreclear(\"{$serial}\",\"%s\");'>";
+    $rm      = "<a id='preclear_rm_{$disk}' class='exec tooltip' style='color:#CC0000;font-weight:bold;margin-left:6px;' title='%s' onclick='stopPreclear(\"{$serial}\",\"%s\");'>";
     $rm     .= "<i class='fa fa-times hdd'></i></a>";
-    $preview = "<a id='preclear_open_{$disk}' class='exec tooltip' style='margin-left:5px;color:#1E90FF;' onclick='openPreclear(\"{$serial}\");' title='Preview'><i class='fa fa-eye hdd'></i></a>";
+    $preview = "<a id='preclear_open_{$disk}' class='exec tooltip' style='margin-left:10px;color:#1E90FF;' onclick='openPreclear(\"{$serial}\");' title='Preview'><i class='fa fa-eye hdd'></i></a>";
     
     if (is_file($file))
     {
@@ -257,25 +257,24 @@ class Preclear
           {
             if (preg_match("#PAUSED|QUEUED#", $stat[2]))
             {
-              $status .= "<span style='color:#ccb800;'>{$stat[2]}</span>";
+              $status .= "<span style='color:#ccb800;margin-right:8px;'>{$stat[2]}</span>";
             }
             else
             {
-              $status .= "<span style='color:#00BE37;'>{$stat[2]}</span>";
+              $status .= "<span style='color:#00BE37;margin-right:8px;'>{$stat[2]}</span>";
             }
           }
 
           else
           {
-
             if (preg_match("#failed|FAIL#", $stat[2]))
               {
-              $status .= "<span style='color:#CC0000;'>{$stat[2]}</span>";
+              $status .= "<span style='color:#CC0000;margin-right:8px;'>{$stat[2]}</span>";
             }
 
             else
             {
-              $status .= "<span>{$stat[2]}</span>";
+              $status .= "<span style='margin-right:8px;'>{$stat[2]}</span>";
             }
           }
           $preview = "${paused}${log}${preview}";

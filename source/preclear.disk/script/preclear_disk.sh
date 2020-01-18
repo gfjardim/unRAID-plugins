@@ -1779,7 +1779,7 @@ is_current_op() {
   fi
 }
 
-keep_pid_updated(){ while [ -e "${all_files[dir]}" ]; do echo "$BASHPID" > "${all_files[pid]}"; sleep 2; done }
+keep_pid_updated(){ while [ -e "${all_files[dir]}" ]; do echo "$script_pid" > "${all_files[pid]}"; sleep 2; done }
 
 ######################################################
 ##                                                  ##
@@ -2009,7 +2009,7 @@ append all_files 'wait'          "${all_files[dir]}/wait"
 
 mkdir -p "${all_files[dir]}"
 
-trap_with_arg "do_exit 0" INT TERM EXIT
+trap_with_arg "do_exit 0" INT TERM EXIT SIGKILL
 
 if [ ! -p "${all_files[fifo]}" ]; then
   mkfifo "${all_files[fifo]}" || exit

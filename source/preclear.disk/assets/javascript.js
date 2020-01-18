@@ -123,6 +123,7 @@ function getPreclearContent()
   }).fail(updateCsrfToken);
 }
 
+
 function updateCsrfToken(jqXHR, textStatus, error)
 {
   if (jqXHR.status == 200)
@@ -142,6 +143,7 @@ function updateCsrfToken(jqXHR, textStatus, error)
     setTimeout( clearTimeout, 300, timers.preclear);
   }
 }
+
 
 function openPreclear(serial)
 {
@@ -302,12 +304,12 @@ function startPreclear(serial, multiple = "no")
         {
           if (data.success)
           {
-            swal({title:"Success!",type:"success"});
+            swal({title:"Success!",type:"success",showConfirmButton:false});
             setTimeout("swal.close();", 1500);
           }
           else
           {
-            swal({title:"Fail!",type:"error"});
+            swal({title:"Fail!",type:"error",showConfirmButton:false});
             setTimeout("swal.close();", 1500);
           }
           if (opts.device.length == 1)
@@ -432,7 +434,7 @@ function stopPreclear(serial, ask, multiple = 'no')
         {
           if (data.success)
           {
-            swal({title:"Success!",type:"success"});
+            swal({title:"Success!",type:"success",showConfirmButton:false});
             setTimeout("swal.close();", 1500);
           }
           // setTimeout("window.location=window.location.pathname+window.location.hash;", 1000);
@@ -446,6 +448,37 @@ function stopPreclear(serial, ask, multiple = 'no')
   $('.showSweetAlert').css('overflow', 'visible');
   $('.showSweetAlert').find('.chosen.swal').chosen({ width: '58%', allow_single_deselect: false });
   $("#multiple_preclear_chosen > .chosen-choices").css("min-height", "27px");
+}
+
+
+function preclearClear()
+{
+  swal(
+  {
+    text:  "This will stop all running sessions, halt all processes and remove all related files.<br><br><span class='red-text'><b>Do you want to proceed?</b></span>",
+    title: "Fix Preclear",
+    type:  "warning",
+    html:  true,
+    closeOnConfirm: false,
+    showCancelButton: true,
+    confirmButtonText:"Fix",
+    cancelButtonText:"Cancel",
+    showLoaderOnConfirm: true
+  }, function(result)
+  {
+    if (result)
+    {
+      $.post(PreclearURL, {'action':'clear_all_preclear'}, function(data)
+      {
+        if (data.success)
+        {
+          swal({title:"Success!",type:"success",showConfirmButton:false});
+          setTimeout("swal.close();", 1500);
+        }
+        getPreclearContent();
+      },'json').fail(updateCsrfToken);
+    }
+  });
 }
 
 
@@ -704,13 +737,12 @@ function getResumablePreclear(serial)
         closeOnConfirm: false,
         showCancelButton: true,
         confirmButtonText:"Resume",
-        cancelButtonText:"Start New"
+        cancelButtonText:"Start New",
+        showLoaderOnConfirm: true
       }, function(result)
       {
         if (result)
         {
-          swal.close();
-
           var opts       = new Object();
           opts["action"] = "start_preclear";
           opts["serial"] = serial;
@@ -726,6 +758,8 @@ function getResumablePreclear(serial)
                 ).always(function(data)
                   {
                     // window.location=window.location.pathname+window.location.hash;
+                    swal({title:"Success!",type:"success",showConfirmButton:false});
+                    setTimeout("swal.close();", 1500);
                     getPreclearContent();
                   }
                 ).fail(updateCsrfToken);
@@ -836,11 +870,11 @@ function preclearStopAll()
       {
         if (data.success)
         {
-          swal({title:"Success!",type:"success"});
+          swal({title:"Success!",type:"success",showConfirmButton:false});
         }
         else
         {
-          swal({title:"Fail!",type:"error"});
+          swal({title:"Fail!",type:"error",showConfirmButton:false});
         }
         setTimeout("swal.close();", 1000);
         getPreclearContent();
