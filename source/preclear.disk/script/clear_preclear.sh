@@ -62,8 +62,6 @@ for dir in $(find /tmp/.preclear -mindepth 1 -maxdepth 1 -type d ); do
   done < <( ps -o "%p|" -o "cmd:100" --no-headers -p $(pidof dd) | grep /dev/$(basename $dir) | cut -d '|' -f 1)
 
   rm -rf $dir
-
   tmux kill-session -t "preclear_disk_"$( get_serial $(basename $dir))
-
   rm -f "/tmp/preclear_stat_"$(basename $dir)
 done

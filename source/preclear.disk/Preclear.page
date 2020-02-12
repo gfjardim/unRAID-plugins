@@ -60,7 +60,6 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
     {
       $(this).find('tr:first,dt:last').css("cursor","default").unbind();
       help = $(this).next('.inline_help').attr("id");
-      console.log(help)
       $.each($(this).find('tr:first > td,dt:last > dd').not( ":first" ), function(i,v){
         $(this).css("cursor","help").bind("click", function(){$("#"+help).toggle('slow');})
       });

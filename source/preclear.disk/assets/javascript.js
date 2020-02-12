@@ -99,9 +99,9 @@ function getPreclearContent()
       $(icon).tooltipster('content', content.html());
     });
 
-    $("a[id*='preclear_footer_']").each(function(i,v)
+    $("a[id^='preclear_footer_']").each(function(i,v)
     {
-      id = $(v).attr("id").replace("preclear_footer_", "");
+      id = $(v).attr("id").split("_").pop();
       if (! (id in data.status))
       {
         $(v).remove();

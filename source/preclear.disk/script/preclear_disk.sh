@@ -413,7 +413,7 @@ maxExecTime() {
       let "pid_time=$(date +%s) - $(date +%s -d "$pid_time")"
       if [ "$pid_time" -gt "$exec_time" ]; then
         exec_time=$pid_time
-        debug "${prog_name} exec_time: ${exec_time}s"
+        # debug "${prog_name} exec_time: ${exec_time}s"
       fi
       if [ "$pid_time" -gt $max_exec_time ]; then
         debug "killing ${prog_name} with pid ${pid} - probably stalled..." 
@@ -558,7 +558,7 @@ write_disk(){
 
       time_current=$(timer)
 
-      kill -USR1 $dd_pid 2>/dev/null && sleep 1
+      kill -USR1 $dd_pid 2>/dev/null && sleep 3
 
       # Calculate the current status
       bytes_dd=$(awk 'END{print $1}' $dd_output|trim)
@@ -704,7 +704,7 @@ write_disk(){
     fi
 
     # Kill dd if hung
-    if [ "$dd_hang" -gt 60 ]; then
+    if [ "$dd_hang" -gt 150 ]; then
       eval "$initial_bytes='$bytes_wrote';"
       eval "$initial_timer='$(( $(date '+%s') - $time_start ))';"
       while read l; do debug "${write_type_s}: dd output: ${l}"; done < <(tail -n20 "$dd_output")
@@ -1178,7 +1178,7 @@ read_entire_disk() {
     fi
 
     # Kill dd if hung
-    if [ "$dd_hang" -gt 60 ]; then
+    if [ "$dd_hang" -gt 150 ]; then
       eval "$initial_bytes='"$bytes_read"';"
       eval "$initial_timer='$(( $(date '+%s') - $time_start ))';"
       while read l; do debug "${read_type_s}: dd output: ${l}"; done < <(tail -n20 "$dd_output")
@@ -2281,14 +2281,14 @@ for cycle in $(seq $cycles); do
       diskop+=([current_op]="preread" [current_pos]="$start_bytes" [current_timer]="$start_timer" )
       save_current_status
 
-      while [[ true ]]; do
+      for x in $(seq 1 10); do
         read_entire_disk no-verify preread start_bytes start_timer preread_average preread_speed
         ret_val=$?
         if [ "$ret_val" -eq 0 ]; then
           append display_step "Pre-read verification:|[${preread_average}] ***SUCCESS***"
           display_status
           break
-        elif [ "$ret_val" -eq 2 ]; then
+        elif [ "$ret_val" -eq 2 -a "$x" -le 10 ]; then
           debug "dd process hung at ${start_bytes}, killing...."
           continue
         else
@@ -2330,14 +2330,14 @@ for cycle in $(seq $cycles); do
       save_current_status
 
       # Erase the disk
-      while [[ true ]]; do
+      for x in $(seq 1 10); do
         write_disk erase start_bytes start_timer write_average write_speed
         ret_val=$?
         if [ "$ret_val" -eq 0 ]; then
           append display_step "Erasing the disk:|[${write_average}] ***SUCCESS***"
           display_status
           break
-        elif [ "$ret_val" -eq 2 ]; then
+        elif [ "$ret_val" -eq 2 -a "$x" -le 10 ]; then
           debug "dd process hung at ${start_bytes}, killing...."
           continue
         else
@@ -2376,13 +2376,13 @@ for cycle in $(seq $cycles); do
     diskop+=([current_op]="$write_op" [current_pos]="$start_bytes" [current_timer]="$start_timer" )
     save_current_status
 
-    while [[ true ]]; do
+    for x in $(seq 1 10); do
       write_disk $write_op start_bytes start_timer write_average write_speed
       ret_val=$?
       if [ "$ret_val" -eq 0 ]; then
         append display_step "${title_write} the disk:|[${write_average}] ***SUCCESS***"
         break
-      elif [ "$ret_val" -eq 2 ]; then
+      elif [ "$ret_val" -eq 2 -a "$x" -le 10 ]; then
         debug "dd process hung at ${start_bytes}, killing...."
         continue
       else
@@ -2469,7 +2469,7 @@ for cycle in $(seq $cycles); do
       display_status "Post-Read in progress ..." ""
       diskop+=([current_op]="postread" [current_pos]="$start_bytes" [current_timer]="$start_timer" )
       save_current_status
-      while [[ true ]]; do
+      for x in $(seq 1 10); do
         read_entire_disk verify postread start_bytes start_timer postread_average postread_speed
         ret_val=$?
         if [ "$ret_val" -eq 0 ]; then
@@ -2477,7 +2477,7 @@ for cycle in $(seq $cycles); do
           display_status
           echo "${disk_properties[name]}|NY|Post-Read verification successful|$$" > ${all_files[stat]}
           break
-        elif [ "$ret_val" -eq 2 ]; then
+        elif [ "$ret_val" -eq 2 -a "$x" -le 10 ]; then
           debug "dd process hung at ${start_bytes}, killing...."
           continue
         else
