@@ -196,7 +196,8 @@ switch ($_POST['action'])
     debug("get_content Finished: ".(time() - $start_time),'DEBUG');
     $sort = array_flip($sort);
     sort($sort, SORT_NUMERIC);
-    echo json_encode(array("disks" => $all_disks_o, "info" => json_encode($disks), "status" => $all_status, "sort" => $sort));
+    $queue = (is_file("/var/run/preclear_queue.pid") && posix_kill(file_get_contents("/var/run/preclear_queue.pid"), 0)) ? true : false;
+    echo json_encode(array("disks" => $all_disks_o, "info" => json_encode($disks), "status" => $all_status, "sort" => $sort, "queue" => $queue));
     break;
 
 
@@ -498,30 +499,43 @@ switch ($_POST['action'])
     $pid_file = "/var/run/preclear_queue.pid";
     $pid = is_file($pid_file) ? file_get_contents($pid_file) : 0;
 
-    if ($session)
-    {
-      if ($pid > 0)
-      {
-        @unlink($pid_file);
-        foreach (range(0, 10) as $i) if (! posix_kill($pid, 0)) break; else sleep(1);
-      }
-      TMUX::killSession( $queue_session );
-    }
-
     file_put_contents("/boot/config/plugins/${plugin}/queue", $queue);
 
     if ($queue > 0)
     {
-      TMUX::NewSession( $queue_session );
-      TMUX::sendCommand( $queue_session, "/usr/local/emhttp/plugins/${plugin}/script/preclear_queue.sh $queue");
+      if ($session && $pid > 0)
+      {
+        if (! posix_kill($pid, 0))
+        {
+          @unlink($pid_file);
+          foreach (range(0, 10) as $i) if (! posix_kill($pid, 0)) break; else sleep(1);
+        }
+        else
+        {
+          posix_kill($pid, 1);
+        }
+      }
+      else
+      {
+        TMUX::NewSession( $queue_session );
+        TMUX::sendCommand( $queue_session, "/usr/local/emhttp/plugins/${plugin}/script/preclear_queue.sh $queue");
+      }
     }
     else
     {
+        @unlink($pid_file);
       foreach (glob("/tmp/.preclear/*/queued") as $file)
       {
         @unlink($file);
+        TMUX::killSession( $queue_session );
       }
     }
+    sleep(1);
+    break;
+
+
+  case 'get_queue':
+    echo is_file("/boot/config/plugins/preclear.disk/queue") ? trim(file_get_contents("/boot/config/plugins/preclear.disk/queue")) : 0;
     break;
 
 

@@ -255,7 +255,7 @@ class Preclear
           
           if ($running)
           {
-            if (preg_match("#PAUSED|QUEUED#", $stat[2]))
+            if (file_exists("/tmp/.preclear/${disk}/pause") || file_exists("/tmp/.preclear/${disk}/queued"))
             {
               $status .= "<span style='color:#ccb800;margin-right:8px;'>{$stat[2]}</span>";
             }
@@ -344,11 +344,12 @@ class Preclear
       $size2 .= "<option value='".($x*16*65536)."'>{$x}M</option>";
     }
 
-    $queued = is_file("/boot/config/plugins/preclear.disk/queue") ? trim(file_get_contents("/boot/config/plugins/preclear.disk/queue")) : 0;
+    // $queued = is_file("/boot/config/plugins/preclear.disk/queue") ? trim(file_get_contents("/boot/config/plugins/preclear.disk/queue")) : 0;
+    $queue = "";
     for ($i=0; $i <= 20; $i++)
     {
-      $selected = ($i == $queued) ? "selected" : "";
-      $queue .= ($i == 0) ? "<option value='$i' $selected>disable</option>" : "<option value='$i' $selected>$i</option>";
+      // $selected = ($i == $queued) ? "selected" : "";
+      $queue .= ($i == 0) ? "<option value='$i'>disable</option>" : "<option value='$i'>$i</option>";
     }
     $scripts = $this->scriptFiles();
     $capabilities = array_key_exists("joel", $scripts) ? $this->scriptCapabilities($scripts["joel"]) : [];

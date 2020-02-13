@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2020.02.12">
+<!ENTITY version   "2020.02.13">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,10 @@
 
 <CHANGES>
 ##&name;
+
+###2020.02.13
+- Fix: better queue handling
+- Fix: css fixes to grey/azure/black themes
 
 ###2020.02.12
 - Fix: Increase time lapse before kill a hunged dd process
@@ -606,6 +610,13 @@ else
   echo "unRAID version ($version) not supported." | logger -t "root: plugin: &name;.plg"
   touch "$unsupported"
 fi
+
+# Fix tmux tmp directory if needed
+if [ ! -d "/tmp/tmux-0" ]; then
+  mkdir /tmp/tmux-0
+fi
+chmod 700 /tmp/tmux-0
+chown -R root:root /tmp/tmux-0
 
 # Verify if tmux is working correctly
 /usr/bin/tmux new-session -d -x 140 -y 200 -s "install_test_session" &amp;>/dev/null

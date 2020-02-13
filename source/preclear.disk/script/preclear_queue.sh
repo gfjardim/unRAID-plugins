@@ -60,8 +60,19 @@ sort_running()
   fi
 }
 
+update_slots()
+{
+  if [ -f "/boot/config/plugins/preclear.disk/queue" ]; then
+    queue=$(cat "/boot/config/plugins/preclear.disk/queue")
+  else
+    queue=0
+  fi
+}
+
 queue=${1-1};
 timer=$(date '+%s')
+
+trap update_slots HUP
 
 echo $$ > /var/run/preclear_queue.pid
 [ $queue -gt 1 ] && debug "Start queue with $queue slots" || debug "Start queue with $queue slot"
@@ -69,24 +80,31 @@ echo $$ > /var/run/preclear_queue.pid
 trap "do_clean;" exit
 
 while [ -f /var/run/preclear_queue.pid ]; do
-  i=0
+  running=0
   for disk in $(sort_running); do
     tmpdir="/tmp/.preclear/${disk}"
-    queued="${tmpdir}/queued"
-    paused="${tmpdir}/pause"
-    if [ -d $tmpdir -a ! -f $paused ]; then
-      if [ $i -lt $queue -a -f $queued ]; then
-        debug "Restoring $disk preclear session"
-        rm $queued
-      elif [ $i -ge $queue -a ! -f $queued ]; then
-        debug "Enqueuing $disk preclear session"
-        touch $queued
+    queue_file="${tmpdir}/queued"
+    pause_file="${tmpdir}/pause"
+
+    if [ ! -f $pause_file -a $queue -gt 0 ]; then
+
+      if [ $running -lt $queue ]; then
+        if [ -f $queue_file ]; then
+          debug "Restoring $disk preclear session"
+          rm $queue_file
+        fi
+        running=$(( $running + 1 ))
+      elif [ $running -ge $queue ]; then
+        if [ ! -f $queue_file ]; then
+          debug "Enqueuing $disk preclear session"
+          touch $queue_file
+        fi
       fi
-      i=$(( $i + 1 ))
-    fi
     timer=$(date '+%s')
+    fi
   done
-  if [ "$i" -eq "0" ] && [[  $(( $(date '+%s') - $timer )) -gt 60 ]]; then
+  debug $running
+  if [ $running -eq "0" ] && [[  $(( $(date '+%s') - $timer )) -gt 60 ]]; then
     debug "No active jobs, stopping queue manager"
     break
   fi

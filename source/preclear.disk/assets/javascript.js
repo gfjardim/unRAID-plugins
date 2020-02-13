@@ -110,6 +110,8 @@ function getPreclearContent()
 
     $.each(hovered, function(k,v){ if(v.length) { $("#"+v).trigger("mouseenter");} });
 
+    $(".preclear-queue").css("color",(data.queue) ? "#00BE37" : "");
+
     window.disksInfo = JSON.parse(data.info);
 
     if (typeof(startDisk) !== 'undefined')
@@ -781,43 +783,49 @@ function getResumablePreclear(serial)
 
 function setPreclearQueue()
 {
-  preclear_dialog = $( "#preclear-dialog" );
-  preclear_dialog.html("");
-  preclear_dialog.append($("#preclear-set-queue-defaults").html());
-
-  swal(
+  $.post(PreclearURL,{action:'get_queue'}, function(data)
   {
-    title: "Set Queue Limit",
-    text:  preclear_dialog.html(),
-    type:  "info",
-    html:  true,
-    closeOnConfirm: false,
-    showCancelButton: true,
-    confirmButtonText:"Set",
-    cancelButtonText:"Cancel"
-  }, function(result)
-  {
-    if (result)
-    {
+    preclear_dialog = $( "#preclear-dialog" );
+    preclear_dialog.html("");
+    newSelect = $("#preclear-set-queue-defaults").clone();
+    newSelect.find("option[value='" + data + "']").attr('selected','selected');
+    preclear_dialog.append(newSelect.html());
 
-      var opts = new Object();
-      popup = $(".sweet-alert.showSweetAlert > p:first");
-      
-      opts["action"] = "set_queue";
-      opts["queue"] = getVal(popup, "queue");
-
-      $.post(PreclearURL, opts).always(function(data)
-              {
-                // window.location=window.location.pathname+window.location.hash;
-                getPreclearContent();
-              }
-            );
-      swal.close();
-    }
-    else
+    swal(
     {
-      swal.close();
-    }
+      title: "Set Queue Limit",
+      text:  preclear_dialog.html(),
+      type:  "info",
+      html:  true,
+      closeOnConfirm: false,
+      showCancelButton: true,
+      confirmButtonText:"Set",
+      cancelButtonText:"Cancel",
+      showLoaderOnConfirm: true
+    }, function(result)
+    {
+      if (result)
+      {
+
+        var opts = new Object();
+        popup = $(".sweet-alert.showSweetAlert > p:first");
+        
+        opts["action"] = "set_queue";
+        opts["queue"] = getVal(popup, "queue");
+
+        $.post(PreclearURL, opts).always(function(data)
+                {
+                  // window.location=window.location.pathname+window.location.hash;
+                  swal({title:"Success!",type:"success",showConfirmButton:false,timer:1500});
+                  getPreclearContent();
+                }
+              );
+      }
+      else
+      {
+        swal.close();
+      }
+    });
   });
 }
 
@@ -904,7 +912,7 @@ var preclearStartSorting = function(e,i)
 
 var preclearStopSorting = function(e,i)
 {
-  timers.preclear = setTimeout('getPreclearContent()', 15000);
+  timers.preclear = setTimeout('getPreclearContent()', 1500);
   $(i.item).find(".sortable_toggled").trigger("click").removeClass("sortable_toggled");
 };
 
@@ -918,7 +926,9 @@ var preclearUpdateSorting = function(e,i)
   });
   $.post(PreclearURL ,{'action':'save_sort', 'devices':devices}, function(data)
   {
-    getPreclearContent();
+    clearTimeout(timers.preclear);
+    timers.preclear = setTimeout('getPreclearContent()', 1500);
+    // getPreclearContent();
   });
 };
 
