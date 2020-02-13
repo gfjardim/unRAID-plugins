@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="1.0.9"
+version="1.0.10"
 
 # PID
 script_pid=$BASHPID

@@ -103,7 +103,7 @@ while [ -f /var/run/preclear_queue.pid ]; do
     timer=$(date '+%s')
     fi
   done
-  debug $running
+
   if [ $running -eq "0" ] && [[  $(( $(date '+%s') - $timer )) -gt 60 ]]; then
     debug "No active jobs, stopping queue manager"
     break
