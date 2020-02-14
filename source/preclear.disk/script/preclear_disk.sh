@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="1.0.10"
+version="1.0.11"
 
 # PID
 script_pid=$BASHPID
@@ -558,7 +558,7 @@ write_disk(){
 
       time_current=$(timer)
 
-      kill -USR1 $dd_pid 2>/dev/null && sleep 3
+      kill -USR1 $dd_pid 2>/dev/null && sleep 1
 
       # Calculate the current status
       bytes_dd=$(awk 'END{print $1}' $dd_output|trim)
@@ -737,7 +737,10 @@ write_disk(){
   debug "${write_type_s}: dd - wrote ${bytes_wrote} of ${total_bytes}."
 
   # Wait last display refresh
-  while kill -0 $display_pid &>/dev/null; do
+  for i in $(seq 30); do
+    if [ ! -e "/proc/${display_pid}/exe" ]; then
+      break
+    fi
     sleep 1
   done
 

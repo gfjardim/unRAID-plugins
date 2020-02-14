@@ -71,11 +71,12 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
   table.preclear thead tr:first-child td{font-size:1.1rem;text-transform:uppercase;letter-spacing:1px;}
   table.preclear thead tr:last-child{border-bottom:0px solid}
   
-  table.preclear thead tr>td{text-align:left;vertical-align:top;width:8%;padding-left:12px;}
-  table.preclear thead tr>td+td{text-align:left;padding-left:12px;width: 25%}
-  table.preclear thead tr>td+td+td{text-align:center;width:5%;}
+/*  table.preclear thead tr>td{text-align:left;vertical-align:top;width:8%;padding-left:12px;}
+  table.preclear thead tr>td+td{text-align:left;padding-left:12px;width: 35%}
+  table.preclear thead tr>td+td+td{text-align:center;width:5%;}*/
   /*table.preclear thead tr>td+td+td+td+td{text-align:center;width:8%;}*/
-  table.preclear thead tr>td+td+td+td+td+td{text-align:right;width:40%;}
+  table.disk_status tr>td+td+td+td+td+td{text-align:right;width:38%;}
+  table.disk_status tr td:last-child{width:30%;padding-right:10px}
 
   /*table.preclear tbody tr:nth-child(even){background-color:#ededed}*/
   table.preclear tbody tr>td{vertical-align:top;text-align:left;padding-left:12px;padding-right:0;white-space:nowrap;}
@@ -92,7 +93,7 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
   i.fa-append{margin:0px;font-size: 0.8em;position: relative; left:-0.5em;top:0.6em;}
 </style>
 <?=$Preclear->html();?>
-<table class=' preclear custom_head disk_status'>
+<table class=' disk_status preclear custom_head '>
   <thead>
     <tr>
       <td>
