@@ -1985,7 +1985,7 @@ done
 
 debug "Disk size: ${disk_properties[size]}"
 debug "Disk blocks: ${disk_properties[blocks]}"
-debug "Blocks (512 byte): ${disk_properties[blocks_512]}"
+debug "Blocks (512 bytes): ${disk_properties[blocks_512]}"
 debug "Block size: ${disk_properties[block_sz]}"
 debug "Start sector: ${disk_properties[start_sector]}"
 

@@ -306,13 +306,11 @@ function startPreclear(serial, multiple = "no")
         {
           if (data.success)
           {
-            swal({title:"Success!",type:"success",showConfirmButton:false});
-            setTimeout("swal.close();", 1500);
+            swal({title:"Success!",type:"success",showConfirmButton:false,timer:1500});
           }
           else
           {
-            swal({title:"Fail!",type:"error",showConfirmButton:false});
-            setTimeout("swal.close();", 1500);
+            swal({title:"Fail!",type:"error",showConfirmButton:false,timer:1500});
           }
           if (opts.device.length == 1)
           {
@@ -322,7 +320,7 @@ function startPreclear(serial, multiple = "no")
         },"json").always(function(data)
         {
           // setTimeout("window.location=window.location.pathname+window.location.hash;", 1500);
-          getPreclearContent();
+          preclearUpdateContent();
         }).fail(updateCsrfToken);
       }
 
@@ -348,7 +346,7 @@ function stopPreclear(serial, ask, multiple = 'no')
     $.post(PreclearURL,{action:"stop_preclear",'serial':serial}).always(function()
     {
       // window.location=window.location.pathname+window.location.hash;
-      getPreclearContent();
+      preclearUpdateContent();
     }).fail(updateCsrfToken);
     return true;
   }
@@ -436,11 +434,10 @@ function stopPreclear(serial, ask, multiple = 'no')
         {
           if (data.success)
           {
-            swal({title:"Success!",type:"success",showConfirmButton:false});
-            setTimeout("swal.close();", 1500);
+            swal({title:"Success!",type:"success",showConfirmButton:false,timer:1500});
           }
           // setTimeout("window.location=window.location.pathname+window.location.hash;", 1000);
-          getPreclearContent();
+          preclearUpdateContent();
         },'json').fail(updateCsrfToken);
       }
     }
@@ -474,8 +471,7 @@ function preclearClear()
       {
         if (data.success)
         {
-          swal({title:"Success!",type:"success",showConfirmButton:false});
-          setTimeout("swal.close();", 1500);
+          swal({title:"Success!",type:"success",showConfirmButton:false,timer:1500});
         }
         getPreclearContent();
       },'json').fail(updateCsrfToken);
@@ -760,9 +756,8 @@ function getResumablePreclear(serial)
                 ).always(function(data)
                   {
                     // window.location=window.location.pathname+window.location.hash;
-                    swal({title:"Success!",type:"success",showConfirmButton:false});
-                    setTimeout("swal.close();", 1500);
-                    getPreclearContent();
+                    swal({title:"Success!",type:"success",showConfirmButton:false,timer:1500});
+                    preclearUpdateContent();
                   }
                 ).fail(updateCsrfToken);
         }
@@ -878,13 +873,12 @@ function preclearStopAll()
       {
         if (data.success)
         {
-          swal({title:"Success!",type:"success",showConfirmButton:false});
+          swal({title:"Success!",type:"success",showConfirmButton:false,timer:1500});
         }
         else
         {
-          swal({title:"Fail!",type:"error",showConfirmButton:false});
+          swal({title:"Fail!",type:"error",showConfirmButton:false,timer:1500});
         }
-        setTimeout("swal.close();", 1000);
         getPreclearContent();
       }, "json").fail(updateCsrfToken);
     }
@@ -943,4 +937,14 @@ function preclearSetSorting()
 {
   $('#preclear-table-body').sortable({tolerance: "pointer",helper:preclearSortableHelper,items:'tr.sortable',cursor:'move',axis:'y',containment:'parent',cancel:'span.docker_readmore,input',delay:100,opacity:0.5,zIndex:9999,
     update:preclearUpdateSorting,start:preclearStartSorting,stop:preclearStopSorting});
+}
+
+
+function preclearUpdateContent()
+{
+  if (typeof usb_disks === "function")
+  {
+    usb_disks();
+  }
+  getPreclearContent();
 }
