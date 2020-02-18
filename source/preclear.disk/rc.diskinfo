@@ -13,7 +13,7 @@ set_exception_handler( "log_exception" );
 ######  DEAMON SECTION  ######
 ##############################
 $debug = FALSE;
-$version = "0.1.2";
+$version = "0.1.3";
 
 $prog      = pathinfo(__FILE__, PATHINFO_BASENAME);
 $prog_name = "Disk Info Daemon";
@@ -696,6 +696,7 @@ class Disks
 
 function force_reload($sig, $signum = false)
 {
+  global $counter_info;
   if (! $GLOBALS["reload_force"])
   {
     syslog(LOG_INFO, "SIGHUP received, forcing refresh of disks info.");
@@ -703,10 +704,12 @@ function force_reload($sig, $signum = false)
   }
   else
   {
-    syslog(LOG_INFO, "SIGHUP ignored - already refreshing disk info.");
+    // syslog(LOG_INFO, "SIGHUP ignored - already refreshing disk info.");
     $GLOBALS["reload_force"] = true; 
   }
+  $counter_info = time();
 }
+
 
 function isTimeout(&$counter, $timeout)
 {
@@ -724,22 +727,26 @@ function isTimeout(&$counter, $timeout)
 ##############################
 #####  PROGRAM SECTION  ######
 ##############################
-$Disks        = new Disks;
-$reload_force = false;
-$counter      = 0;
+$Disks          = new Disks;
+$reload_force   = false;
+$counter_config = 0;
+$counter_info   = 0;
 
 while(TRUE)
 {
   while(TRUE)
   { ####  DO YOUR STUFF HERE  ####
 
-    if (isTimeout($counter, 30))
+    if (isTimeout($counter_config, 30))
     {
       $Disks->get_unraid_config();
     }
 
-    $Disks->get_disks();
-    $Disks->unassigned_disks_info($reload_force);
+    if ( ($reload_force && isTimeout($counter_info, 3)) || isTimeout($counter_info, 30))
+    {
+      $Disks->get_disks();
+      $Disks->unassigned_disks_info($reload_force);
+    }
     sleep(1);
 
     ######  END OF SECTION  ######

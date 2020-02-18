@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="1.0.11"
+version="1.0.12"
 
 # PID
 script_pid=$BASHPID
@@ -2118,31 +2118,31 @@ if [ "$verify_disk_mbr" == "y" ]; then
   append display_title "${ul}unRAID Server: verifying Preclear State of disk ${noul} ${bold}${disk_properties['serial']}${norm}."
   append display_title "Verifying disk '${disk_properties['serial']}' for unRAID's Preclear State."
 
-  if ! is_current_op "zeroed"; then
+  # if ! is_current_op "zeroed"; then
 
-    display_status "Verifying unRAID's signature on the MBR ..." ""
-    echo "${disk_properties[name]}|NN|Verifying unRAID's signature on the MBR...|$$" > ${all_files[stat]}
-    sleep 5
+  display_status "Verifying unRAID's signature on the MBR ..." ""
+  echo "${disk_properties[name]}|NN|Verifying unRAID's signature on the MBR...|$$" > ${all_files[stat]}
+  sleep 5
 
-    if verify_mbr $theDisk; then
-      append display_step "Verifying unRAID's Preclear MBR:|***SUCCESS***"
-      echo "${disk_properties[name]}|NN|Verifying unRAID's signature on the MBR successful|$$" > ${all_files[stat]}
-      display_status
-    else
-      append display_step "Verifying unRAID's signature:| ***FAIL***"
-      echo "${disk_properties[name]}|NY|Verifying unRAID's signature on the MBR failed|$$" > ${all_files[stat]}
-      display_status
-      echo -e "--> RESULT: FAIL! $theDisk DOESN'T have a valid unRAID MBR signature!!!\n\n"
-      if [ "$notify_channel" -gt 0 ]; then
-        send_mail "FAIL! $diskName ($theDisk) DOESN'T have a valid unRAID MBR signature!!!" "$diskName ($theDisk) DOESN'T have a valid unRAID MBR signature!!!" "$diskName ($theDisk) DOESN'T have a valid unRAID MBR signature!!!" "" "alert"
-      fi
-      do_exit 1
-    fi
-  else
+  if verify_mbr $theDisk; then
     append display_step "Verifying unRAID's Preclear MBR:|***SUCCESS***"
     echo "${disk_properties[name]}|NN|Verifying unRAID's signature on the MBR successful|$$" > ${all_files[stat]}
     display_status
+  else
+    append display_step "Verifying unRAID's signature:| ***FAIL***"
+    echo "${disk_properties[name]}|NY|Verifying unRAID's signature on the MBR failed|$$" > ${all_files[stat]}
+    display_status
+    echo -e "--> RESULT: FAIL! $theDisk DOESN'T have a valid unRAID MBR signature!!!\n\n"
+    if [ "$notify_channel" -gt 0 ]; then
+      send_mail "FAIL! $diskName ($theDisk) DOESN'T have a valid unRAID MBR signature!!!" "$diskName ($theDisk) DOESN'T have a valid unRAID MBR signature!!!" "$diskName ($theDisk) DOESN'T have a valid unRAID MBR signature!!!" "" "alert"
+    fi
+    do_exit 1
   fi
+  # else
+  #   append display_step "Verifying unRAID's Preclear MBR:|***SUCCESS***"
+  #   echo "${disk_properties[name]}|NN|Verifying unRAID's signature on the MBR successful|$$" > ${all_files[stat]}
+  #   display_status
+  # fi
 
   if [ "$max_steps" -eq "2" ]; then
     display_status "Verifying if disk is zeroed ..." ""
