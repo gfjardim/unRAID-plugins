@@ -303,6 +303,7 @@ switch ($_POST['action'])
           $cmd = "$script {$op}{$noprompt} $device";
           @unlink("/tmp/preclear_stat_{$devname}");
         }
+        debug("preclear will be invoked as: $cmd\n");
       }
 
       // Enabling queue
@@ -321,7 +322,6 @@ switch ($_POST['action'])
         }
       }
 
-      debug("preclear will be invoked as: $cmd");
 
       if (! TMUX::hasSession( $session ))
       {
