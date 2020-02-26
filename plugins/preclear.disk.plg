@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2020.02.17a">
+<!ENTITY version   "2020.02.26">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,11 @@
 
 <CHANGES>
 ##&name;
+
+###2020.02.26
+- Fix: error while output smart upon script error
+- Fix: migrate to SweetAlert v2
+- Fix: include Joe L. script by default
 
 ###2020.02.17a
 - Fix: better diskinfo update handling
@@ -526,8 +531,13 @@ The 'plugin' package MD5 hash.
 </FILE>
 
 <!--The 'readvz' script.-->
-<FILE Name="/boot/readvz" Mode="755">
+<FILE Name="/usr/local/sbin/readvz" Mode="755">
 <URL>&gitURL;/source/packages/readvz</URL>
+</FILE>
+
+<!--The 'readvz' script.-->
+<FILE Name="/usr/local/sbin/preclear_disk_ori.sh" Mode="755">
+<URL>&gitURL;/source/packages/preclear_disk_19.sh</URL>
 </FILE>
 
 <!--
@@ -775,7 +785,9 @@ udevadm control --reload-rules
 # Remove plugin related files
 rm -f /usr/local/bin/preclear \
       /var/run/preclear_queue.pid \
-      /var/log/preclear.disk.log
+      /var/log/preclear.disk.log \
+      /usr/local/sbin/preclear_disk_ori.sh \
+      /usr/local/sbin/readvz
 
 # Remove plugin related directories
 rm -rf /boot/config/plugins/&name; \

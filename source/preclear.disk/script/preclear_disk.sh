@@ -1497,9 +1497,9 @@ ask_preclear(){
 }
 
 save_smart_info() {
-  local name=$3
   local device=$1
   local type=$2
+  local name=$3
   local valid_attributes=" 5 9 183 184 187 190 194 196 197 198 199 "
   local valid_temp=" 190 194 "
   local smart_file="${all_files[smart_prefix]}${name}"
@@ -1695,9 +1695,11 @@ debug_smart()
   local disk=$1
   local smart=$2
   [ "$disable_smart" != "y" ] && save_smart_info $disk "$smart" "error"
-  while read l; do 
-    debug "S.M.A.R.T.: ${l}"; 
-  done < <(cat "${all_files[smart_prefix]}error" | column --separator '|' --table)
+  if [ -f "${all_files[smart_prefix]}error" ]; then
+    while read l; do 
+      debug "S.M.A.R.T.: ${l}"; 
+    done < <(cat "${all_files[smart_prefix]}error" | column --separator '|' --table)
+  fi
 }
 
 debug_syslog()

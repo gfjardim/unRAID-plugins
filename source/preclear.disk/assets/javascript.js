@@ -158,11 +158,11 @@ function openPreclear(serial)
 }
 
 
-function toggleScript(el, serial)
+function toggleScript(el, serial, multiple)
 {
   window.scope = $(el).val();
  
-  startPreclear( serial );
+  startPreclear( serial, multiple );
 }
 
 
@@ -224,7 +224,7 @@ function startPreclear(serial, multiple = "no")
 
     if (size)
     {
-      var options = "<dl class='dl-dialog'><dt>Script:<st><dd><select onchange='toggleScript(this,\""+serial+"\");'>";
+      var options = "<dl class='dl-dialog'><dt>Script:<st><dd><select onchange='toggleScript(this,\""+serial+"\",\""+multiple+"\");'>";
       $.each( scripts, function( key, value )
         {
           var sel = ( key == scope ) ? "selected" : "";
@@ -235,46 +235,51 @@ function startPreclear(serial, multiple = "no")
     }
   }
 
+
   preclear_dialog.append($("#"+scope+"-start-defaults").html());
 
-  swal(
-  {
+  swal2({
     title: "Start Preclear",
-    text:  preclear_dialog.html(),
-    type:  "info",
-    html:  true,
-    closeOnConfirm: false,
-    showCancelButton: true,
-    confirmButtonText:"Start",
-    cancelButtonText:"Cancel",
-    showLoaderOnConfirm: true
-  }, function(result)
-  {
-    if (result)
+    content:{ element: "div", attributes:{ innerHTML: preclear_dialog.html()}},
+    icon: "info",
+    buttons:{
+      confirm:{text: "Start", value: true, visible: true, className: "", closeModal: false},
+      cancel:{text: "Cancel", value: null, visible: true, className: "", closeModal: true},
+    }
+  }).then((answer) => {
+    if (answer)
     {
-       // $('button:eq(0)',$('#dialog_id').dialog.buttons).button('disable');
-      // $(e.target).attr('disabled', true);
-
       var opts       = new Object();
       opts["device"] = [];
       if(serial)
       {
         opts["device"].push(getDiskInfo(serial, 'DEVICE'));
       }
-      popup = $(".sweet-alert.showSweetAlert > p:first");
+      popup = $(".swal-content");
       opts["action"] = "start_preclear";
       opts["op"]     = getVal(popup, "op");
       opts["scope"]  = scope;
 
-      if ($('.showSweetAlert').find('#multiple_preclear :selected').length)
+      if (popup.find('#multiple_preclear :selected').length)
       {
         opts["device"] = [];
-        $('.showSweetAlert').find('#multiple_preclear :selected').each( function(){
+        popup.find('#multiple_preclear :selected').each( function(){
           opts["device"].push(getDiskInfo(this.value, 'DEVICE'));
         });
       }
 
-      if (scope == "joel")
+      if (scope == "gfjardim")
+      {
+        opts["--cycles"]        = getVal(popup, "--cycles");
+        opts["--notify"]        = getVal(popup, "preclear_notify1") == "on" ? 1 : 0;
+        opts["--notify"]       += getVal(popup, "preclear_notify2") == "on" ? 2 : 0;
+        opts["--notify"]       += getVal(popup, "preclear_notify3") == "on" ? 4 : 0;
+        opts["--frequency"]     = getVal(popup, "--frequency");
+        opts["--skip-preread"]  = getVal(popup, "--skip-preread");
+        opts["--skip-postread"] = getVal(popup, "--skip-postread");      
+        opts["--test"]          = getVal(popup, "--test");      
+      }
+      else
       {
         opts["-c"]  = getVal(popup, "-c");
         opts["-o"]  = getVal(popup, "preclear_notify1") == "on" ? 1 : 0;
@@ -288,51 +293,23 @@ function startPreclear(serial, multiple = "no")
         opts["-s"]  = getVal(popup, "-s");
       }
 
-      else
-      {
-        opts["--cycles"]        = getVal(popup, "--cycles");
-        opts["--notify"]        = getVal(popup, "preclear_notify1") == "on" ? 1 : 0;
-        opts["--notify"]       += getVal(popup, "preclear_notify2") == "on" ? 2 : 0;
-        opts["--notify"]       += getVal(popup, "preclear_notify3") == "on" ? 4 : 0;
-        opts["--frequency"]     = getVal(popup, "--frequency");
-        opts["--skip-preread"]  = getVal(popup, "--skip-preread");
-        opts["--skip-postread"] = getVal(popup, "--skip-postread");      
-        opts["--test"]          = getVal(popup, "--test");      
-      }
 
       if (opts.device.length > 0)
       {
         $.post(PreclearURL, opts, function(data)
         {
-          if (data.success)
-          {
-            swal({title:"Success!",type:"success",showConfirmButton:false,timer:1500});
-          }
-          else
-          {
-            swal({title:"Fail!",type:"error",showConfirmButton:false,timer:1500});
-          }
-          if (opts.device.length == 1)
-          {
-            key = opts.device[0].split("/").pop();
-            // openPreclear(disksInfo[key]["SERIAL_SHORT"]);
-          }
+          preclearShowResult(data.success);
         },"json").always(function(data)
         {
-          // setTimeout("window.location=window.location.pathname+window.location.hash;", 1500);
           preclearUpdateContent();
         }).fail(updateCsrfToken);
       }
-
-    }
-    else
-    {
-      swal.close();
     }
   });
+
   // allow dropdown overflow
-  $('.showSweetAlert').css('overflow', 'visible');
-  $('.showSweetAlert').find('.chosen.swal').chosen({ width: '58%', allow_single_deselect: false });
+  $('.swal-modal').css('overflow', 'visible');
+  $('.swal-modal').find('.chosen.swal').chosen({ width: '60%', allow_single_deselect: false });
   $("#multiple_preclear_chosen > .chosen-choices").css("min-height", "27px");
 }
 
@@ -343,11 +320,10 @@ function stopPreclear(serial, ask, multiple = 'no')
 
   if (ask != "ask")
   {
-    $.post(PreclearURL,{action:"stop_preclear",'serial':serial}).always(function()
-    {
-      // window.location=window.location.pathname+window.location.hash;
+    $.post(PreclearURL,{action:"stop_preclear",'serial':serial}, function(data){
+      preclearShowResult(data.success);
       preclearUpdateContent();
-    }).fail(updateCsrfToken);
+    },"json").fail(updateCsrfToken);
     return true;
   }
 
@@ -396,20 +372,16 @@ function stopPreclear(serial, ask, multiple = 'no')
     preclear_dialog.append("<hr style='margin-left:12px;'>");
   }
 
-  swal(
-  {
+  swal2({
     title: "Stop Preclear",
-    text:  preclear_dialog.html(),
-    type:  "warning",
-    html:  true,
-    closeOnConfirm: false,
-    showCancelButton: true,
-    confirmButtonText:"Stop",
-    cancelButtonText:"Cancel",
-    showLoaderOnConfirm: true
-  }, function(result)
-  {
-    if (result)
+    content:{ element: "div", attributes:{ innerHTML: preclear_dialog.html()}},
+    icon: "warning",
+    buttons:{
+      confirm:{text: "Stop", value: true, visible: true, className: "", closeModal: false},
+      cancel:{text: "Cancel", value: null, visible: true, className: "", closeModal: true},
+    }
+  }).then((answer) => {
+    if (answer)
     {
       var opts       = new Object();
       opts["serial"] = [];
@@ -417,13 +389,13 @@ function stopPreclear(serial, ask, multiple = 'no')
       {
         opts["serial"].push(serial, 'DEVICE');
       }
-      popup = $(".sweet-alert.showSweetAlert > p:first");
+      popup = $(".swal-content");
       opts["action"] = "stop_preclear";
 
-      if ($('.showSweetAlert').find('#multiple_preclear :selected').length)
+      if (popup.find('#multiple_preclear :selected').length)
       {
         opts["serial"] = [];
-        $('.showSweetAlert').find('#multiple_preclear :selected').each( function(){
+        popup.find('#multiple_preclear :selected').each( function(){
           opts["serial"].push(this.value);
         });
       }
@@ -432,47 +404,35 @@ function stopPreclear(serial, ask, multiple = 'no')
       {
         $.post(PreclearURL, opts, function(data)
         {
-          if (data.success)
-          {
-            swal({title:"Success!",type:"success",showConfirmButton:false,timer:1500});
-          }
-          // setTimeout("window.location=window.location.pathname+window.location.hash;", 1000);
+          preclearShowResult(data.success);
           preclearUpdateContent();
         },'json').fail(updateCsrfToken);
       }
     }
-    // swal.close();
   });
   // allow dropdown overflow
-  $('.showSweetAlert').css('overflow', 'visible');
-  $('.showSweetAlert').find('.chosen.swal').chosen({ width: '58%', allow_single_deselect: false });
+  $('.swal-modal').css('overflow', 'visible');
+  $('.swal-modal').find('.chosen.swal').chosen({ width: '58%', allow_single_deselect: false });
   $("#multiple_preclear_chosen > .chosen-choices").css("min-height", "27px");
 }
 
 
 function preclearClear()
 {
-  swal(
-  {
-    text:  "This will stop all running sessions, halt all processes and remove all related files.<br><br><span class='red-text'><b>Do you want to proceed?</b></span>",
+  swal2({
     title: "Fix Preclear",
-    type:  "warning",
-    html:  true,
-    closeOnConfirm: false,
-    showCancelButton: true,
-    confirmButtonText:"Fix",
-    cancelButtonText:"Cancel",
-    showLoaderOnConfirm: true
-  }, function(result)
-  {
-    if (result)
+    content:{ element: "div", attributes:{ innerHTML:  "This will stop all running sessions, halt all processes and remove all related files.<br><br><span class='red-text'><b>Do you want to proceed?</b></span>"}},
+    icon: "warning",
+    buttons:{
+      confirm:{text: "Fix", value: true, visible: true, className: "", closeModal: false},
+      cancel:{text: "Cancel", value: null, visible: true, className: "", closeModal: true},
+    }
+  }).then((answer) => {
+    if (answer)
     {
       $.post(PreclearURL, {'action':'clear_all_preclear'}, function(data)
       {
-        if (data.success)
-        {
-          swal({title:"Success!",type:"success",showConfirmButton:false,timer:1500});
-        }
+        preclearShowResult(data.success);
         getPreclearContent();
       },'json').fail(updateCsrfToken);
     }
@@ -726,20 +686,17 @@ function getResumablePreclear(serial)
   {
     if (data.resume)
     {
-      swal(
-      {
+      swal2({
         title: "Resume Preclear?",
-        text:  "There's a previous preclear session available for this drive.<br>Do you want to resume it instead of starting a new one?",
-        type:  "info",
-        html:  true,
-        closeOnConfirm: false,
-        showCancelButton: true,
-        confirmButtonText:"Resume",
-        cancelButtonText:"Start New",
-        showLoaderOnConfirm: true
-      }, function(result)
-      {
-        if (result)
+        content:{ element: "div", attributes:{ innerHTML: "There's a previous preclear session available for this drive.<br>Do you want to resume it instead of starting a new one?"}},
+        icon: "info",
+        buttons:{
+          cancel:{text: "Cancel", value: null, visible: true, className: "swal-button-left", closeModal: true},
+          confirm:{text: "Resume", value: 1, visible: true, className: "", closeModal: false},
+          new:{text: "Start New", value: 2, visible: true, className: "", closeModal: false},
+        }
+      }).then((answer) => {
+        if (answer == 1)
         {
           var opts       = new Object();
           opts["action"] = "start_preclear";
@@ -749,22 +706,17 @@ function getResumablePreclear(serial)
           opts["file"]   = data.resume;
           opts["scope"]  = "gfjardim";
 
-          $.post(PreclearURL, opts, function(data)
-                  {
-                    // openPreclear(serial);
-                  }
-                ).always(function(data)
-                  {
-                    // window.location=window.location.pathname+window.location.hash;
-                    swal({title:"Success!",type:"success",showConfirmButton:false,timer:1500});
-                    preclearUpdateContent();
-                  }
-                ).fail(updateCsrfToken);
+          $.post(PreclearURL, opts).always(function(data) {
+            preclearShowResult(true);
+            preclearUpdateContent();
+          }).fail(updateCsrfToken);
         }
-        else
+        else if (answer == 2)
         {
-          swal.close();
-          setTimeout(startPreclear, 300, serial);
+          swal2.stopLoading();
+          // setTimeout(startPreclear, 300, serial);
+          startPreclear(serial);
+          // swal2.close();
         }
       });
     }
@@ -786,39 +738,30 @@ function setPreclearQueue()
     newSelect.find("option[value='" + data + "']").attr('selected','selected');
     preclear_dialog.append(newSelect.html());
 
-    swal(
-    {
+    swal2({
       title: "Set Queue Limit",
-      text:  preclear_dialog.html(),
-      type:  "info",
-      html:  true,
-      closeOnConfirm: false,
-      showCancelButton: true,
-      confirmButtonText:"Set",
-      cancelButtonText:"Cancel",
-      showLoaderOnConfirm: true
-    }, function(result)
-    {
-      if (result)
+      content:{ element: "div", attributes:{ innerHTML: preclear_dialog.html()}},
+      icon: "info",
+      buttons:{
+        confirm:{text: "Set", value: true, visible: true, className: "", closeModal: false},
+        cancel:{text: "Cancel", value: null, visible: true, className: "", closeModal: true},
+      }
+    }).then((answer) => {
+      if (answer)
       {
 
         var opts = new Object();
-        popup = $(".sweet-alert.showSweetAlert > p:first");
-        
+        popup = $(".swal-modal");
         opts["action"] = "set_queue";
         opts["queue"] = getVal(popup, "queue");
+        console.log(opts["queue"])
 
         $.post(PreclearURL, opts).always(function(data)
                 {
-                  // window.location=window.location.pathname+window.location.hash;
-                  swal({title:"Success!",type:"success",showConfirmButton:false,timer:1500});
+                  preclearShowResult(true);
                   getPreclearContent();
                 }
               );
-      }
-      else
-      {
-        swal.close();
       }
     });
   });
@@ -854,35 +797,37 @@ function preclearResumeAll()
 
 function preclearStopAll()
 {
-  swal(
-  {
+  swal2({
     title: "Stop Preclear Sessions",
     text:  "Do you want to stop all running preclear sessions?",
-    type:  "warning",
-    html:  true,
-    closeOnConfirm: false,
-    showCancelButton: true,
-    confirmButtonText:"Stop",
-    cancelButtonText:"Cancel",
-    showLoaderOnConfirm: true
-  }, function(result)
-  {
-    if (result)
+    icon: "warning",
+    buttons:{
+      confirm:{text: "Stop", value: true, visible: true, className: "", closeModal: false},
+      cancel:{text: "Cancel", value: null, visible: true, className: "", closeModal: true},
+    }
+  }).then((answer) => {
+    if (answer)
     {
       $.post(PreclearURL,{action:'stop_all_preclear'}, function(data)
       {
-        if (data.success)
-        {
-          swal({title:"Success!",type:"success",showConfirmButton:false,timer:1500});
-        }
-        else
-        {
-          swal({title:"Fail!",type:"error",showConfirmButton:false,timer:1500});
-        }
+        preclearShowResult(data.success);
         getPreclearContent();
       }, "json").fail(updateCsrfToken);
     }
   });
+}
+
+
+function preclearShowResult(success)
+{
+  if (success)
+  {
+    swal2({title:"Success!",text:" ",icon:"success",buttons:{confirm:{visible:false},cancel:{visible:false}},timer:1200});
+  } 
+  else
+  {
+    swal2({title:"Fail!",text:" ",icon:"error",buttons:{confirm:{visible:false},cancel:{visible:false}},timer:1200});
+  }
 }
 
 
@@ -903,6 +848,7 @@ var preclearStartSorting = function(e,i)
   $(i.item).find("div[class*=toggle-]:visible").prev().trigger("click");
   // $(i.item).height($(i.item).find("span.toggle-reports").first().height());
 };
+
 
 var preclearStopSorting = function(e,i)
 {

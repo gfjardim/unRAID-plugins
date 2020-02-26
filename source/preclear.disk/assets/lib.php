@@ -129,7 +129,7 @@ class Preclear
 
   public function Authors()
   {
-    $authors      = ["gfjardim" => "gfjardim", "joel" => "Joe L."];
+    $authors      = ["gfjardim" => "gfjardim", "joel" => "Joe L.", "docker" => "docker"];
     $scripts      = $this->scriptFiles();
 
     foreach ($authors as $key => $name) {
@@ -137,10 +137,6 @@ class Preclear
 
       if ( array_key_exists("version", $capabilities) && $capabilities["version"] )
       {
-        if ( $capabilities["fast_postread"] )
-        {
-          $name = "bjp999";      
-        }
         $authors[$key] = "$name - ${capabilities['version']}";      
       }
 
@@ -169,13 +165,22 @@ class Preclear
   public function scriptFiles()
   {
     $scripts = ["gfjardim" => "/usr/local/emhttp/plugins/".$this->plugin."/script/preclear_disk.sh",
-                "joel"     => "/boot/config/plugins/".$this->plugin."/preclear_disk.sh"];
+                "joel"     => "/usr/local/sbin/preclear_disk_ori.sh",
+                "docker"   => "docker"];
 
     foreach ($scripts as $author => $file)
     {
       if (! is_file($file))
       {
         unset($scripts[$author]);
+      }
+      elseif ($author == "docker")
+      {
+        $image = shell_exec("docker images --filter=reference='docker' --format='{{println .Repository}}' | grep -cve '^\s*$'");
+        if (intval($image) == 0)
+        {
+          unset($scripts[$author]);
+        }
       }
     }
     return $scripts;
@@ -189,7 +194,9 @@ class Preclear
     echo "var scope  = 'gfjardim';\n";
     echo "var scripts = ".json_encode($this->scriptFiles()).";\n";
     printf("var zip = '%s-%s-%s.zip';\n", str_replace(' ','_',strtolower($var['NAME'])), $this->plugin, date('Ymd-Hi') );
-    echo file_get_contents("plugins/".$this->plugin."/assets/javascript.js");
+    echo "</script>\n";
+    echo "<script type='text/javascript' src='";autov("/plugins/$this->plugin/assets/javascript.js"); echo "'></script>\n";
+    echo "<script>\n";
   }
 
 
@@ -281,7 +288,7 @@ class Preclear
           break;
 
         default:
-          $running = false;
+          $running = true;
           $log     = "";
           $status .= "<span>{$stat[2]}</span>";
           break;
@@ -370,7 +377,7 @@ class Preclear
         <dl class="dl-dialog">
           <dt>Select Disks: </dt>
           <dd style='margin-bottom:0px;'>
-              <select id="multiple_preclear" name="disks" multiple class='chosen swal' data-placeholder="Select Your Options">
+              <select id="multiple_preclear" name="disks" multiple class='chosen swal' data-placeholder="Preclear Disks">
                 {0}
               </select>
           </dd>
@@ -405,8 +412,80 @@ class Preclear
             </dd>
             <dt>&nbsp;</dt>
             <dd>
+            <dd>
               <select name="-M" disabled>
                 <option value="1" selected>On preclear end</option>
+                <option value="2">On every cycle end</option>
+                <option value="3">On every cycle and step end</option>
+                <option value="4">On every 25% of progress</option>
+              </select>
+              </dd>
+          </div>
+          <?endif;?>
+          <div class='read_options'>
+            <dt>Read size: </dt>
+            <dd>
+              <select name="-r">
+                <option value="0">Default</option><?=$size;?>
+              </select>
+            </dd>
+          </div>
+          <div class='write_options'>
+            <dt>Write size: </dt>
+            <dd>
+              <select name="-w">
+                <option value="0">Default</option><?=$size;?>
+              </select>
+            </dd>
+            <dt>Skip Pre-read: </dt>
+            <dd>
+              <input type="checkbox" name="-W" class="switch" >
+            </dd>
+          </div>
+          <?if ( array_key_exists("fast_postread", $capabilities) && $capabilities["fast_postread"] ):?>
+          <div class='postread_options'>
+            <dt>Fast post-read verify: </dt>
+            <dd>
+              <input type="checkbox" name="-f" class="switch" >
+            </dd>
+          </div>
+          <?endif;?>
+          <div class='inline_help'>
+            <dt>Enable Testing (just for debugging):</dt>
+            <dd>
+              <input type="checkbox" name="-s" class="switch" >
+            </dd>
+          </div>
+        </dl>
+      </div>
+
+      <? $capabilities = array_key_exists("docker", $scripts) ? $this->scriptCapabilities($scripts["docker"]) : [];?>
+      <div id="binhex-start-defaults" style="display:none;">
+        <dl class="dl-dialog">
+          <dt>Operation: </dt>
+          <dd>
+            <select name="op" onchange="toggleSettings(this);">
+              <option value='0'>Clear</option>
+              <option value='-V'>Run the post-read verify</option>
+              <option value='-t'>Test</option>
+              <option value='-C 64'>Convert to a start sector of 64</option>
+              <option value='-C 63'>Convert to a start sector of 63</option>
+              <option value='-z'>Zero only the MBR</option>
+            </select>
+          </dd>
+          <div class='write_options'>
+            <dt>Cycles: </dt>
+            <dd>
+              <select name="-c"><?=$cycles;?></select>
+            </dd>
+          </div>
+          <?if ( array_key_exists("notifications", $capabilities) && $capabilities["notifications"] ):?>
+          <div class="notify_options">
+            <dt>Notifications: </dt>
+            <dd>
+              <select name="-M">
+                <option value="0">Disabled</option>
+                <option value="1">On preclear end</option>
                 <option value="2">On every cycle end</option>
                 <option value="3">On every cycle and step end</option>
                 <option value="4">On every 25% of progress</option>

@@ -259,8 +259,18 @@ switch ($_POST['action'])
 
       else
       {
-        $notify    = (isset($_POST['-o']) && $_POST['-o'] > 0) ? " -o ".urldecode($_POST['-o']) : "";
-        $mail      = (isset($_POST['-M']) && $_POST['-M'] > 0 && intval($_POST['-o']) > 0) ? " -M ".urldecode($_POST['-M']) : "";
+        $capable      = array_key_exists($scope, $script_files) ? $Preclear->scriptCapabilities($script_files[$scope]) : [];
+        $notification = (array_key_exists("notifications", $capable) && $capable["notifications"]);
+        if ($notification)
+        {
+          $notify  = (isset($_POST['-o']) && $_POST['-o'] > 0) ? " -o ".urldecode($_POST['-o']) : "";
+          $mail    = (isset($_POST['-M']) && $_POST['-M'] > 0 && intval($_POST['-o']) > 0) ? " -M ".urldecode($_POST['-M']) : "";
+        }
+        else
+        {
+          $notify  = "";
+          $mail    = (isset($_POST['-M']) && $_POST['-M'] > 0) ? " -M ".urldecode($_POST['-M']) : "";
+        }
         $passes    = isset($_POST['-c']) ? " -c ".urldecode($_POST['-c']) : "";
         $read_sz   = (isset($_POST['-r']) && $_POST['-r'] != 0) ? " -r ".urldecode($_POST['-r']) : "";
         $write_sz  = (isset($_POST['-w']) && $_POST['-w'] != 0) ? " -w ".urldecode($_POST['-w']) : "";
@@ -270,7 +280,6 @@ switch ($_POST['action'])
         $confirm   = (! $op || $op == " -z" || $op == " -V") ? TRUE : FALSE;
         $test      = (isset($_POST['-s']) && $_POST['-s'] == "on") ? " -s" : "";
 
-        $capable  = array_key_exists("joel", $script_files) ? $Preclear->scriptCapabilities($script_files["joel"]) : [];
         $noprompt = (array_key_exists("noprompt", $capable) && $capable["noprompt"]) ? " -J" : "";
         
         if ( $post_read && $pre_read )
@@ -312,6 +321,8 @@ switch ($_POST['action'])
         }
       }
 
+      debug("preclear will be invoked as: $cmd");
+
       if (! TMUX::hasSession( $session ))
       {
         TMUX::NewSession( $session );
@@ -325,7 +336,7 @@ switch ($_POST['action'])
 
       if ( $confirm && ! $noprompt )
       {
-        foreach( range(0, 5) as $x )
+        foreach( range(0, 10) as $x )
         {
           if ( strpos(TMUX::getSession($session), "Answer Yes to continue") )
           {
@@ -352,8 +363,15 @@ switch ($_POST['action'])
     foreach ($serials as $serial)
     {
       $device = basename($Preclear->serialDisk($serial));
+      $session = "preclear_disk_{$serial}";
       
-      TMUX::sendKeys("preclear_disk_{$serial}", "C-c");
+      TMUX::sendKeys($session, "C-c");
+
+      $docker = intval(shell_exec("/usr/bin/docker container ls --filter='Name=${session}' --format='{{println .Names}}'|wc -l"));
+      if ($docker >= 1)
+      {
+        shell_exec("/usr/bin/docker stop '$session'");
+      }
       
       $file = "/tmp/preclear_stat_{$device}";
       if (is_file($file))
@@ -369,7 +387,7 @@ switch ($_POST['action'])
         shell_exec("kill $(ps -s '$pid' -o pid=) &>/dev/null");
       }
 
-      TMUX::killSession("preclear_disk_{$serial}");
+      TMUX::killSession($session);
       if (is_file("/tmp/preclear_stat_{$device}")) @unlink("/tmp/preclear_stat_{$device}");
       if (is_file("/tmp/.preclear/{$device}/pid")) @unlink("/tmp/.preclear/{$device}/pid");
 
@@ -387,7 +405,15 @@ switch ($_POST['action'])
       $serial = str_replace("preclear_disk_", "", $session);
       $device = basename($Preclear->serialDisk($serial));
       $file = "/tmp/preclear_stat_{$device}";
+
       TMUX::sendKeys($session, "C-c");
+      
+      $docker = intval(shell_exec("/usr/bin/docker container ls --filter='Name=${session}' --format='{{println .Names}}'|wc -l"));
+      if ($docker >= 1)
+      {
+        shell_exec("/usr/bin/docker stop '$session'");
+      }
+      
       if (is_file($file))
       {
         $stat = explode("|", file_get_contents($file));
@@ -575,6 +601,14 @@ switch ($_POST['action'])
   case 'clear_all_preclear':
     shell_exec("/usr/local/emhttp/plugins/preclear.disk/script/clear_preclear.sh");
     echo json_encode(["success" => true]);
+    break;;
+
+
+  default:
+    if (isset( $_POST['action']))
+    {
+      echo json_encode(["success" => false]);
+    }
     break;;
 }
 
