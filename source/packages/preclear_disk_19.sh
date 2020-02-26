@@ -137,12 +137,12 @@ To list device names of drives not assigned to the unRAID array:
 
        -z       = Zero the MBR (first 512 bytes) of the disk.  Do nothing else.
 
-       -a       = start partition on sector 63. (default when on unRAID 4.X)
+       -a       = start partition on sector 63. (default when on unRAID <= 4.6)
+            The -a option is completely ignored on disks > 2.2TB as they use a GPT
+            partition that will always start on a 4k boundary (64).
        -A       = start partition on sector 64. (not compatible with unRAID 4.6 and prior)
-            On unRAID 4.7 and subsequent, the -a or -A default is set based on the value
-            set on the Settings page in the unRAID web-management console.
-            Both of these (-a and -A) are completely ignored on disks > 2.2TB as they 
-            use a GPT partition that will always start on a 4k boundary.
+            If neither option (-a or -A) is specified then the default is set based on
+            the value set on the Settings page in the unRAID web-management console.
 
        -C 63    = convert an existing pre-cleared disk to use sector 63 as a
                   starting sector.
@@ -663,7 +663,8 @@ fi
 
 if [ "$fast_postread" == "y" ]
 then
-  if [ ! -e "/boot/readvz" ]
+  readvz_exists=$(which readvz 2>/dev/null|wc -l)
+  if [ "$readvz_exists" -eq 0 ]
   then
     echo "error: \"readvz\" program does not exist." >&2
     usage >&2
@@ -1388,7 +1389,7 @@ exec </dev/tty
 # First, do some basic tests to ensure the disk  is not part of the arrray
 # and not mounted, and not in use in any way.
 #----------------------------------------------------------------------------------
-devices=`cat /proc/mdcmd | cat -v | grep rdevName | sed 's/\([^=]*\)=\([^=]\)/\/dev\/\2/'`
+devices=`/usr/local/sbin/mdcmd status | cat -v | grep rdevName | sed 's/\([^=]*\)=\([^=]\)/\/dev\/\2/'`
 
 echo $devices | grep $theDisk >/dev/null 2>&1
 if [  $? = 0 ]
