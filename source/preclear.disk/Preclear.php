@@ -61,7 +61,7 @@ function debug($msg, $type = "NOTICE")
   {
     return NULL;
   }
-  $msg = "\n".date("D M j G:i:s T Y").": ".print_r($msg,true)."\n";
+  $msg = date("D M j G:i:s T Y").": ".print_r($msg,true)."\n";
   file_put_contents($GLOBALS["log_file"], $msg, FILE_APPEND);
 }
 
