@@ -141,5 +141,4 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
     setTimeout(preclearFixHelp,100);
   });
 
-
 </script>

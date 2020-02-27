@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2020.02.26a">
+<!ENTITY version   "2020.02.27">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,9 @@
 
 <CHANGES>
 ##&name;
+
+###2020.02.27
+- Fix: minor changes
 
 ###2020.02.26
 - Fix: error while output smart upon script error
@@ -651,7 +654,6 @@ if [ $? -ne 0 ]; then
   touch "$unsupported"
 fi
 
-
 # Verify and install plugin package
 sum1=$(/usr/bin/md5sum /boot/config/plugins/&name;/&name;-&version;.txz)
 sum2=$(/usr/bin/cat /boot/config/plugins/&name;/&name;-&version;.md5)
@@ -699,7 +701,7 @@ chmod -R 755 /usr/local/emhttp/plugins/&name;/script/
 ln -sf /usr/local/emhttp/plugins/&name;/script/preclear.sh /usr/local/bin/preclear
 
 # Install diskinfo service
-mv /usr/local/emhttp/plugins/&name;/rc.diskinfo /etc/rc.d/rc.diskinfo
+cp /usr/local/emhttp/plugins/&name;/rc.diskinfo /etc/rc.d/rc.diskinfo
 chmod +x /etc/rc.d/rc.diskinfo
 
 # Add CRON entry to keep alive

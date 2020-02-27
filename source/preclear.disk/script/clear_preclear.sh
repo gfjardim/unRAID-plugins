@@ -40,6 +40,8 @@ get_serial()
 
 for dir in $(find /tmp/.preclear -mindepth 1 -maxdepth 1 -type d ); do
   pidfile="$dir/pid"
+  disk_name=$(basename $dir)
+  serial=$( get_serial $disk_name )
 
   if [ -f "$pidfile" ]; then
     pid=$(cat $pidfile)
@@ -59,9 +61,19 @@ for dir in $(find /tmp/.preclear -mindepth 1 -maxdepth 1 -type d ); do
 
   while read dd_pid; do
     stop_kill $dd_pid 10
-  done < <( ps -o "%p|" -o "cmd:100" --no-headers -p $(pidof dd) | grep /dev/$(basename $dir) | cut -d '|' -f 1)
+  done < <( ps -o "%p|" -o "cmd:100" --no-headers -p $(pidof dd) | grep /dev/$disk_name | cut -d '|' -f 1)
 
   rm -rf $dir
-  tmux kill-session -t "preclear_disk_"$( get_serial $(basename $dir))
-  rm -f "/tmp/preclear_stat_"$(basename $dir)
+  if [ -n "$serial" ]; then
+
+    session="preclear_disk_${serial}"
+
+    docker=$(/usr/bin/docker container ls --filter='Name=${session}' --format='{{println .Names}}'|wc -l)
+    if [ "$docker" -gt 0 ]; then
+      /usr/bin/docker stop "$session"
+    fi
+    tmux kill-session -t "$session"
+
+    rm -f "/tmp/preclear_stat_${disk_name}"
+  fi
 done

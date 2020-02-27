@@ -166,7 +166,7 @@ class Preclear
   {
     $scripts = ["gfjardim" => "/usr/local/emhttp/plugins/".$this->plugin."/script/preclear_disk.sh",
                 "joel"     => "/usr/local/sbin/preclear_disk_ori.sh",
-                "docker"   => "docker"];
+                "docker"   => "/usr/local/sbin/preclear_disk_docker.sh"];
 
     foreach ($scripts as $author => $file)
     {
@@ -176,7 +176,7 @@ class Preclear
       }
       elseif ($author == "docker")
       {
-        $image = shell_exec("docker images --filter=reference='docker' --format='{{println .Repository}}' | grep -cve '^\s*$'");
+        $image = shell_exec("docker images --filter=reference='*/*preclear*:latest' --format='{{println .Repository}}' | grep -cve '^\s*$'");
         if (intval($image) == 0)
         {
           unset($scripts[$author]);
@@ -271,7 +271,6 @@ class Preclear
               $status .= "<span style='color:#00BE37;margin-right:8px;'>{$stat[2]}</span>";
             }
           }
-
           else
           {
             if (preg_match("#failed|FAIL#", $stat[2]))
@@ -284,7 +283,7 @@ class Preclear
               $status .= "<span style='margin-right:8px;'>{$stat[2]}</span>";
             }
           }
-          $preview = "${paused}${log}${preview}";
+          $preview = is_dir("/tmp/.preclear/${disk}") ? "${paused}${log}${preview}" : "${paused}${preview}";
           break;
 
         default:
@@ -460,7 +459,7 @@ class Preclear
       </div>
 
       <? $capabilities = array_key_exists("docker", $scripts) ? $this->scriptCapabilities($scripts["docker"]) : [];?>
-      <div id="binhex-start-defaults" style="display:none;">
+      <div id="docker-start-defaults" style="display:none;">
         <dl class="dl-dialog">
           <dt>Operation: </dt>
           <dd>

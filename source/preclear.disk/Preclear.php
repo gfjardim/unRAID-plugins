@@ -61,7 +61,7 @@ function debug($msg, $type = "NOTICE")
   {
     return NULL;
   }
-  $msg = "\n".date("D M j G:i:s T Y").": ".print_r($msg,true);
+  $msg = "\n".date("D M j G:i:s T Y").": ".print_r($msg,true)."\n";
   file_put_contents($GLOBALS["log_file"], $msg, FILE_APPEND);
 }
 
@@ -303,7 +303,7 @@ switch ($_POST['action'])
           $cmd = "$script {$op}{$noprompt} $device";
           @unlink("/tmp/preclear_stat_{$devname}");
         }
-        debug("preclear will be invoked as: $cmd\n");
+        debug("preclear will be invoked as: $cmd");
       }
 
       // Enabling queue
@@ -388,6 +388,7 @@ switch ($_POST['action'])
       }
 
       TMUX::killSession($session);
+      sleep(0.2);
       if (is_file("/tmp/preclear_stat_{$device}")) @unlink("/tmp/preclear_stat_{$device}");
       if (is_file("/tmp/.preclear/{$device}/pid")) @unlink("/tmp/.preclear/{$device}/pid");
 
