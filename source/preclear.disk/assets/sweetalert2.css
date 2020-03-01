@@ -4,6 +4,22 @@
 .swal-content select{
   color:#1c1b1b;
 }
+input[type=text].swal-content__input, input[type=password].swal-content__input, select.swal-content__input, .swal-content__textarea {
+    -webkit-appearance: none;
+    background-color: #fff;
+    color:#1c1b1b;
+    border: none;
+    font-size: 14px;
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    border: 1px solid rgba(0,0,0,.14);
+    padding: 10px 13px;
+    border-radius: 2px;
+    transition: border-color .2s;
+    position: center;
+    max-width: unset;
+}
 .swal-button, .swal-button--cancel, .swal-button--danger{
   font-family:clear-sans;
   font-size:1.2rem;
@@ -40,7 +56,7 @@
 }
 .swal-button[disabled], .swal-button--cancel[disabled], .swal-button--danger[disabled]{
   cursor:default;
-  color:#ff8c2f;
+  color:#404040;
   background:-webkit-gradient(linear,left top,right top,from(#404040),to(#808080)) 0 0 no-repeat,-webkit-gradient(linear,left top,right top,from(#404040),to(#808080)) 0 100% no-repeat,-webkit-gradient(linear,left bottom,left top,from(#404040),to(#404040)) 0 100% no-repeat,-webkit-gradient(linear,left bottom,left top,from(#808080),to(#808080)) 100% 100% no-repeat;
   background:linear-gradient(90deg,#404040 0,#808080) 0 0 no-repeat,linear-gradient(90deg,#404040 0,#808080) 0 100% no-repeat,linear-gradient(0deg,#404040 0,#404040) 0 100% no-repeat,linear-gradient(0deg,#808080 0,#808080) 100% 100% no-repeat;
   background-size:100% 2px,100% 2px,2px 100%,2px 100%

@@ -16,9 +16,10 @@ $Preclear = new Preclear;
 
   if (typeof swal2 === "undefined")
   {
-    $.getScript( '/plugins/<?=$plugin;?>/assets/sweetalert2.js' );
-    $('head').append( $('<link rel="stylesheet" type="text/css" />').attr('href', '/plugins/<?=$plugin;?>/assets/sweetalert2.css') );
+    $('head').append( $('<link rel="stylesheet" type="text/css" />').attr('href', '<?autov("/plugins/${plugin}/assets/sweetalert2.css");?>') );
+    $.getScript( '/plugins/<?=$plugin;?>/assets/sweetalert2.js');
   }
+
   $(function()
     {
       footer = $("<span id='preclear-footer'></span>").insertAfter("div#footer > span#copyright").css("float","right").css("margin-right", "6px");
