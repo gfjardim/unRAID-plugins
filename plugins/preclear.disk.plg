@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2020.03.01">
+<!ENTITY version   "2020.03.02">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,9 @@
 
 <CHANGES>
 ##&name;
+
+###2020.03.02
+- Fix: drives > 2.2TiB and with protective MBR partition starting on sector 64 failing signature verification.
 
 ###2020.03.01
 - Fix: update swal2 css
@@ -770,10 +773,8 @@ The 'remove' script.
 <FILE Run="/bin/bash" Method="remove">
 <INLINE>
 
-# kill all tmux sessions
-for session in $(tmux ls 2&gt;/dev/null | grep preclear | cut -d':' -f1); do 
-  tmux kill-session -t "${session}" >/dev/null 2>&amp;1
-done
+# kill all preclear sessions
+/usr/local/emhttp/plugins/&name;/script/clear_preclear.sh
 
 # Remove plugin
 removepkg &name;-&version;

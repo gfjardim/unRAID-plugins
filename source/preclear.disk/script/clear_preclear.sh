@@ -77,3 +77,10 @@ for dir in $(find /tmp/.preclear -mindepth 1 -maxdepth 1 -type d ); do
     rm -f "/tmp/preclear_stat_${disk_name}"
   fi
 done
+
+while read session; do
+  echo "killing preclear session: $session"
+  tmux send -t "$session" "C-c" ENTER 2>/dev/null
+  sleep 2
+  tmux kill-session -t "$session" >/dev/null 2>&1
+done < <(tmux ls 2>/dev/null|grep "preclear_disk_"|cut -d ':' -f 1)

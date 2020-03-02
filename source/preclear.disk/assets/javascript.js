@@ -6,24 +6,27 @@ if (! $.tooltipster)
   $("<script type='text/javascript' src='/plugins/"+plugin+"/assets/tooltipster.bundle.min.js'>").appendTo("head");
 }
 
-String.prototype.formatUnicorn = String.prototype.formatUnicorn ||
-function () {
-    "use strict";
-    var str = this.toString();
-    if (arguments.length) {
-        var t = typeof arguments[0];
-        var key;
-        var args = ("string" === t || "number" === t) ?
-            Array.prototype.slice.call(arguments)
-            : arguments[0];
+if (typeof " ".formatUnicorn !== "function")
+{
+  String.prototype.formatUnicorn = String.prototype.formatUnicorn ||
+  function () {
+      "use strict";
+      var str = this.toString();
+      if (arguments.length) {
+          var t = typeof arguments[0];
+          var key;
+          var args = ("string" === t || "number" === t) ?
+              Array.prototype.slice.call(arguments)
+              : arguments[0];
 
-        for (key in args) {
-            str = str.replace(new RegExp("\\{" + key + "\\}", "gi"), args[key]);
-        }
-    }
+          for (key in args) {
+              str = str.replace(new RegExp("\\{" + key + "\\}", "gi"), args[key]);
+          }
+      }
 
-    return str;
-};
+      return str;
+  };
+}
 
 $('body').on('mouseenter', '.tooltip, .tooltip-toggle', function()
 {
@@ -691,7 +694,7 @@ function getResumablePreclear(serial)
         content:{ element: "div", attributes:{ innerHTML: "There's a previous preclear session available for this drive.<br>Do you want to resume it instead of starting a new one?"}},
         icon: "info",
         buttons:{
-          cancel:{text: "Cancel", value: null, visible: true, className: "swal-button-left", closeModal: true},
+          cancel:{text: "Cancel", value: null, visible: true, className: "swal-button .swal-button-left", closeModal: true},
           confirm:{text: "Resume", value: 1, visible: true, className: "", closeModal: false},
           new:{text: "Start New", value: 2, visible: true, className: "", closeModal: false},
         }

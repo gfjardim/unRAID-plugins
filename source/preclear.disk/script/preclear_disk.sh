@@ -311,7 +311,11 @@ verify_mbr() {
 
   case "$start_sector" in
     63|64)
-      let partition_size=($disk_blocks - $start_sector)
+      if [ $disk_blocks -ge $max_mbr_blocks ]; then
+        partition_size=$(printf "%d" 0xFFFFFFFF)
+      else
+        let partition_size=($disk_blocks - $start_sector)
+      fi
       ;;
     1)
       if [ "$over_mbr_size" != "y" ]; then
