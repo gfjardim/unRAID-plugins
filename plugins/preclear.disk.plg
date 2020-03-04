@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2020.03.02">
+<!ENTITY version   "2020.03.02a">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,9 @@
 
 <CHANGES>
 ##&name;
+
+###2020.03.02a
+- Fix: apply the last fix to the original preclear script and bump version to 1.20
 
 ###2020.03.02
 - Fix: drives > 2.2TiB and with protective MBR partition starting on sector 64 failing signature verification.
@@ -539,14 +542,14 @@ The 'plugin' package MD5 hash.
 <URL>&gitURL;/archive/&name;-&version;.md5</URL>
 </FILE>
 
-<!--The 'readvz' script.-->
+<!--The 'readvz' executable.-->
 <FILE Name="/usr/local/sbin/readvz" Mode="755">
 <URL>&gitURL;/source/packages/readvz</URL>
 </FILE>
 
-<!--The 'readvz' script.-->
+<!--The 'preclear_disk_ori.sh' script.-->
 <FILE Name="/usr/local/sbin/preclear_disk_ori.sh" Mode="755">
-<URL>&gitURL;/source/packages/preclear_disk_19.sh</URL>
+<URL>&gitURL;/source/packages/preclear_disk_20.sh</URL>
 </FILE>
 
 <!--
