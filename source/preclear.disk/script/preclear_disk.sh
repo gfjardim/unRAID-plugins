@@ -407,23 +407,23 @@ write_signature() {
 
 maxExecTime() {
   # maxExecTime prog_name disk_name max_exec_time
-  exec_time=0
-  prog_name=$1
-  disk_name=$(basename $2)
-  max_exec_time=$3
+  local exec_time=0
+  local prog_name=$1
+  local disk_name=$(basename $2)
+  local max_exec_time=$3
 
   while read line; do
-    pid=$( echo $line | awk '{print $1}')
-    pid_time=$(find /proc/${pid} -maxdepth 0 -type d -printf "%a\n" 2>/dev/null)
-    pid_child=$(ps -h --ppid ${pid} 2>/dev/null | wc -l)
+    local pid=$( echo $line | awk '{print $1}')
+    local pid_date=$(find /proc/${pid} -maxdepth 0 -type d -printf "%a\n" 2>/dev/null)
+    local pid_child=$(ps -h --ppid ${pid} 2>/dev/null | wc -l)
     # pid_child=0
-    if [ -n "$pid_time" -a "$pid_child" -eq 0 ]; then
-      let "pid_time=$(date +%s) - $(date +%s -d "$pid_time")"
-      if [ "$pid_time" -gt "$exec_time" ]; then
-        exec_time=$pid_time
+    if [ -n "$pid_date" -a "$pid_child" -eq 0 ]; then
+      eval "local pid_elapsed=$(( $(date +%s) - $(date +%s -d "$pid_date") ))"
+      if [ "$pid_elapsed" -gt "$exec_time" ]; then
+        exec_time=$pid_elapsed
         # debug "${prog_name} exec_time: ${exec_time}s"
       fi
-      if [ "$pid_time" -gt $max_exec_time ]; then
+      if [ "$pid_elapsed" -gt $max_exec_time ]; then
         debug "killing ${prog_name} with pid ${pid} - probably stalled..." 
         kill -9 $pid &>/dev/null
       fi
@@ -431,7 +431,6 @@ maxExecTime() {
   done < <(ps ax -o pid,cmd | awk '/'$prog_name'.*\/dev\/'${disk_name}'/{print $1}' )
   echo $exec_time
 }
-
 
 write_disk(){
   # called write_disk
@@ -455,13 +454,14 @@ write_disk(){
   local disk_bytes=${disk_properties[size]}
   local disk_serial=${disk_properties[serial]}
   local last_progress=0
+
+  declare -A is_paused_by
+  declare -A paused_by
   local pause=${all_files[pause]}
-  local paused_file=n
-  local paused_at=0
-  local paused_smart=n
-  local paused_sync=n
+  local is_paused=n
+  local do_pause=0
+
   local percent_wrote
-  local percent_pause=0
   local queued=n
   local queued_file=${all_files[queued]}
   local short_test=$short_test
@@ -469,11 +469,11 @@ write_disk(){
   local stat_file=${all_files[stat]}
   local tb_formatted
   local total_bytes
+  local update_period=0
   local write_bs=""
   local display_pid=0
   local write_bs=2097152
   local write_type_v
-
   local write_type=$1
   local initial_bytes=$2
   local initial_timer=$3
@@ -560,10 +560,19 @@ write_disk(){
 
   while kill -0 $dd_pid &>/dev/null; do
 
-    if [ $(( $(timer) - $timelapse )) -gt 10 ]; then
+    # update elapsed time
+    if [ "$is_paused" == "y" ]; then
+      time_elapsed $write_type paused && time_elapsed cycle paused && time_elapsed main paused
+    else
+      time_elapsed $write_type && time_elapsed cycle && time_elapsed main
+    fi
 
-      # update elapsed time
-      time_current=$(timer)
+    if [ $(( $(timer) - $timelapse )) -gt $update_period ]; then
+
+      if [ "$update_period" -lt 10 ]; then
+        update_period=$(($update_period + 1))
+      fi
+
       current_elapsed=$(time_elapsed $write_type export)
 
       kill -USR1 $dd_pid 2>/dev/null && sleep 1
@@ -605,49 +614,24 @@ write_disk(){
       fi
 
       # Save current status
-      diskop+=([current_op]="$write_type" [current_pos]="$bytes_wrote" [current_timer]=$(time_elapsed $write_type export)  )
+      diskop+=([current_op]="$write_type" [current_pos]="$bytes_wrote" [current_timer]=$(time_elapsed $write_type export))
       save_current_status
 
-      # Pause if a 'smartctl' command is taking too much time to complete
-      maxSmartTime=$(maxExecTime "smartctl" "$disk_name" "60")
-      if [ "$maxSmartTime" -gt 30 -a "$paused_smart" != "y" ]; then
-        debug "dd[${dd_pid}]: Pausing (smartctl exec time: ${maxSmartTime}s)"
-        kill -TSTP $dd_pid
-        # update elapsed time
-        time_elapsed $write_type && time_elapsed cycle && time_elapsed main
-        paused_smart=y
-      elif [ "$maxSmartTime" -lt 30 -a "$paused_smart" == "y" ]; then
-        debug "dd[${dd_pid}]: resumed"
-        kill -CONT $dd_pid
-        paused_smart=n
-      fi
+      local maxTimeout=15
+      for prog in hdparm smartctl; do
+        local prog_elapsed=$(maxExecTime "$prog" "$disk_name" "30")
+        if [ "$prog_elapsed" -gt "$maxTimeout" ]; then
+          paused_by["$prog"]="Pause ("$prog" run time: ${prog_elapsed}s)"
+        else
+          paused_by["$prog"]=n
+        fi
+      done
 
-      # Pause if a 'hdparm' command is taking too much time to complete
-      maxHdparmTime=$(maxExecTime "hdparm" "$disk_name" "60")
-      if [ "$maxHdparmTime" -gt 30 -a "$paused_hdparm" != "y" ]; then
-        debug "dd[${dd_pid}]: Pausing (hdparm exec time: ${maxHdparmTime}s)"
-        kill -TSTP $dd_pid
-        # update elapsed time
-        time_elapsed $write_type && time_elapsed cycle && time_elapsed main
-        paused_hdparm=y
-      elif [ "$maxHdparmTime" -lt 30 -a "$paused_hdparm" == "y" ]; then
-        debug "dd[${dd_pid}]: resumed"
-        kill -CONT $dd_pid
-        paused_hdparm=n
-      fi
-
-      # Pause if a sync command were issued
       isSync=$(ps -e -o pid,command | grep -Po "\d+ [s]ync$|\d+ [s]6-sync$" | wc -l)
-      if [ "$isSync" -gt 0 -a "$paused_sync" != "y" ]; then
-        debug "dd[${dd_pid}]: Pausing (sync command issued)"
-        kill -TSTP $dd_pid
-        # update elapsed time
-        time_elapsed $write_type && time_elapsed cycle && time_elapsed main
-        paused_sync=y
-      elif [ "$isSync" -eq 0 -a "$paused_sync" == "y" ]; then
-        debug "dd[${dd_pid}]: resumed"
-        kill -CONT $dd_pid
-        paused_sync=n
+      if [ "$isSync" -gt 0 ]; then
+        paused_by["sync"]="Pause (sync command issued)"
+      else
+        paused_by["sync"]=n
       fi
 
       if (( $percent_wrote % 10 == 0 )) && [ "$last_progress" -ne $percent_wrote ]; then
@@ -656,7 +640,6 @@ write_disk(){
       fi
 
       timelapse=$(timer)
-
     else
       sleep 1
     fi
@@ -666,57 +649,82 @@ write_disk(){
       cycle_disp=" ($cycle of $cycles)"
     fi
 
-    # Pause if requested
-    if [ -f "$pause" -a "$paused_file" != "y" ]; then
-      kill -TSTP $dd_pid && paused_at=$(timer)
-      # update elapsed time
+    if [ -f "$pause" ]; then
+      paused_by["file"]="Pause requested"
+    else
+      paused_by["file"]=n
+    fi
+
+    if [ -f "$queued_file" ]; then
+      paused_by["queue"]="Pause requested by queue manager"
+    else
+      paused_by["queue"]=n
+    fi
+
+    do_pause=0
+    for issuer in "${!paused_by[@]}"; do
+      local pauseIssued=${paused_by[$issuer]}
+      local pausedBy=${is_paused_by[$issuer]}
+      local pauseReason=""
+      if [ "$pauseIssued" != "n" ]; then
+        pauseReason=$pauseIssued
+        pauseIssued=y
+      fi
+
+      if [ "$pauseIssued" == "y" ]; then
+        do_pause=$(( $do_pause + 1 ))
+        if [ "$pausedBy" != "y" ]; then
+          is_paused_by[$issuer]=y
+          if [ "$pauseReason" != "y" ]; then
+            debug "$pauseReason" 
+          fi
+        fi
+      elif [ "$pauseIssued" == "n" ]; then
+        if [ "$pausedBy" == "y" ]; then
+          do_pause=$(( $do_pause - 1 ))
+          is_paused_by[$issuer]=n
+        fi
+      fi
+    done
+
+    if [ "$do_pause" -gt 0 ] && [ "$is_paused" == "n" ]; then
+      kill -TSTP $dd_pid
+      is_paused=y
       time_elapsed $write_type && time_elapsed cycle && time_elapsed main
-      paused_file=y
       debug "Paused"
-    elif [ -f "$queued_file" -a "$queued" != "y" ]; then
-      kill -TSTP $dd_pid && paused_at=$(timer)
-      # update elapsed time
-      time_elapsed $write_type && time_elapsed cycle && time_elapsed main
-      queued=y
-      debug "Enqueued"
-    elif [ ! -f "$pause" -a "$paused_file" == "y" ]; then
+    fi
+
+    if [ "$do_pause" -lt 0 ] && [ "$is_paused" == "y" ]; then
       kill -CONT $dd_pid
-      paused_file=n
-      debug "Resumed"
-    elif [ ! -f "$queued_file" -a "$queued" == "y" ]; then
-      kill -CONT $dd_pid
-      queued=n
+      is_paused=n
+      time_elapsed $write_type paused && time_elapsed cycle paused && time_elapsed main paused
       debug "Resumed"
     fi
 
-    if [ "$paused_file" == "y" -o "$paused_sync" == "y" -o "$paused_hdparm" == "y" -o "$paused_smart" == "y" ]; then
-      echo "$disk_name|NN|${write_type_s}${cycle_disp}: PAUSED|$$" >$stat_file
-      if [ ! -e "/proc/${display_pid}/exe" ]; then
-        display_status "${write_type_s} in progress:|###(${percent_wrote}% Done)### ***PAUSED***" "** PAUSED"
-        display_pid=$!
+    local stat_content
+    local display_content
+    local display_status
+    if [ "$is_paused" == "y" ]; then
+      if [ -f "$queue_file" ]; then
+        stat_content="${write_type_s}${cycle_disp}: QUEUED"
+        display_content="${write_type_s} in progress:|###(${percent_wrote}% Done)### ***QUEUED***"
+        display_status="** QUEUED"
+      else
+        stat_content="${write_type_s}${cycle_disp}: PAUSED"
+        display_content="${write_type_s} in progress:|###(${percent_wrote}% Done)### ***PAUSED***"
+        display_status="** PAUSED"
       fi
-      # update elapsed time
-      time_elapsed $write_type paused && time_elapsed cycle paused && time_elapsed main paused
-      is=y
-    elif [ "$queued" == "y" ]; then
-      echo "$disk_name|NN|${write_type_s}${cycle_disp}: QUEUED|$$" >$stat_file
-      if [ ! -e "/proc/${display_pid}/exe" ]; then
-        display_status "${write_type_s} in progress:|###(${percent_wrote}% Done)### ***QUEUED***" "** QUEUED"
-        display_pid=$!
-      fi
-      # update elapsed time
-      time_elapsed $write_type paused && time_elapsed cycle paused && time_elapsed main paused
-      is_paused=y
     else
-      echo "$disk_name|NN|${write_type_s}${cycle_disp}: ${percent_wrote}% @ $current_speed MB/s ($(time_elapsed $write_type display))|$$" >$stat_file
-      # Display refresh
-      if [ ! -e "/proc/${display_pid}/exe" ]; then
-        display_status "${write_type_s} in progress:|###(${percent_wrote}% Done)###" "** $status" &
-        display_pid=$!
-      fi
-      # update elapsed time
-      time_elapsed $write_type && time_elapsed cycle && time_elapsed main
-      is_paused=n
+      stat_content="${write_type_s}${cycle_disp}: ${percent_wrote}% @ $current_speed MB/s ($(time_elapsed $write_type display))"
+      display_content="${write_type_s} in progress:|###(${percent_wrote}% Done)###"
+      display_status="** $status"
+    fi
+    echo "$disk_name|NN|${stat_content}|$$" >$stat_file
+
+    # Display refresh
+    if [ ! -e "/proc/${display_pid}/exe" ]; then
+      display_status "$display_content" "$display_status" &
+      display_pid=$!
     fi
 
     # Detect hung dd write
@@ -760,6 +768,7 @@ write_disk(){
   fi
 
   debug "${write_type_s}: dd - wrote ${bytes_wrote} of ${total_bytes}."
+  debug "${write_type_s}: elapsed time - $(time_elapsed $write_type display)"
 
   # Wait last display refresh
   for i in $(seq 30); do
@@ -938,13 +947,15 @@ read_entire_disk() {
   local disk_blocks=${disk_properties[blocks_512]}
   local disk_serial=${disk_properties[serial]}
   local last_progress=0
+
+  declare -A is_paused_by
+  declare -A paused_by
   local pause=${all_files[pause]}
-  local paused_at=0
-  local paused_file=n
-  local paused_smart=n
-  local paused_sync=n
+  local is_paused=n
+  local do_pause=0
+
   local percent_read=0
-  local queued=n
+  local update_period=0
   local queued_file=${all_files[queued]}
   local read_stress=$read_stress
   local short_test=$short_test
@@ -1125,10 +1136,19 @@ read_entire_disk() {
       kill -0 $skip_p5 2>/dev/null && wait $skip_p5
     fi
 
-    if [ $(( $(timer) - $timelapse )) -gt 10 ]; then
+    # update elapsed time
+    if [ "$is_paused" == "y" ]; then
+      time_elapsed $read_type paused && time_elapsed cycle paused && time_elapsed main paused
+    else
+      time_elapsed $read_type && time_elapsed cycle && time_elapsed main
+    fi
 
-      # update elapsed time
-      time_current=$(timer)
+    if [ $(( $(timer) - $timelapse )) -gt $update_period ]; then
+
+      if [ "$update_period" -lt 10 ]; then
+        update_period=$(($update_period + 1))
+      fi
+
       current_elapsed=$(time_elapsed $read_type export)
 
       # Refresh dd status
@@ -1170,48 +1190,21 @@ read_entire_disk() {
       diskop+=([current_op]="$read_type" [current_pos]="$bytes_read" [current_timer]=$current_elapsed )
       save_current_status
 
-      maxTimeout=15
-      
-      # Pause if a 'smartctl' command is taking too much time to complete
-      maxSmartTime=$(maxExecTime "smartctl" "$disk_name" "60")
-      if [ "$maxSmartTime" -gt "$maxTimeout" -a "$paused_smart" != "y" ]; then
-        debug "dd[${dd_pid}]: pausing (smartctl exec time: ${maxSmartTime}s)"
-        kill -TSTP $dd_pid
-        # update elapsed time
-        time_elapsed $read_type && time_elapsed cycle && time_elapsed main
-        paused_smart=y
-      elif [ "$maxSmartTime" -lt "$maxTimeout" -a "$paused_smart" == "y" ]; then
-        debug "dd[${dd_pid}]: resumed"
-        kill -CONT $dd_pid
-        paused_smart=n
-      fi
+      local maxTimeout=15
+      for prog in hdparm smartctl; do
+        local prog_elapsed=$(maxExecTime "$prog" "$disk_name" "30")
+        if [ "$prog_elapsed" -gt "$maxTimeout" ]; then
+          paused_by["$prog"]="Pause ("$prog" run time: ${prog_elapsed}s)"
+        else
+          paused_by["$prog"]=n
+        fi
+      done
 
-      # Pause if a 'hdparm' command is taking too much time to complete
-      maxHdparmTime=$(maxExecTime "hdparm" "$disk_name" "60")
-      if [ "$maxHdparmTime" -gt "$maxTimeout" -a "$paused_hdparm" != "y" ]; then
-        debug "dd[${dd_pid}]: pausing (hdparm exec time: ${maxHdparmTime}s)"
-        kill -TSTP $dd_pid
-        # update elapsed time
-        time_elapsed $read_type && time_elapsed cycle && time_elapsed main
-        paused_hdparm=y
-      elif [ "$maxHdparmTime" -lt "$maxTimeout" -a "$paused_hdparm" == "y" ]; then
-        debug "dd[${dd_pid}]: resumed"
-        kill -CONT $dd_pid
-        paused_hdparm=n
-      fi
-
-      # Pause if a sync command were issued
       isSync=$(ps -e -o pid,command | grep -Po "\d+ [s]ync$|\d+ [s]6-sync$" | wc -l)
-      if [ "$isSync" -gt 0 -a "$paused_sync" != "y" ]; then
-        debug "dd[${dd_pid}]: pausing (sync command issued)"
-        kill -TSTP $dd_pid
-        # update elapsed time
-        time_elapsed $read_type && time_elapsed cycle && time_elapsed main
-        paused_sync=y
-      elif [ "$isSync" -eq 0 -a "$paused_sync" == "y" ]; then
-        debug "dd[${dd_pid}]: resumed"
-        kill -CONT $dd_pid
-        paused_sync=n
+      if [ "$isSync" -gt 0 ]; then
+        paused_by["sync"]="Pause (sync command issued)"
+      else
+        paused_by["sync"]=n
       fi
 
       if (( $percent_read  % 10 == 0 )) && [ "$last_progress" -ne $percent_read ]; then
@@ -1229,34 +1222,82 @@ read_entire_disk() {
       cycle_disp=" ($cycle of $cycles)"
     fi
 
-    if [ "$paused_file" == "y" -o "$paused_sync" == "y" -o "$paused_hdparm" == "y" -o "$paused_smart" == "y" ]; then
-      echo "$disk_name|NN|${read_type_t}${cycle_disp} PAUSED|$$" >$stat_file
-      if [ ! -e "/proc/${display_pid}/exe" ]; then
-        display_status "${read_type_t}|###(${percent_read}% Done)### ***PAUSED***" "** PAUSED"
-        display_pid=$!
-      fi
-      # update elapsed time
-      time_elapsed $read_type paused && time_elapsed cycle paused && time_elapsed main paused
-      is_paused=y
-    elif [ "$queued" == "y" ]; then
-      echo "$disk_name|NN|${read_type_t}${cycle_disp} QUEUED|$$" >$stat_file
-      if [ ! -e "/proc/${display_pid}/exe" ]; then
-        display_status "${read_type_t}|###(${percent_read}% Done)### ***QUEUED***" "** QUEUED"
-        display_pid=$!
-      fi
-      # update elapsed time
-      time_elapsed $read_type paused && time_elapsed cycle paused && time_elapsed main paused
-      is_paused=y
+    if [ -f "$pause" ]; then
+      paused_by["file"]="Pause requested"
     else
-      echo "$disk_name|NN|${read_type_s}${cycle_disp}: ${percent_read}% @ ${average_speed} MB/s ($(time_elapsed $read_type display))|$$" > $stat_file
-      # Display refresh
-      if [ ! -e "/proc/${display_pid}/exe" ]; then
-        display_status "$read_type_t|###(${percent_read}% Done)###" "** $status" &
-        display_pid=$!
+      paused_by["file"]=n
+    fi
+
+    if [ -f "$queued_file" ]; then
+      paused_by["queue"]="Pause requested by queue manager"
+    else
+      paused_by["queue"]=n
+    fi
+
+    do_pause=0
+    for issuer in "${!paused_by[@]}"; do
+      local pauseIssued=${paused_by[$issuer]}
+      local pausedBy=${is_paused_by[$issuer]}
+      local pauseReason=""
+      if [ "$pauseIssued" != "n" ]; then
+        pauseReason=$pauseIssued
+        pauseIssued=y
       fi
-      is_paused=n
-      # update elapsed time
+
+      if [ "$pauseIssued" == "y" ]; then
+        do_pause=$(( $do_pause + 1 ))
+        if [ "$pausedBy" != "y" ]; then
+          is_paused_by[$issuer]=y
+          if [ "$pauseReason" != "y" ]; then
+            debug "$pauseReason" 
+          fi
+        fi
+      elif [ "$pauseIssued" == "n" ]; then
+        if [ "$pausedBy" == "y" ]; then
+          do_pause=$(( $do_pause - 1 ))
+          is_paused_by[$issuer]=n
+        fi
+      fi
+    done
+    
+    if [ "$do_pause" -gt 0 ] && [ "$is_paused" == "n" ]; then
+      kill -TSTP $dd_pid
+      is_paused=y
       time_elapsed $read_type && time_elapsed cycle && time_elapsed main
+      debug "Paused"
+    fi
+
+    if [ "$do_pause" -lt 0 ] && [ "$is_paused" == "y" ]; then
+      kill -CONT $dd_pid
+      is_paused=n
+      time_elapsed $read_type paused && time_elapsed cycle paused && time_elapsed main paused
+      debug "Resumed"
+    fi
+
+    local stat_content
+    local display_content
+    local display_status
+    if [ "$is_paused" == "y" ]; then
+      if [ -f "$queue_file" ]; then
+        stat_content="${read_type_s}${cycle_disp}: QUEUED"
+        display_content="${read_type_t}|###(${percent_read}% Done)### ***QUEUED***"
+        display_status="** QUEUED"
+      else
+        stat_content="${read_type_s}${cycle_disp}: PAUSED"
+        display_content="${read_type_t}|###(${percent_read}% Done)### ***PAUSED***"
+        display_status="** PAUSED"
+      fi
+    else
+      stat_content="${read_type_s}${cycle_disp}: ${percent_read}% @ $current_speed MB/s ($(time_elapsed $read_type display))"
+      display_content="${read_type_t}|###(${percent_read}% Done)###"
+      display_status="** $status"
+    fi
+    echo "$disk_name|NN|${stat_content}|$$" >$stat_file
+
+    # Display refresh
+    if [ ! -e "/proc/${display_pid}/exe" ]; then
+      display_status "$display_content" "$display_status" &
+      display_pid=$!
     fi
 
     # Detect hung dd read
@@ -1290,29 +1331,6 @@ read_entire_disk() {
       let next_notify=($next_notify + 25)
     fi
 
-    # Pause if requested
-    if [ -f "$pause" -a "$paused_file" != "y" ]; then
-      kill -TSTP $dd_pid && paused_at=$(timer)
-      paused_file=y
-      # update elapsed time
-      time_elapsed $read_type && time_elapsed cycle && time_elapsed main
-      debug "Paused"
-    elif [ -f "$queued_file" -a "$queued" != "y" ]; then
-      kill -TSTP $dd_pid && paused_at=$(timer)
-      queued=y
-      # update elapsed time
-      time_elapsed $read_type && time_elapsed cycle && time_elapsed main
-      debug "Enqueued"
-    elif [ ! -f "$pause" -a "$paused_file" == "y" ]; then
-      kill -CONT $dd_pid
-      paused_file=n
-      debug "Resumed"
-    elif [ ! -f "$queued_file" -a "$queued" == "y" ]; then
-      kill -CONT $dd_pid
-      queued=n
-      debug "Resumed"
-    fi
-
   done
 
   wait $dd_pid
@@ -1340,6 +1358,7 @@ read_entire_disk() {
   fi
 
   debug "${read_type_s}: dd - read ${bytes_read} of ${total_bytes}."
+  debug "${write_type_s}: elapsed time - $(time_elapsed $read_type display)"
 
   if test "$dd_exit_code" -ne 0; then
     debug "${read_type_s}: dd command failed, exit code [$dd_exit_code]."
@@ -1789,7 +1808,7 @@ debug_smart()
   if [ -f "${all_files[smart_prefix]}error" ]; then
     while read l; do 
       debug "S.M.A.R.T.: ${l}"; 
-    done < <(cat "${all_files[smart_prefix]}error" | column --separator '|' --table)
+    done < <(cat "${all_files[smart_prefix]}error" | column --separator '|' --table| tr " " ".")
   fi
 }
 
@@ -2151,7 +2170,6 @@ fi
 if [ -f "$load_file" ] && $(bash -n "$load_file"); then
   debug "Restoring previous instance of preclear"
   . "$load_file"
-  cat "$load_file" | debug
   if [ "$all_timer_diff" -gt 0 ]; then
     main_elapsed_time=$all_timer_diff
     cycle_elapsed_time=$cycle_timer_diff
@@ -2650,6 +2668,8 @@ for cycle in $(seq $cycles); do
   [ "$disable_smart" != "y" ] && output_smart $theDisk "$smart_type"
   display_status '' ''
   debug_smart $theDisk "$smart_type"
+
+  debug "Cycle: elapsed time: $(time_elapsed cycle display)"
 
   # Send end of the cycle notification
   if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 2 ]; then
