@@ -249,16 +249,17 @@ class Preclear
     $rm      = "<a id='preclear_rm_{$disk}' class='exec tooltip' style='color:#CC0000;font-weight:bold;margin-left:6px;' title='%s' onclick='stopPreclear(\"{$serial}\",\"%s\");'>";
     $rm     .= "<i class='fa fa-times hdd'></i></a>";
     $preview = "<a id='preclear_open_{$disk}' class='exec tooltip' style='margin-left:10px;color:#1E90FF;' onclick='openPreclear(\"{$serial}\");' title='Preview'><i class='fa fa-eye hdd'></i></a>";
-    
+
     if (is_file($file))
     {
       $stat = explode("|", file_get_contents($file));
-      
+      $stat[2] = strpos(TMUX::getSession("preclear_disk_{$serial}"), "Yes to continue") !== false ? 
+                "<span class='yellow-orb'><i class='fa fa-bell' /> Please answer Yes to continue</span>" : $stat[2];
       switch ( count($stat) )
       {
         case 4:
           $running = file_exists( "/proc/".trim($stat[3]) );
-          $log     = "<a class='exec tooltip' title='Preclear Log' style='margin:0px -3px 0px 5px;color:#1E90FF;' onclick='openWindow(\"/plugins/preclear.disk/script/tail_log&amp;arg1=preclear_disk_${serial}_".trim($stat[3])."\",\"Log Information\",600,900);'><i class='fa fa-file-text-o'></i></a>";
+          $log     = "<a class='exec tooltip' title='Preclear Log' style='margin:0px -3px 0px 8px;color:#1E90FF;' onclick='openWindow(\"/plugins/preclear.disk/script/tail_log&amp;arg1=preclear_disk_${serial}_".trim($stat[3])."\",\"Log Information\",600,900);'><i class='fa fa-file-text-o'></i></a>";
           
           if ($running)
           {
