@@ -488,7 +488,7 @@ write_disk(){
   touch $dd_output
 
   if [ "$short_test" == "y" ]; then
-    total_bytes=$(( ($write_bs * 2048) + 1 ))
+    total_bytes=$(( ($write_bs * 2048 * 4) + 1 ))
   else
     total_bytes=${disk_properties[size]}
   fi
@@ -805,8 +805,8 @@ write_disk(){
 
   # update elapsed time
   time_elapsed $write_type && time_elapsed cycle && time_elapsed main
-
-  eval "$output='$(time_elapsed $write_type display) @ $average_speed MB/s';$output_speed='$average_speed MB/s'"
+  current_elapsed=$(time_elapsed $write_type display)
+  eval "$output='$current_elapsed @ $average_speed MB/s';$output_speed='$average_speed MB/s'"
   return $exit_code
 }
 
@@ -893,23 +893,26 @@ save_current_status() {
   local current_timer=${diskop[current_timer]}
   local tmp_resume="${all_files[resume_temp]}.tmp"
 
-  echo -e "current_op=$current_op" > "$tmp_resume"
-  echo -e "current_pos=$current_pos" >> "$tmp_resume"
-  echo -e "current_timer=$current_timer" >> "$tmp_resume"
-  echo -e "current_cycle=$cycle" >> "$tmp_resume"
-  echo -e "main_elapsed_time=$( time_elapsed main export )" >> "$tmp_resume"
-  echo -e "cycle_elapsed_time=$( time_elapsed cycle export )" >> "$tmp_resume"
-
+  echo -e '# parsed arguments'  > "$tmp_resume"
   for arg in "${!arguments[@]}"; do
-    echo "$arg=\"${arguments[$arg]}\"" >> "$tmp_resume"
+    echo "$arg='${arguments[$arg]}'" >> "$tmp_resume"
   done
-
+  echo -e '' >> "$tmp_resume"
+  echo -e '# current operation' >> "$tmp_resume"
+  echo -e "current_op='$current_op'" >> "$tmp_resume"
+  echo -e "current_pos='$current_pos'" >> "$tmp_resume"
+  echo -e "current_timer='$current_timer'" >> "$tmp_resume"
+  echo -e "current_cycle='$cycle'\n" >> "$tmp_resume"
+  echo -e '# previous operations' >> "$tmp_resume"
   echo -e "preread_average='$preread_average'" >> "$tmp_resume"
   echo -e "preread_speed='$preread_speed'" >> "$tmp_resume"
   echo -e "write_average='$write_average'" >> "$tmp_resume"
   echo -e "write_speed='$write_speed'" >> "$tmp_resume"
   echo -e "postread_average='$postread_average'" >> "$tmp_resume"
-  echo -e "postread_speed='$postread_speed'" >> "$tmp_resume"
+  echo -e "postread_speed='$postread_speed'\n" >> "$tmp_resume"
+  echo -e '# current elapsed time' >> "$tmp_resume"
+  echo -e "main_elapsed_time='$( time_elapsed main export )'" >> "$tmp_resume"
+  echo -e "cycle_elapsed_time='$( time_elapsed cycle export )'" >> "$tmp_resume"
   mv -f "$tmp_resume" "${all_files[resume_temp]}"
 
   local last_updated=$(( $(timer) - ${diskop[last_update]} ))
@@ -978,7 +981,7 @@ read_entire_disk() {
 
   # Bytes to read
   if [ "$short_test" == "y" ]; then
-    total_bytes=$(( ($read_bs * 2048) + 1 ))
+    total_bytes=$(( ($read_bs * 2048 * 4) + 1 ))
   else
     total_bytes=${disk_properties[size]}
   fi
@@ -1358,7 +1361,7 @@ read_entire_disk() {
   fi
 
   debug "${read_type_s}: dd - read ${bytes_read} of ${total_bytes}."
-  debug "${write_type_s}: elapsed time - $(time_elapsed $read_type display)"
+  debug "${read_type_s}: elapsed time - $(time_elapsed $read_type display)"
 
   if test "$dd_exit_code" -ne 0; then
     debug "${read_type_s}: dd command failed, exit code [$dd_exit_code]."
@@ -1388,7 +1391,8 @@ read_entire_disk() {
   fi
   # update elapsed time
   time_elapsed $read_type && time_elapsed cycle && time_elapsed main
-  eval "$output='$(time_elapsed $read_type display) @ $average_speed MB/s';$output_speed='$average_speed MB/s'"
+  current_elapsed=$(time_elapsed $read_type display)
+  eval "$output='$current_elapsed @ $average_speed MB/s';$output_speed='$average_speed MB/s'"
   return 0
 }
 
@@ -2004,7 +2008,7 @@ append diskop 'current_op' ""
 append diskop 'current_pos' ""
 append diskop 'current_timer' ""
 append diskop 'last_update' 0
-append diskop 'update_interval' "900"
+append diskop 'update_interval' "60"
 
 # Disk properties
 append disk_properties 'device'      "$theDisk"
