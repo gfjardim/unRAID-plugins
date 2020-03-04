@@ -246,8 +246,8 @@ function startPreclear(serial, multiple = "no")
     content:{ element: "div", attributes:{ innerHTML: preclear_dialog.html()}},
     icon: "info",
     buttons:{
-      confirm:{text: "Start", value: true, visible: true, className: "", closeModal: false},
       cancel:{text: "Cancel", value: null, visible: true, className: "", closeModal: true},
+      confirm:{text: "Start", value: true, visible: true, className: "", closeModal: false},
     }
   }).then((answer) => {
     if (answer)
@@ -380,8 +380,8 @@ function stopPreclear(serial, ask, multiple = 'no')
     content:{ element: "div", attributes:{ innerHTML: preclear_dialog.html()}},
     icon: "warning",
     buttons:{
-      confirm:{text: "Stop", value: true, visible: true, className: "", closeModal: false},
       cancel:{text: "Cancel", value: null, visible: true, className: "", closeModal: true},
+      confirm:{text: "Stop", value: true, visible: true, className: "", closeModal: false},
     }
   }).then((answer) => {
     if (answer)
@@ -427,8 +427,8 @@ function preclearClear()
     content:{ element: "div", attributes:{ innerHTML:  "This will stop all running sessions, halt all processes and remove all related files.<br><br><span class='red-text'><b>Do you want to proceed?</b></span>"}},
     icon: "warning",
     buttons:{
-      confirm:{text: "Fix", value: true, visible: true, className: "", closeModal: false},
       cancel:{text: "Cancel", value: null, visible: true, className: "", closeModal: true},
+      confirm:{text: "Fix", value: true, visible: true, className: "", closeModal: false},
     }
   }).then((answer) => {
     if (answer)
@@ -746,8 +746,8 @@ function setPreclearQueue()
       content:{ element: "div", attributes:{ innerHTML: preclear_dialog.html()}},
       icon: "info",
       buttons:{
-        confirm:{text: "Set", value: true, visible: true, className: "", closeModal: false},
         cancel:{text: "Cancel", value: null, visible: true, className: "", closeModal: true},
+        confirm:{text: "Set", value: true, visible: true, className: "", closeModal: false},
       }
     }).then((answer) => {
       if (answer)
@@ -805,8 +805,8 @@ function preclearStopAll()
     text:  "Do you want to stop all running preclear sessions?",
     icon: "warning",
     buttons:{
-      confirm:{text: "Stop", value: true, visible: true, className: "", closeModal: false},
       cancel:{text: "Cancel", value: null, visible: true, className: "", closeModal: true},
+      confirm:{text: "Stop", value: true, visible: true, className: "", closeModal: false},
     }
   }).then((answer) => {
     if (answer)
