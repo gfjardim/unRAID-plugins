@@ -42,14 +42,18 @@ fi
 debug() {
   local msg="$*"
   if [ -z "$msg" ]; then
-    read msg;
+    while read msg; do 
+      cat <<< "$(date +"%b %d %T" ) ${log_prefix} $msg" >> /var/log/preclear.disk.log
+      logger --id="${script_pid}" -t "${syslog_prefix}" "${msg}"
+    done
+  else
+    cat <<< "$(date +"%b %d %T" ) ${log_prefix} $msg" >> /var/log/preclear.disk.log
+    logger --id="${script_pid}" -t "${syslog_prefix}" "${msg}"
   fi
-  cat <<< "$(date +"%b %d %T" ) ${log_prefix} $msg" >> /var/log/preclear.disk.log
-  logger --id="${script_pid}" -t "${syslog_prefix}" "${msg}" 
 }
 
 # Redirect errors to log
-exec 2> >(while read err; do debug "${err}"; echo "${err}"; done; >&2)
+exec 2> >(while read err; do debug "${err}"; echo "${err}"; done; do_exit 1 >&2)
 
 # Let's make sure some features are supported by BASH
 BV=$(echo $BASH_VERSION|tr '.' "\n"|grep -Po "^\d+"|xargs printf "%.2d\n"|tr -d '\040\011\012\015')
@@ -438,6 +442,7 @@ write_disk(){
   local cycle=$cycle
   local cycles=$cycles
   local current_speed
+  local current_elapsed=0
   local dd_exit=${all_files[dd_exit]}
   local dd_flags="conv=notrunc iflag=count_bytes,nocache,fullblock oflag=seek_bytes"
   local dd_hang=0
@@ -465,7 +470,6 @@ write_disk(){
   local tb_formatted
   local total_bytes
   local write_bs=""
-  local time_start
   local display_pid=0
   local write_bs=2097152
   local write_type_v
@@ -479,11 +483,7 @@ write_disk(){
   # start time
   resume_timer=${!initial_timer}
   resume_timer=${resume_timer:-0}
-  if [ "$resume_timer" -gt "0" ]; then
-    time_start=$(( $(date '+%s') - $resume_timer ))
-  else
-    time_start=$(timer)
-  fi
+  time_elapsed $write_type set $resume_timer
 
   touch $dd_output
 
@@ -506,7 +506,6 @@ write_disk(){
 
   # Print-formatted bytes
   tb_formatted=$(format_number $total_bytes)
-
 
   # Type of write: zero or erase (random data)
   if [ "$write_type" == "zero" ]; then
@@ -539,6 +538,9 @@ write_disk(){
   $dd_cmd 2>$dd_output & dd_pid=$!
   debug "${write_type_s}: dd pid [$dd_pid]"
 
+  # update elapsed time
+  time_elapsed $write_type && time_elapsed cycle && time_elapsed main
+
   # if we are interrupted, kill the background zeroing of the disk.
   all_files[dd_pid]=$dd_pid
 
@@ -550,17 +552,19 @@ write_disk(){
   fi
 
   local timelapse=$(( $(timer) - 20 ))
-  local current_speed_time=0
-  local current_speed_bytes=$(echo $resume_seek|trim)
+  local current_speed_time=$(timer)
+  local current_speed_bytes=0
   local current_dd_time=0
 
-  sleep 1
+  sleep 3
 
   while kill -0 $dd_pid &>/dev/null; do
 
     if [ $(( $(timer) - $timelapse )) -gt 10 ]; then
 
+      # update elapsed time
       time_current=$(timer)
+      current_elapsed=$(time_elapsed $write_type export)
 
       kill -USR1 $dd_pid 2>/dev/null && sleep 1
 
@@ -578,8 +582,8 @@ write_disk(){
         let percent_wrote=($bytes_wrote*100/$total_bytes)
       fi
 
-      if [ $(( $time_current - $time_start )) -gt 0 ]; then
-        average_speed=$(( $bytes_wrote  / ($time_current - $time_start) / 1000000 ))
+      if [ "$current_elapsed" -gt 0 ]; then
+        average_speed=$(( $bytes_wrote  / $current_elapsed / 1000000 ))
       fi
 
       if [ -z "$current_speed" ]; then
@@ -594,25 +598,27 @@ write_disk(){
           current_speed=$(awk "BEGIN {printf \"%d\",(${bytes_diff}/${time_diff}/1000000)}")
           current_speed_bytes=$bytes_dd_current
           current_speed_time=$current_dd_time
-          if [ "$current_speed" -lt 0 ]; then
+          if [ "$current_speed" -le 0 ]; then
             current_speed=$average_speed
           fi
         fi
       fi
 
       # Save current status
-      diskop+=([current_op]="$write_type" [current_pos]="$bytes_wrote" [current_timer]=$(( $(date '+%s') - $time_start )) )
+      diskop+=([current_op]="$write_type" [current_pos]="$bytes_wrote" [current_timer]=$(time_elapsed $write_type export)  )
       save_current_status
 
       # Pause if a 'smartctl' command is taking too much time to complete
       maxSmartTime=$(maxExecTime "smartctl" "$disk_name" "60")
       if [ "$maxSmartTime" -gt 30 -a "$paused_smart" != "y" ]; then
         debug "dd[${dd_pid}]: Pausing (smartctl exec time: ${maxSmartTime}s)"
-        kill -TSTP $dd_pid && paused_at=$(timer)
+        kill -TSTP $dd_pid
+        # update elapsed time
+        time_elapsed $write_type && time_elapsed cycle && time_elapsed main
         paused_smart=y
       elif [ "$maxSmartTime" -lt 30 -a "$paused_smart" == "y" ]; then
         debug "dd[${dd_pid}]: resumed"
-        kill -CONT $dd_pid && time_start=$(($time_start + ($(timer) - $paused_at)))
+        kill -CONT $dd_pid
         paused_smart=n
       fi
 
@@ -620,11 +626,13 @@ write_disk(){
       maxHdparmTime=$(maxExecTime "hdparm" "$disk_name" "60")
       if [ "$maxHdparmTime" -gt 30 -a "$paused_hdparm" != "y" ]; then
         debug "dd[${dd_pid}]: Pausing (hdparm exec time: ${maxHdparmTime}s)"
-        kill -TSTP $dd_pid && paused_at=$(timer)
+        kill -TSTP $dd_pid
+        # update elapsed time
+        time_elapsed $write_type && time_elapsed cycle && time_elapsed main
         paused_hdparm=y
       elif [ "$maxHdparmTime" -lt 30 -a "$paused_hdparm" == "y" ]; then
         debug "dd[${dd_pid}]: resumed"
-        kill -CONT $dd_pid && time_start=$(($time_start + ($(timer) - $paused_at)))
+        kill -CONT $dd_pid
         paused_hdparm=n
       fi
 
@@ -632,11 +640,13 @@ write_disk(){
       isSync=$(ps -e -o pid,command | grep -Po "\d+ [s]ync$|\d+ [s]6-sync$" | wc -l)
       if [ "$isSync" -gt 0 -a "$paused_sync" != "y" ]; then
         debug "dd[${dd_pid}]: Pausing (sync command issued)"
-        kill -TSTP $dd_pid && paused_at=$(timer)
+        kill -TSTP $dd_pid
+        # update elapsed time
+        time_elapsed $write_type && time_elapsed cycle && time_elapsed main
         paused_sync=y
       elif [ "$isSync" -eq 0 -a "$paused_sync" == "y" ]; then
         debug "dd[${dd_pid}]: resumed"
-        kill -CONT $dd_pid && time_start=$(($time_start + ($(timer) - $paused_at)))
+        kill -CONT $dd_pid
         paused_sync=n
       fi
 
@@ -651,7 +661,7 @@ write_disk(){
       sleep 1
     fi
 
-    status="Time elapsed: $(timer $time_start) | Write speed: $current_speed MB/s | Average speed: $average_speed MB/s"
+    status="Time elapsed: $(time_elapsed $write_type display) | Write speed: $current_speed MB/s | Average speed: $average_speed MB/s"
     if [ "$cycles" -gt 1 ]; then
       cycle_disp=" ($cycle of $cycles)"
     fi
@@ -659,18 +669,22 @@ write_disk(){
     # Pause if requested
     if [ -f "$pause" -a "$paused_file" != "y" ]; then
       kill -TSTP $dd_pid && paused_at=$(timer)
+      # update elapsed time
+      time_elapsed $write_type && time_elapsed cycle && time_elapsed main
       paused_file=y
       debug "Paused"
     elif [ -f "$queued_file" -a "$queued" != "y" ]; then
       kill -TSTP $dd_pid && paused_at=$(timer)
+      # update elapsed time
+      time_elapsed $write_type && time_elapsed cycle && time_elapsed main
       queued=y
       debug "Enqueued"
     elif [ ! -f "$pause" -a "$paused_file" == "y" ]; then
-      kill -CONT $dd_pid && time_start=$(($time_start + ($(timer) - $paused_at)))
+      kill -CONT $dd_pid
       paused_file=n
       debug "Resumed"
     elif [ ! -f "$queued_file" -a "$queued" == "y" ]; then
-      kill -CONT $dd_pid && time_start=$(($time_start + ($(timer) - $paused_at)))
+      kill -CONT $dd_pid
       queued=n
       debug "Resumed"
     fi
@@ -681,21 +695,27 @@ write_disk(){
         display_status "${write_type_s} in progress:|###(${percent_wrote}% Done)### ***PAUSED***" "** PAUSED"
         display_pid=$!
       fi
-      is_paused=y
+      # update elapsed time
+      time_elapsed $write_type paused && time_elapsed cycle paused && time_elapsed main paused
+      is=y
     elif [ "$queued" == "y" ]; then
       echo "$disk_name|NN|${write_type_s}${cycle_disp}: QUEUED|$$" >$stat_file
       if [ ! -e "/proc/${display_pid}/exe" ]; then
         display_status "${write_type_s} in progress:|###(${percent_wrote}% Done)### ***QUEUED***" "** QUEUED"
         display_pid=$!
       fi
+      # update elapsed time
+      time_elapsed $write_type paused && time_elapsed cycle paused && time_elapsed main paused
       is_paused=y
     else
-      echo "$disk_name|NN|${write_type_s}${cycle_disp}: ${percent_wrote}% @ $current_speed MB/s ($(timer $time_start))|$$" >$stat_file
+      echo "$disk_name|NN|${write_type_s}${cycle_disp}: ${percent_wrote}% @ $current_speed MB/s ($(time_elapsed $write_type display))|$$" >$stat_file
       # Display refresh
       if [ ! -e "/proc/${display_pid}/exe" ]; then
         display_status "${write_type_s} in progress:|###(${percent_wrote}% Done)###" "** $status" &
         display_pid=$!
       fi
+      # update elapsed time
+      time_elapsed $write_type && time_elapsed cycle && time_elapsed main
       is_paused=n
     fi
 
@@ -710,7 +730,7 @@ write_disk(){
     # Kill dd if hung
     if [ "$dd_hang" -gt 150 ]; then
       eval "$initial_bytes='$bytes_wrote';"
-      eval "$initial_timer='$(( $(date '+%s') - $time_start ))';"
+      eval "$initial_timer='$current_elapsed';"
       while read l; do debug "${write_type_s}: dd output: ${l}"; done < <(tail -n20 "$dd_output")
       kill -9 $dd_pid
       return 2
@@ -722,8 +742,9 @@ write_disk(){
       report_out="${write_type_s} in progress on $disk_serial ($disk_name): ${percent_wrote}% complete.\\n"
       report_out+="Wrote $(format_number ${bytes_wrote}) of ${tb_formatted} @ ${current_speed} \\n"
       report_out+="Disk temperature: ${disktemp}\\n"
-      report_out+="Cycle's Elapsed Time: $(timer ${cycle_timer})\\n"
-      report_out+="Total Elapsed time: $(timer ${all_timer})"
+      report_out+="${write_type_s} Elapsed Time: $(time_elapsed $write_type display)\\n"
+      report_out+="Cycle's Elapsed Time: $(time_elapsed cycle display)\\n"
+      report_out+="Total Elapsed time: $(time_elapsed main display)"
       send_mail "${write_type_s} in progress on $disk_serial ($disk_name)" "${write_type_s} in progress on $disk_serial ($disk_name): ${percent_wrote}% @ ${current_speed}. Temp: ${disktemp}. Cycle ${cycle} of ${cycles}." "${report_out}"
       let next_notify=($next_notify + 25)
     fi
@@ -754,7 +775,7 @@ write_disk(){
     debug "${write_type_s}: dd command failed, exit code [$dd_exit_code]."
     while read l; do debug "${write_type_s}: dd output: ${l}"; done < <(tail -n20 "$dd_output")
 
-    diskop+=([current_op]="$write_type" [current_pos]="$bytes_wrote" [current_timer]=$(( $(date '+%s') - $time_start )) )
+    diskop+=([current_op]="$write_type" [current_pos]="$bytes_wrote" [current_timer]=$current_elapsed )
     save_current_status
 
     exit_code=1
@@ -767,13 +788,16 @@ write_disk(){
     report_out="${write_type_s} finished on $disk_serial ($disk_name).\\n"
     report_out+="Wrote $(format_number ${bytes_wrote}) of ${tb_formatted} @ ${current_speed} \\n"
     report_out+="Disk temperature: $(get_disk_temp $disk "$smart_type").\\n"
-    report_out+="${write_type_s} Elapsed Time: $(timer $time_start).\\n"
-    report_out+="Cycle's Elapsed Time: $(timer $cycle_timer).\\n"
-    report_out+="Total Elapsed time: $(timer $all_timer)."
+    report_out+="${write_type_s} Elapsed Time: $(time_elapsed $write_type display).\\n"
+    report_out+="Cycle's Elapsed Time: $(time_elapsed cycle display).\\n"
+    report_out+="Total Elapsed time: $(time_elapsed main display)."
     send_mail "${write_type_s} finished on $disk_serial ($disk_name)" "${write_type_s} finished on $disk_serial ($disk_name). Cycle ${cycle} of ${cycles}." "$report_out"
   fi
 
-  eval "$output='$(timer $time_start) @ $average_speed MB/s';$output_speed='$average_speed MB/s'"
+  # update elapsed time
+  time_elapsed $write_type && time_elapsed cycle && time_elapsed main
+
+  eval "$output='$(time_elapsed $write_type display) @ $average_speed MB/s';$output_speed='$average_speed MB/s'"
   return $exit_code
 }
 
@@ -801,6 +825,48 @@ timer() {
   fi
 }
 
+format_time() {
+  local time=$1
+  ds=$((time % 60))
+  dm=$(((time / 60) % 60))
+  dh=$((time / 3600))
+  printf '%d:%02d:%02d' $dh $dm $ds
+}
+
+time_elapsed(){
+  local _elapsed="_time_elapsed_$1" _last="_time_elapsed_last_$1" _current=$(date '+%s') _delta
+
+  eval "local x=\${$_elapsed+x}"
+  if [ -z "$x" ]; then
+    eval "declare -g $_elapsed=0 $_last=$_current"
+  fi
+
+  # return without computing time if paused
+  if [ "$#" -eq "2" ] && [ "$2" == "paused" ]; then
+    eval "$_last=$_current" && return 0
+  fi
+
+  # set a new elapsed time if requested
+  if [ "$#" -eq "3" ] && [ "$2" == "set" ]; then
+    eval "$_last=$_current;$_elapsed=$3" && return 0
+  fi
+
+  # display formatted or export not formatted elapsed time
+  if [ "$#" -eq "2" ]; then
+    if [ "$2" == "display" ]; then
+      eval "local _time=\$$_elapsed"
+      printf '%d:%02d:%02d' $((_time / 3600)) $(((_time / 60) % 60)) $((_time % 60))
+      return 0
+    elif [ "$2" == "export" ]; then
+      eval "echo \$$_elapsed" && return 0
+    fi
+  fi
+
+  # compute the elapsed time
+  eval "_delta=\$(( $_current - \$$_last ));"
+  eval "$_last=$_current && $_elapsed=\$(( \$$_elapsed + \$_delta ))"
+}
+
 is_numeric() {
   local _var=$2 _num=$3
   if [ ! -z "${_num##*[!0-9]*}" ]; then
@@ -822,8 +888,8 @@ save_current_status() {
   echo -e "current_pos=$current_pos" >> "$tmp_resume"
   echo -e "current_timer=$current_timer" >> "$tmp_resume"
   echo -e "current_cycle=$cycle" >> "$tmp_resume"
-  echo -e "all_timer_diff=$(( $(date '+%s') - $all_timer ))" >> "$tmp_resume"
-  echo -e "cycle_timer_diff=$(( $(date '+%s') - $cycle_timer ))" >> "$tmp_resume"
+  echo -e "main_elapsed_time=$( time_elapsed main export )" >> "$tmp_resume"
+  echo -e "cycle_elapsed_time=$( time_elapsed cycle export )" >> "$tmp_resume"
 
   for arg in "${!arguments[@]}"; do
     echo "$arg=\"${arguments[$arg]}\"" >> "$tmp_resume"
@@ -849,9 +915,11 @@ save_current_status() {
 }
 
 read_entire_disk() { 
-  local average_speed bytes_dd current_speed count disktemp dd_cmd resume_skip report_out status tb_formatted
-  local skip_b1 skip_b2 skip_b3 skip_p1 skip_p2 skip_p3 skip_p4 skip_p5 time_start time_current read_type_s read_type_t read_type_v total_bytes
+  local average_speed bytes_dd current_speed current_elapsed count disktemp dd_cmd resume_skip report_out status tb_formatted
+  local skip_b1 skip_b2 skip_b3 skip_p1 skip_p2 skip_p3 skip_p4 skip_p5 time_current read_type_s read_type_t read_type_v total_bytes
   local blkpid=${all_files[blkpid]}
+  local current_speed=0
+  local average_speed=0
   local bytes_read=0
   local bytes_dd_current=0
   local cmp_exit_status=0
@@ -895,11 +963,7 @@ read_entire_disk() {
   # start time
   resume_timer=${!initial_timer}
   resume_timer=${resume_timer:-0}
-  if [ "$resume_timer" -gt "0" ]; then
-    time_start=$(( $(date '+%s') - $resume_timer ))
-  else
-    time_start=$(timer)
-  fi
+  time_elapsed $read_type set $resume_timer
 
   # Bytes to read
   if [ "$short_test" == "y" ]; then
@@ -976,7 +1040,10 @@ read_entire_disk() {
         return 1
       fi
     fi
-    
+
+    # update elapsed time
+    time_elapsed $read_type && time_elapsed cycle && time_elapsed main
+
     # Verify the rest of the disk
     debug "${read_type_s}: verifying the rest of the disk."
     cmp_cmd="cmp ${all_files[fifo]} /dev/zero"
@@ -1017,9 +1084,11 @@ read_entire_disk() {
   all_files[dd_pid]=$dd_pid
 
   local timelapse=$(( $(timer) - 20 ))
-  local current_speed_time=0
+  local current_speed_time=$(timer)
   local current_speed_bytes=0
   local current_dd_time=0
+
+  sleep 3
 
   while kill -0 $dd_pid >/dev/null 2>&1; do
 
@@ -1058,7 +1127,9 @@ read_entire_disk() {
 
     if [ $(( $(timer) - $timelapse )) -gt 10 ]; then
 
+      # update elapsed time
       time_current=$(timer)
+      current_elapsed=$(time_elapsed $read_type export)
 
       # Refresh dd status
       kill -USR1 $dd_pid 2>/dev/null && sleep 1
@@ -1073,8 +1144,8 @@ read_entire_disk() {
         let percent_read=($bytes_read*100/$total_bytes)
       fi
 
-      if [ $(( $time_current - $time_start )) -gt 0 ]; then
-        average_speed=$(( $bytes_read  / ($time_current - $time_start) / 1000000 ))
+      if [ $(( $current_elapsed )) -gt 0 ]; then
+        average_speed=$(( $bytes_read  / $current_elapsed / 1000000 ))
       fi
 
       if [ -z "$current_speed" ]; then
@@ -1089,14 +1160,14 @@ read_entire_disk() {
           current_speed=$(awk "BEGIN {printf \"%d\",(${bytes_diff}/${time_diff}/1000000)}")
           current_speed_bytes=$bytes_dd_current
           current_speed_time=$current_dd_time
-          if [ "$current_speed" -lt 0 ]; then
+          if [ "$current_speed" -le 0 ]; then
             current_speed=$average_speed
           fi
         fi
       fi
 
       # Save current status
-      diskop+=([current_op]="$read_type" [current_pos]="$bytes_read" [current_timer]=$(( $(date '+%s') - $time_start )) )
+      diskop+=([current_op]="$read_type" [current_pos]="$bytes_read" [current_timer]=$current_elapsed )
       save_current_status
 
       maxTimeout=15
@@ -1105,11 +1176,13 @@ read_entire_disk() {
       maxSmartTime=$(maxExecTime "smartctl" "$disk_name" "60")
       if [ "$maxSmartTime" -gt "$maxTimeout" -a "$paused_smart" != "y" ]; then
         debug "dd[${dd_pid}]: pausing (smartctl exec time: ${maxSmartTime}s)"
-        kill -TSTP $dd_pid && paused_at=$(timer)
+        kill -TSTP $dd_pid
+        # update elapsed time
+        time_elapsed $read_type && time_elapsed cycle && time_elapsed main
         paused_smart=y
       elif [ "$maxSmartTime" -lt "$maxTimeout" -a "$paused_smart" == "y" ]; then
         debug "dd[${dd_pid}]: resumed"
-        kill -CONT $dd_pid && time_start=$(($time_start + ($(timer) - $paused_at)))
+        kill -CONT $dd_pid
         paused_smart=n
       fi
 
@@ -1117,11 +1190,13 @@ read_entire_disk() {
       maxHdparmTime=$(maxExecTime "hdparm" "$disk_name" "60")
       if [ "$maxHdparmTime" -gt "$maxTimeout" -a "$paused_hdparm" != "y" ]; then
         debug "dd[${dd_pid}]: pausing (hdparm exec time: ${maxHdparmTime}s)"
-        kill -TSTP $dd_pid && paused_at=$(timer)
+        kill -TSTP $dd_pid
+        # update elapsed time
+        time_elapsed $read_type && time_elapsed cycle && time_elapsed main
         paused_hdparm=y
       elif [ "$maxHdparmTime" -lt "$maxTimeout" -a "$paused_hdparm" == "y" ]; then
         debug "dd[${dd_pid}]: resumed"
-        kill -CONT $dd_pid && time_start=$(($time_start + ($(timer) - $paused_at)))
+        kill -CONT $dd_pid
         paused_hdparm=n
       fi
 
@@ -1129,11 +1204,13 @@ read_entire_disk() {
       isSync=$(ps -e -o pid,command | grep -Po "\d+ [s]ync$|\d+ [s]6-sync$" | wc -l)
       if [ "$isSync" -gt 0 -a "$paused_sync" != "y" ]; then
         debug "dd[${dd_pid}]: pausing (sync command issued)"
-        kill -TSTP $dd_pid && paused_at=$(timer)
+        kill -TSTP $dd_pid
+        # update elapsed time
+        time_elapsed $read_type && time_elapsed cycle && time_elapsed main
         paused_sync=y
       elif [ "$isSync" -eq 0 -a "$paused_sync" == "y" ]; then
         debug "dd[${dd_pid}]: resumed"
-        kill -CONT $dd_pid && time_start=$(($time_start + ($(timer) - $paused_at)))
+        kill -CONT $dd_pid
         paused_sync=n
       fi
 
@@ -1147,7 +1224,7 @@ read_entire_disk() {
       sleep 1
     fi
 
-    status="Time elapsed: $(timer $time_start) | Current speed: $current_speed MB/s | Average speed: $average_speed MB/s"
+    status="Time elapsed: $(time_elapsed $read_type display) | Current speed: $current_speed MB/s | Average speed: $average_speed MB/s"
     if [ "$cycles" -gt 1 ]; then
       cycle_disp=" ($cycle of $cycles)"
     fi
@@ -1158,6 +1235,8 @@ read_entire_disk() {
         display_status "${read_type_t}|###(${percent_read}% Done)### ***PAUSED***" "** PAUSED"
         display_pid=$!
       fi
+      # update elapsed time
+      time_elapsed $read_type paused && time_elapsed cycle paused && time_elapsed main paused
       is_paused=y
     elif [ "$queued" == "y" ]; then
       echo "$disk_name|NN|${read_type_t}${cycle_disp} QUEUED|$$" >$stat_file
@@ -1165,15 +1244,19 @@ read_entire_disk() {
         display_status "${read_type_t}|###(${percent_read}% Done)### ***QUEUED***" "** QUEUED"
         display_pid=$!
       fi
+      # update elapsed time
+      time_elapsed $read_type paused && time_elapsed cycle paused && time_elapsed main paused
       is_paused=y
     else
-      echo "$disk_name|NN|${read_type_s}${cycle_disp}: ${percent_read}% @ ${average_speed} MB/s ($(timer $time_start))|$$" > $stat_file
+      echo "$disk_name|NN|${read_type_s}${cycle_disp}: ${percent_read}% @ ${average_speed} MB/s ($(time_elapsed $read_type display))|$$" > $stat_file
       # Display refresh
       if [ ! -e "/proc/${display_pid}/exe" ]; then
         display_status "$read_type_t|###(${percent_read}% Done)###" "** $status" &
         display_pid=$!
       fi
       is_paused=n
+      # update elapsed time
+      time_elapsed $read_type && time_elapsed cycle && time_elapsed main
     fi
 
     # Detect hung dd read
@@ -1187,7 +1270,7 @@ read_entire_disk() {
     # Kill dd if hung
     if [ "$dd_hang" -gt 150 ]; then
       eval "$initial_bytes='"$bytes_read"';"
-      eval "$initial_timer='$(( $(date '+%s') - $time_start ))';"
+      eval "$initial_timer='$(time_elapsed $read_type display)';"
       while read l; do debug "${read_type_s}: dd output: ${l}"; done < <(tail -n20 "$dd_output")
 
       kill -9 $dd_pid
@@ -1200,8 +1283,9 @@ read_entire_disk() {
       report_out="${read_type_s} in progress on $disk_serial ($disk_name): ${percent_read}% complete.\\n"
       report_out+="Read $(format_number ${bytes_read}) of ${tb_formatted} @ ${current_speed} \\n"
       report_out+="Disk temperature: ${disktemp}\\n"
-      report_out+="Cycle's Elapsed Time: $(timer ${cycle_timer}).\\n"
-      report_out+="Total Elapsed time: $(timer ${all_timer})."
+      report_out+="${read_type_s} Elapsed Time: $(time_elapsed $read_type display).\\n"
+      report_out+="Cycle's Elapsed Time: $(time_elapsed cycle display).\\n"
+      report_out+="Total Elapsed time: $(time_elapsed main display)."
       send_mail "$read_type_s in progress on $disk_serial ($disk_name)" "${read_type_s} in progress on $disk_serial ($disk_name): ${percent_read}% @ ${current_speed}. Temp: ${disktemp}. Cycle ${cycle} of ${cycles}." "${report_out}" &
       let next_notify=($next_notify + 25)
     fi
@@ -1210,17 +1294,21 @@ read_entire_disk() {
     if [ -f "$pause" -a "$paused_file" != "y" ]; then
       kill -TSTP $dd_pid && paused_at=$(timer)
       paused_file=y
+      # update elapsed time
+      time_elapsed $read_type && time_elapsed cycle && time_elapsed main
       debug "Paused"
     elif [ -f "$queued_file" -a "$queued" != "y" ]; then
       kill -TSTP $dd_pid && paused_at=$(timer)
       queued=y
+      # update elapsed time
+      time_elapsed $read_type && time_elapsed cycle && time_elapsed main
       debug "Enqueued"
     elif [ ! -f "$pause" -a "$paused_file" == "y" ]; then
-      kill -CONT $dd_pid && time_start=$(($time_start + ($(timer) - $paused_at)))
+      kill -CONT $dd_pid
       paused_file=n
       debug "Resumed"
     elif [ ! -f "$queued_file" -a "$queued" == "y" ]; then
-      kill -CONT $dd_pid && time_start=$(($time_start + ($(timer) - $paused_at)))
+      kill -CONT $dd_pid
       queued=n
       debug "Resumed"
     fi
@@ -1257,13 +1345,12 @@ read_entire_disk() {
     debug "${read_type_s}: dd command failed, exit code [$dd_exit_code]."
     while read l; do debug "${read_type_s}: dd output: ${l}"; done < <(tail -n20 "$dd_output")
 
-    diskop+=([current_op]="$read_type" [current_pos]="$bytes_read" [current_timer]=$(( $(date '+%s') - $time_start )) )
+    diskop+=([current_op]="$read_type" [current_pos]="$bytes_read" [current_timer]=$(time_elapsed $read_type display) )
     save_current_status
     return 1
   else
     debug "${read_type_s}: dd exit code - $dd_exit_code"
   fi
-
 
   # Fail if not zeroed or error
   if [ "$cmp_exit_status" -ne 0 ]; then
@@ -1275,13 +1362,14 @@ read_entire_disk() {
     report_out="$read_type_s finished on $disk_serial ($disk_name).\\n"
     report_out+="Read $(format_number $bytes_read) of $tb_formatted @ $average_speed MB/s\\n"
     report_out+="Disk temperature: $(get_disk_temp $disk "$smart_type").\\n"
-    report_out+="$read_type_s Elapsed Time: $(timer $time_start).\\n"
-    report_out+="Cycle's Elapsed Time: $(timer $cycle_timer).\\n"
-    report_out+="Total Elapsed time: $(timer $all_timer)."
+    report_out+="$read_type_s Elapsed Time: $(time_elapsed $read_type display).\\n"
+    report_out+="Cycle's Elapsed Time: $(time_elapsed cycle display).\\n"
+    report_out+="Total Elapsed time: $(time_elapsed main display)."
     send_mail "$read_type_s finished on $disk_serial ($disk_name)" "$read_type_s finished on $disk_serial ($disk_name). Cycle ${cycle} of ${cycles}." "$report_out" &
   fi
-
-  eval "$output='$(timer $time_start) @ $average_speed MB/s';$output_speed='$average_speed MB/s'"
+  # update elapsed time
+  time_elapsed $read_type && time_elapsed cycle && time_elapsed main
+  eval "$output='$(time_elapsed $read_type display) @ $average_speed MB/s';$output_speed='$average_speed MB/s'"
   return 0
 }
 
@@ -1309,8 +1397,6 @@ display_status(){
   local stat=""
   local width="${canvas[width]}"
   local height="${canvas[height]}"
-  local all_timer=$all_timer
-  local cycle_timer=$cycle_timer
   local smart_output="${all_files[smart_out]}"
   local wpos=4
   local hpos=1
@@ -1396,10 +1482,11 @@ display_status(){
     tput cup $(($height+$hpos-4)) $wpos >> $out
     echo -e "$status" >> $out
   fi
-
-  footer="Total elapsed time: $(timer $all_timer)"
-  if [[ -n "$cycle_timer" ]]; then
-    footer="Cycle elapsed time: $(timer $cycle_timer) | $footer"
+  local elapsed_main=$(time_elapsed main display)
+  footer="Total elapsed time: $elapsed_main"
+  local elapsed_cycle=$(time_elapsed cycle display)
+  if [[ -n "$elapsed_cycle" ]]; then
+    footer="Cycle elapsed time: $elapsed_cycle | $footer"
   fi
   footer_num=$(echo "$footer"|sed -e "s|\*\{3\}\([^\*]*\)\*\{3\}|\1|g"|sed -e "s|\#\{3\}\([^\#]*\)\#\{3\}|\1|g"|wc -m)
   tput cup $(( $height + $hpos - 1)) $(( $width/2 - $footer_num/2  )) >> $out
@@ -1485,7 +1572,7 @@ ask_preclear(){
     tput cup $l $wpos && echo "Disk Device:    ${disk_info[device]}"
   fi
 
-  tput cup $(($height - 4)) $wpos && echo "Type ${bold}Yes${norm} to proceed: "
+  tput cup $(($height - 4)) $wpos && echo "Answer ${bold}Yes${norm} to continue: "
   tput cup $(($height - 4)) $(($wpos+21)) && read answer
 
   tput cup $(( $height - 1)) $wpos; 
@@ -1619,7 +1706,7 @@ save_report() {
   local log_entry=$log_prefix
   local size=$(numfmt --to=si --suffix=B --format='%1.f' --round=nearest ${disk_properties[size]})
   local model=${disk_properties[model]}
-  local time=$(timer cycle_timer)
+  local time=$(time_elapsed main display)
   local smart=${disk_properties[smart_type]}
   local form_out=${all_files[form_out]}
   local title="Preclear Disk<br>Send Anonymous Statistics"
@@ -1799,6 +1886,8 @@ keep_pid_updated(){ while [ -e "${all_files[dir]}" ]; do echo "$script_pid" > "$
 #Defaut values
 all_timer_diff=0
 cycle_timer_diff=0
+main_elapsed_time=0
+cycle_elapsed_time=0
 command=$(echo "$0 $@")
 read_stress=y
 cycles=1
@@ -1864,15 +1953,6 @@ theDisk=$(echo $1|trim)
 
 debug "Command: $command"
 debug "Preclear Disk Version: ${version}"
-
-if [ -f "$load_file" ] && $(bash -n "$load_file"); then
-  debug "Restoring previous instance of preclear"
-  . "$load_file"
-  if [ "$all_timer_diff" -eq 0 ]; then
-    debug "Resume failed, please start a new instance of preclear"
-    exit 1
-  fi
-fi
 
 append arguments 'notify_freq'       "$notify_freq"
 append arguments 'notify_channel'    "$notify_channel"
@@ -2051,9 +2131,6 @@ else
   noul=`echo -n -e "\033[24m"`
 fi
 
-# set init timer
-all_timer=$(timer)
-
 # set the default canvas
 # draw_canvas $canvas_height $canvas_width >/dev/null
 
@@ -2069,6 +2146,26 @@ fi
 ##                MAIN PROGRAM BLOCK                ##
 ##                                                  ##
 ######################################################
+
+# Restoring session or exit if it's not possible
+if [ -f "$load_file" ] && $(bash -n "$load_file"); then
+  debug "Restoring previous instance of preclear"
+  . "$load_file"
+  cat "$load_file" | debug
+  if [ "$all_timer_diff" -gt 0 ]; then
+    main_elapsed_time=$all_timer_diff
+    cycle_elapsed_time=$cycle_timer_diff
+  fi
+  if [ "$main_elapsed_time" -eq 0 ]; then
+    debug "Resume failed, please start a new instance of preclear"
+    echo "${disk_properties[name]}|NN|Resume failed!|${script_pid}" > "/tmp/preclear_stat_${disk_properties[name]}"
+    exit 1
+  fi
+fi
+
+# set init timer or reset timer
+time_elapsed main set $main_elapsed_time
+time_elapsed cycle set $cycle_elapsed_time
 
 # Verify if it's already running
 if [ -f "${all_files[pid]}" ]; then
@@ -2099,9 +2196,6 @@ fi
 
 echo "${disk_properties[name]}|NN|Starting...|${script_pid}" > "/tmp/preclear_stat_${disk_properties[name]}"
 
-# reset timer
-all_timer=$(( $(date '+%s') - $all_timer_diff ))
-
 if [ -z "$current_op" ] || [ ! -f "${all_files[smart_prefix]}cycle_initial_start" ]; then
   # Export initial SMART status
   [ "$disable_smart" != "y" ] && save_smart_info $theDisk "$smart_type" "cycle_initial_start"
@@ -2117,10 +2211,13 @@ fi
 
 if [ "$verify_disk_mbr" == "y" ]; then
   max_steps=1
-  cycle_timer=$(( $(date '+%s') - $cycle_timer_diff ))
   if [ "$verify_zeroed" == "y" ]; then
     max_steps=2
   fi
+
+  # update elapsed time
+  time_elapsed main && time_elapsed cycle 
+
   append display_title "${ul}unRAID Server: verifying Preclear State of disk ${noul} ${bold}${disk_properties['serial']}${norm}."
   append display_title "Verifying disk '${disk_properties['serial']}' for unRAID's Preclear State."
 
@@ -2144,6 +2241,10 @@ if [ "$verify_disk_mbr" == "y" ]; then
     fi
     do_exit 1
   fi
+  
+  # update elapsed time
+  time_elapsed main && time_elapsed cycle 
+  
   # else
   #   append display_step "Verifying unRAID's Preclear MBR:|***SUCCESS***"
   #   echo "${disk_properties[name]}|NN|Verifying unRAID's signature on the MBR successful|$$" > ${all_files[stat]}
@@ -2182,6 +2283,10 @@ if [ "$verify_disk_mbr" == "y" ]; then
       fi
     fi
   fi
+
+  # update elapsed time
+  time_elapsed main && time_elapsed cycle 
+  
   if [ "$notify_channel" -gt 0 ]; then
     send_mail "Disk $diskName ($theDisk) is precleared!" "Disk $diskName ($theDisk) is precleared!" "Disk $diskName ($theDisk) is precleared!"
   fi
@@ -2229,8 +2334,12 @@ for cycle in $(seq $cycles); do
     continue
   fi
 
-  # Set a cycle timer
-  cycle_timer=$(( $(date '+%s') - $cycle_timer_diff ))
+  if [ -z "$current_pos" ]; then
+    time_elapsed cycle set 0
+  fi
+
+  # update elapsed time
+  time_elapsed main && time_elapsed cycle
 
   # Reset canvas
   unset display_title
@@ -2290,6 +2399,9 @@ for cycle in $(seq $cycles); do
       diskop+=([current_op]="preread" [current_pos]="$start_bytes" [current_timer]="$start_timer" )
       save_current_status
 
+      # update elapsed time
+      time_elapsed main && time_elapsed cycle 
+
       for x in $(seq 1 10); do
         read_entire_disk no-verify preread start_bytes start_timer preread_average preread_speed
         ret_val=$?
@@ -2318,6 +2430,9 @@ for cycle in $(seq $cycles); do
     fi
   fi
 
+  # update elapsed time
+  time_elapsed main && time_elapsed cycle 
+
   # Erase the disk in erase-clear op
   if [ "$erase_preclear" == "y" ]; then
 
@@ -2340,6 +2455,10 @@ for cycle in $(seq $cycles); do
 
       # Erase the disk
       for x in $(seq 1 10); do
+
+        # update elapsed time
+        time_elapsed main && time_elapsed cycle 
+
         write_disk erase start_bytes start_timer write_average write_speed
         ret_val=$?
         if [ "$ret_val" -eq 0 ]; then
@@ -2367,6 +2486,9 @@ for cycle in $(seq $cycles); do
     fi
   fi
 
+  # update elapsed time
+  time_elapsed main && time_elapsed cycle 
+
   # Erase/Zero the disk
   # Check current operation if restoring a previous preclear instance
   if is_current_op "$write_op"; then
@@ -2386,6 +2508,10 @@ for cycle in $(seq $cycles); do
     save_current_status
 
     for x in $(seq 1 10); do
+
+      # update elapsed time
+      time_elapsed main && time_elapsed cycle 
+
       write_disk $write_op start_bytes start_timer write_average write_speed
       ret_val=$?
       if [ "$ret_val" -eq 0 ]; then
@@ -2413,49 +2539,55 @@ for cycle in $(seq $cycles); do
 
   if [ "$erase_disk" != "y" ]; then
 
-      # Write unRAID's preclear signature to the disk
-      # Check current operation if restoring a previous preclear instance
-      if is_current_op "write_mbr"; then
+    # Write unRAID's preclear signature to the disk
+    # Check current operation if restoring a previous preclear instance
+    if is_current_op "write_mbr"; then
 
-        display_status "Writing unRAID's Preclear signature to the disk ..." ''
-        diskop+=([current_op]="write_mbr" [current_pos]="0" [current_timer]="0" )
-        save_current_status
-        echo "${disk_properties[name]}|NN|Writing unRAID's Preclear signature|$$" > ${all_files[stat]}
-        write_signature 64
-        # sleep 10
-        append display_step "Writing unRAID's Preclear signature:|***SUCCESS***"
-        echo "${disk_properties[name]}|NN|Writing unRAID's Preclear signature finished|$$" > ${all_files[stat]}
-        # sleep 10
-      else
-        append display_step "Writing unRAID's Preclear signature:|***SUCCESS***"
-        display_status
-      fi
+      # update elapsed time
+      time_elapsed main && time_elapsed cycle 
 
-      # Verify unRAID's preclear signature in disk
-      # Check current operation if restoring a previous preclear instance
-      if is_current_op "read_mbr"; then
-        display_status "Verifying unRAID's signature on the MBR ..." ""
-        diskop+=([current_op]="read_mbr" [current_pos]="0" [current_timer]="0" )
-        save_current_status
-        echo "${disk_properties[name]}|NN|Verifying unRAID's signature on the MBR|$$" > ${all_files[stat]}
-        if verify_mbr $theDisk; then
-          append display_step "Verifying unRAID's Preclear signature:|***SUCCESS*** "
-          display_status
-          echo "${disk_properties[name]}|NN|unRAID's signature on the MBR is valid|$$" > ${all_files[stat]}
-        else
-          append display_step "Verifying unRAID's Preclear signature:|***FAIL*** "
-          display_status
-          echo -e "--> FAIL: unRAID's Preclear signature not valid. \n\n"
-          echo "${disk_properties[name]}|NY|unRAID's signature on the MBR failed - Aborted|$$" > ${all_files[stat]}
-          send_mail "FAIL! Invalid unRAID's MBR signature on $diskName ($theDisk)" "FAIL! Invalid unRAID's MBR signature on $diskName ($theDisk)." "Invalid unRAID's MBR signature on $diskName ($theDisk) - Aborted" "" "alert"
-          save_report  "No - Invalid unRAID's MBR signature." "$preread_speed" "$postread_speed" "$write_speed"
-          debug_smart $theDisk "$smart_type"
-          do_exit 1
-        fi
-      else
+      display_status "Writing unRAID's Preclear signature to the disk ..." ''
+      diskop+=([current_op]="write_mbr" [current_pos]="0" [current_timer]="0" )
+      save_current_status
+      echo "${disk_properties[name]}|NN|Writing unRAID's Preclear signature|$$" > ${all_files[stat]}
+      write_signature 64
+      # sleep 10
+      append display_step "Writing unRAID's Preclear signature:|***SUCCESS***"
+      echo "${disk_properties[name]}|NN|Writing unRAID's Preclear signature finished|$$" > ${all_files[stat]}
+      # sleep 10
+    else
+      append display_step "Writing unRAID's Preclear signature:|***SUCCESS***"
+      display_status
+    fi
+
+    # Verify unRAID's preclear signature in disk
+    # Check current operation if restoring a previous preclear instance
+    if is_current_op "read_mbr"; then
+      display_status "Verifying unRAID's signature on the MBR ..." ""
+      diskop+=([current_op]="read_mbr" [current_pos]="0" [current_timer]="0" )
+      save_current_status
+      echo "${disk_properties[name]}|NN|Verifying unRAID's signature on the MBR|$$" > ${all_files[stat]}
+      if verify_mbr $theDisk; then
         append display_step "Verifying unRAID's Preclear signature:|***SUCCESS*** "
         display_status
+        echo "${disk_properties[name]}|NN|unRAID's signature on the MBR is valid|$$" > ${all_files[stat]}
+      else
+        append display_step "Verifying unRAID's Preclear signature:|***FAIL*** "
+        display_status
+        echo -e "--> FAIL: unRAID's Preclear signature not valid. \n\n"
+        echo "${disk_properties[name]}|NY|unRAID's signature on the MBR failed - Aborted|$$" > ${all_files[stat]}
+        send_mail "FAIL! Invalid unRAID's MBR signature on $diskName ($theDisk)" "FAIL! Invalid unRAID's MBR signature on $diskName ($theDisk)." "Invalid unRAID's MBR signature on $diskName ($theDisk) - Aborted" "" "alert"
+        save_report  "No - Invalid unRAID's MBR signature." "$preread_speed" "$postread_speed" "$write_speed"
+        debug_smart $theDisk "$smart_type"
+        do_exit 1
       fi
+    else
+      append display_step "Verifying unRAID's Preclear signature:|***SUCCESS*** "
+      display_status
+    fi
+
+    # update elapsed time
+    time_elapsed main && time_elapsed cycle
 
   fi
 
@@ -2479,6 +2611,10 @@ for cycle in $(seq $cycles); do
       diskop+=([current_op]="postread" [current_pos]="$start_bytes" [current_timer]="$start_timer" )
       save_current_status
       for x in $(seq 1 10); do
+
+        # update elapsed time
+        time_elapsed main && time_elapsed cycle
+
         read_entire_disk verify postread start_bytes start_timer postread_average postread_speed
         ret_val=$?
         if [ "$ret_val" -eq 0 ]; then
@@ -2503,6 +2639,9 @@ for cycle in $(seq $cycles); do
     fi
   fi
 
+  # update elapsed time
+  time_elapsed main && time_elapsed cycle 
+
   # Export final SMART status for cycle
   [ "$disable_smart" != "y" ] && save_smart_info $theDisk "$smart_type" "cycle_${cycle}_end"
   # Compare start/end values
@@ -2523,13 +2662,16 @@ for cycle in $(seq $cycles); do
       report_out+="Last Cycle's Zeroing Time: ${write_average}.\\n"
     fi
     [ "$skip_postread" != "y" ] && report_out+="Last Cycle's Post-Read Time: ${postread_average}.\\n"
-    report_out+="Last Cycle's Elapsed TIme: $(timer cycle_timer)\\n"
+    report_out+="Last Cycle's Elapsed TIme: $(time_elapsed cycle display)\\n"
     report_out+="Disk Start Temperature: ${disk_properties[temp]}\n"
     report_out+="Disk Current Temperature: $(get_disk_temp $theDisk "$smart_type")\\n"
     [ "$cycles" -gt 1 ] && report_out+="\\nStarting a new cycle.\\n"
     send_mail "Disk $diskName ($theDisk) PASSED cycle ${cycle}!" "${op_title}: Disk $diskName ($theDisk) PASSED cycle ${cycle}!" "$report_out"
   fi
 done
+
+# update elapsed time
+time_elapsed main && time_elapsed cycle
 
 echo "${disk_properties[name]}|NN|${op_title} Finished Successfully!|$$" > ${all_files[stat]};
 
@@ -2583,7 +2725,7 @@ if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 1 ]; then
     report_out+="Last Cycle\'s Zeroing Time: ${write_average}.\\n"
   fi
   [ "$skip_postread" != "y" ] && report_out+="Last Cycle\'s Post-Read Time: ${postread_average}.\\n"
-  report_out+="Last Cycle\'s Elapsed TIme: $(timer cycle_timer)\\n"
+  report_out+="Last Cycle\'s Elapsed TIme: $(time_elapsed cycle display)\\n"
   report_out+="Disk Start Temperature: ${disk_properties[temp]}\\n"
   report_out+="Disk Current Temperature: $(get_disk_temp $theDisk "$smart_type")\\n"
   if [ "$disable_smart" != "y" ]; then
