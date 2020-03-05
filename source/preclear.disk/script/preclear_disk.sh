@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="1.0.12"
+version="1.0.13"
 
 # PID
 script_pid=$BASHPID
@@ -2697,6 +2697,8 @@ done
 
 # update elapsed time
 time_elapsed main && time_elapsed cycle
+debug "Preclear: total elapsed time: $(time_elapsed main display)"
+
 
 echo "${disk_properties[name]}|NN|${op_title} Finished Successfully!|$$" > ${all_files[stat]};
 
