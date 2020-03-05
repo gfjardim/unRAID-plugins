@@ -1669,15 +1669,16 @@ output_smart() {
   local output="${all_files[smart_out]}"
   local device=$1
   local type=$2
-  nfinal="${final}_$(( $RANDOM * 19318203981230 + 40 ))"
+  local msg
+  local nfinal="${final}_$(( $RANDOM * 19318203981230 + 40 ))"
   cp -f "$final" "$nfinal"
   sed -i " 1 s/$/|STATUS/" $nfinal
-  status=$(timeout -s 9 30 smartctl --attributes $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" | \
+  local status=$(timeout -s 9 30 smartctl --attributes $type $device 2>/dev/null | sed -n "/ATTRIBUTE_NAME/,/^$/p" | \
            grep -v "ATTRIBUTE_NAME" | grep -v "^$" | awk '{print $1 "-" $2 "|" $9 }')
   while read line; do
-    attr=$(echo $line | cut -d'|' -f1)
-    inival=$(echo "$line" | cut -d'|' -f2)
-    lasval=$(echo "$line" | grep -o '[^|]*$')
+    local attr=$(echo $line | cut -d'|' -f1)
+    local inival=$(echo "$line" | cut -d'|' -f2)
+    local lasval=$(echo "$line" | grep -o '[^|]*$')
     let diff=($lasval - $inival)
     if [ "$diff" -gt "0" ]; then
       msg="Up $diff"
@@ -1687,7 +1688,7 @@ output_smart() {
     else
       msg="-"
     fi
-    stat=$(echo $status|grep -Po "${attr}[^\s]*")
+    local stat=$(echo $status|grep -Po "${attr}[^\s]*")
     if [[ $stat =~ FAILING_NOW ]]; then
       msg="$msg|->FAILING NOW!<-"
     elif [[ $stat =~ In_the_past ]]; then
@@ -1977,6 +1978,21 @@ theDisk=$(echo $1|trim)
 debug "Command: $command"
 debug "Preclear Disk Version: ${version}"
 
+# Restoring session or exit if it's not possible
+if [ -f "$load_file" ] && $(bash -n "$load_file"); then
+  debug "Restoring previous instance of preclear"
+  . "$load_file"
+  if [ "$all_timer_diff" -gt 0 ]; then
+    main_elapsed_time=$all_timer_diff
+    cycle_elapsed_time=$cycle_timer_diff
+  fi
+  if [ "$main_elapsed_time" -eq 0 ]; then
+    debug "Resume failed, please start a new instance of preclear"
+    echo "${disk_properties[name]}|NN|Resume failed!|${script_pid}" > "/tmp/preclear_stat_${disk_properties[name]}"
+    exit 1
+  fi
+fi
+
 append arguments 'notify_freq'       "$notify_freq"
 append arguments 'notify_channel'    "$notify_channel"
 append arguments 'skip_preread'      "$skip_preread"
@@ -2164,30 +2180,15 @@ else
   diskName="${disk_properties[name]}"
 fi
 
+# set init timer or reset timer
+time_elapsed main set $main_elapsed_time
+time_elapsed cycle set $cycle_elapsed_time
+
 ######################################################
 ##                                                  ##
 ##                MAIN PROGRAM BLOCK                ##
 ##                                                  ##
 ######################################################
-
-# Restoring session or exit if it's not possible
-if [ -f "$load_file" ] && $(bash -n "$load_file"); then
-  debug "Restoring previous instance of preclear"
-  . "$load_file"
-  if [ "$all_timer_diff" -gt 0 ]; then
-    main_elapsed_time=$all_timer_diff
-    cycle_elapsed_time=$cycle_timer_diff
-  fi
-  if [ "$main_elapsed_time" -eq 0 ]; then
-    debug "Resume failed, please start a new instance of preclear"
-    echo "${disk_properties[name]}|NN|Resume failed!|${script_pid}" > "/tmp/preclear_stat_${disk_properties[name]}"
-    exit 1
-  fi
-fi
-
-# set init timer or reset timer
-time_elapsed main set $main_elapsed_time
-time_elapsed cycle set $cycle_elapsed_time
 
 # Verify if it's already running
 if [ -f "${all_files[pid]}" ]; then

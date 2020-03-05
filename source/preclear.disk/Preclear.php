@@ -115,6 +115,7 @@ switch ($_POST['action'])
     {
       $odd="odd";
       $counter = 9999;
+      $reports   = is_dir("/boot/preclear_reports") ? glob("/boot/preclear_reports/*.txt") : [];
       foreach ($disks as $disk)
       {
         $disk_name = $disk['NAME'];
@@ -122,13 +123,12 @@ switch ($_POST['action'])
         $serial    = trim($disk['SERIAL']);
         $temp      = $disk['TEMP'] ? my_temp($disk['TEMP']) : "*";
         $mounted   = $disk["MOUNTED"];
-        $reports   = is_dir("/boot/preclear_reports") ? glob("/boot/preclear_reports/*.txt") : [];
-        $reports   = array_filter($reports, function ($report) use ($disk)
+        $disk_reports   = array_filter($reports, function ($report) use ($disk)
                                   {
                                     return preg_match("|".$disk["SERIAL_SHORT"]."|", $report) && ( preg_match("|_report_|", $report) || preg_match("|_rpt_|", $report) ); 
                                   });
 
-        if (count($reports))
+        if (count($disk_reports))
         {
           $title  = "<span title='Click to view reports.' class='exec toggle-reports' style='margin-left:0px;' hdd='{$disk_name}'>
                       <i class='fa fa-hdd-o hdd'></i>
@@ -138,7 +138,7 @@ switch ($_POST['action'])
           
           $report_files = "<div class='toggle-${disk_name}' style='display:none;'>";
 
-          foreach ($reports as $report)
+          foreach ($disk_reports as $report)
           {
             $report_files .= "<div style='margin:4px 0px 4px 0px;'>
                                 <i class='fa fa-list-alt hdd'></i>
