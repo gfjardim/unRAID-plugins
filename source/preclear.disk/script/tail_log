@@ -17,14 +17,17 @@
 $docroot = $docroot ?? $_SERVER['DOCUMENT_ROOT'] ?: '/usr/local/emhttp';
 require_once "$docroot/webGui/include/ColorCoding.php";
 
+$serial = (isset($argv[1])) ? $argv[1] : false;
+
 $handle = popen('/usr/bin/tail -n +1 -f "/var/log/preclear.disk.log" 2>&1', 'r');
 while (!feof($handle)) {
   $line = fgets($handle);
   if (strpos($line,'tail_log')!==false) continue;
-  if (strpos($line, $argv[1])==false) continue;
+  if ($serial && strpos($line, $serial)==false) continue;
   $span = "span";
   foreach ($match as $type) foreach ($type['text'] as $text) if (preg_match("/$text/i",$line)) {$span = "span class='{$type['class']}'"; break 2;}
-  echo "<$span>".htmlspecialchars($line)."</span>";
+  $line = preg_replace("/ /i", "&nbsp;", htmlspecialchars($line));
+  echo "<$span>".$line."</span>";
   flush();
 }
 pclose($handle);

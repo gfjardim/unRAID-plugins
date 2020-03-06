@@ -488,7 +488,7 @@ write_disk(){
   touch $dd_output
 
   if [ "$short_test" == "y" ]; then
-    total_bytes=$(( ($write_bs * 2048 * 4) + 1 ))
+    total_bytes=$(( ($write_bs * 2048 * 2) + 1 ))
   else
     total_bytes=${disk_properties[size]}
   fi
@@ -981,7 +981,7 @@ read_entire_disk() {
 
   # Bytes to read
   if [ "$short_test" == "y" ]; then
-    total_bytes=$(( ($read_bs * 2048 * 4) + 1 ))
+    total_bytes=$(( ($read_bs * 2048 * 2) + 1 ))
   else
     total_bytes=${disk_properties[size]}
   fi
@@ -1211,7 +1211,7 @@ read_entire_disk() {
       fi
 
       if (( $percent_read  % 10 == 0 )) && [ "$last_progress" -ne $percent_read ]; then
-        debug "${read_type_s}: progress - ${percent_read}% $read_type_v"
+        debug "${read_type_s}: progress - ${percent_read}% $read_type_v @ $current_speed MB/s"
         last_progress=$percent_read
       fi
 
@@ -1813,7 +1813,7 @@ debug_smart()
   if [ -f "${all_files[smart_prefix]}error" ]; then
     while read l; do 
       debug "S.M.A.R.T.: ${l}"; 
-    done < <(cat "${all_files[smart_prefix]}error" | column --separator '|' --table| tr " " ".")
+    done < <(cat "${all_files[smart_prefix]}error" | column --separator '|' --table)
   fi
 }
 
@@ -1988,7 +1988,7 @@ if [ -f "$load_file" ] && $(bash -n "$load_file"); then
   fi
   if [ "$main_elapsed_time" -eq 0 ]; then
     debug "Resume failed, please start a new instance of preclear"
-    echo "${disk_properties[name]}|NN|Resume failed!|${script_pid}" > "/tmp/preclear_stat_${disk_properties[name]}"
+    echo "$(basename $theDisk)|NN|Resume failed!|${script_pid}" > "/tmp/preclear_stat_$(basename $theDisk)"
     exit 1
   fi
 fi
