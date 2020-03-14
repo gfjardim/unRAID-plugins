@@ -125,7 +125,7 @@ function getPreclearContent()
   },'json').always(function(data)
   {
     timers.getPreclearContent = setTimeout('getPreclearContent()', ($(data.status).length > 0) ? 5000 : 15000);
-  }).fail(updateCsrfToken);
+  });
 }
 
 
@@ -133,19 +133,12 @@ function updateCsrfToken(jqXHR, textStatus, error)
 {
   if (jqXHR.status == 200)
   {
-    console.log("Updating CSRF token");
-    $.get(PreclearURL,{action: "get_csrf_token"}, function(response)
-    {
-      $.ajaxPrefilter(function(s, orig, xhr){
-        if (s.type.toLowerCase() == "post" && ! s.crossDomain) {
-          s.data = s.data.replace(/csrf_token=.{16}/g, "csrf_token=" + response.csrf_token);
-        }
-      }); 
-    }, "json").fail(function(s,o,xhr){location.reload(true);});
+    swal2({title:"Your CSRF token is not valid!",text:"Please try to refresh your browser or log in again.",icon:"error",buttons:{confirm:{visible:true},cancel:{visible:false}}});
+    clearTimeout(timers.getPreclearContent);
   }
   else if (jqXHR.status == 404)
   {  
-    setTimeout( clearTimeout, 300, timers.preclear);
+    setTimeout( clearTimeout, 300, timers.getPreclearContent);
   }
 }
 
@@ -610,6 +603,7 @@ function rmReport(file, el)
   }).fail(updateCsrfToken);
 }
 
+
 function get_tab_title_by_name(name) {
   var tab    = $("input[name$=tabs] + label").filter(function(){return $(this).text() === name;}).prev();
   var title  = $("div#title > span.left"    ).filter(function(){return $(this).text() === name;}).parent();
@@ -683,6 +677,7 @@ function addButtonTab(Button, Name, autoHide, Append)
   }
 }
 
+
 function getResumablePreclear(serial)
 {
   $.post(PreclearURL,{action:'get_resumable', serial:serial}, function(data)
@@ -709,7 +704,7 @@ function getResumablePreclear(serial)
           opts["file"]   = data.resume;
           opts["scope"]  = "gfjardim";
 
-          $.post(PreclearURL, opts).always(function(data) {
+          $.post(PreclearURL, opts).done(function(data) {
             preclearShowResult(true);
             preclearUpdateContent();
           }).fail(updateCsrfToken);
