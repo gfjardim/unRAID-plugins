@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="1.0.13"
+version="1.0.14"
 
 # PID
 script_pid=$BASHPID
@@ -940,7 +940,8 @@ read_entire_disk() {
   local cycles=$cycles
   local display_pid=0
   local dd_exit=${all_files[dd_exit]}
-  local dd_flags="conv=notrunc iflag=nocache,count_bytes,skip_bytes"
+  local dd_flags_verify="conv=notrunc iflag=nocache,count_bytes,skip_bytes"
+  local dd_flags_read="conv=notrunc,noerror iflag=nocache,count_bytes,skip_bytes"
   local dd_hang=0
   local dd_last_bytes=0
   local dd_output=${all_files[dd_out]}
@@ -1034,7 +1035,7 @@ read_entire_disk() {
       cmp_cmd="cmp ${all_files[fifo]} /dev/zero"
       debug "${read_type_s}: $cmp_cmd"
 
-      dd_cmd="dd if=$disk of=${all_files[fifo]} count=$(( $read_bs - 512 )) skip=512 $dd_flags"
+      dd_cmd="dd if=$disk of=${all_files[fifo]} count=$(( $read_bs - 512 )) skip=512 $dd_flags_verify"
       debug "${read_type_s}: $dd_cmd"
 
       # exec dd/compare command
@@ -1062,7 +1063,7 @@ read_entire_disk() {
     debug "${read_type_s}: verifying the rest of the disk."
     cmp_cmd="cmp ${all_files[fifo]} /dev/zero"
     debug "${read_type_s}: $cmp_cmd"
-    dd_cmd="dd if=$disk of=${all_files[fifo]} bs=$read_bs $dd_skip $dd_flags"
+    dd_cmd="dd if=$disk of=${all_files[fifo]} bs=$read_bs $dd_skip $dd_flags_verify"
     debug "${read_type_s}: $dd_cmd"
 
     # exec dd/compare command
@@ -1075,7 +1076,7 @@ read_entire_disk() {
       dd_skip="skip=0 count=$total_bytes"
     fi
 
-    dd_cmd="dd if=$disk of=/dev/null bs=$read_bs $dd_skip $dd_flags"
+    dd_cmd="dd if=$disk of=/dev/null bs=$read_bs $dd_skip $dd_flags_read"
     debug "${read_type_s}: $dd_cmd"
 
     # exec dd command
@@ -2024,7 +2025,7 @@ append diskop 'current_op' ""
 append diskop 'current_pos' ""
 append diskop 'current_timer' ""
 append diskop 'last_update' 0
-append diskop 'update_interval' "60"
+append diskop 'update_interval' "120"
 
 # Disk properties
 append disk_properties 'device'      "$theDisk"

@@ -123,10 +123,9 @@ switch ($_POST['action'])
         $serial    = trim($disk['SERIAL']);
         $temp      = $disk['TEMP'] ? my_temp($disk['TEMP']) : "*";
         $mounted   = $disk["MOUNTED"];
-        $disk_reports   = array_filter($reports, function ($report) use ($disk)
-                                  {
-                                    return preg_match("|".$disk["SERIAL_SHORT"]."|", $report) && ( preg_match("|_report_|", $report) || preg_match("|_rpt_|", $report) ); 
-                                  });
+        $disk_reports   = array_filter($reports, function ($report) use ($disk) {
+                            return preg_match("|".$disk["SERIAL_SHORT"]."|", $report) && ( preg_match("|_report_|", $report) || preg_match("|_rpt_|", $report) ); 
+                          });
 
         if (count($disk_reports))
         {

@@ -50,7 +50,7 @@ $('body').on('mouseenter', '.tooltip, .tooltip-toggle', function()
 
 function getPreclearContent()
 {
-  clearTimeout(timers.preclear);
+  clearTimeout(timers.getPreclearContent);
   $.post(PreclearURL,{action:'get_content'},function(data)
   {
     var hovered = $( ".tooltip:hover" ).map(function(){return this.id;}).get();
@@ -124,7 +124,7 @@ function getPreclearContent()
     }
   },'json').always(function(data)
   {
-    timers.preclear = setTimeout('getPreclearContent()', ($(data.status).length > 0) ? 5000 : 15000);
+    timers.getPreclearContent = setTimeout('getPreclearContent()', ($(data.status).length > 0) ? 5000 : 15000);
   }).fail(updateCsrfToken);
 }
 
@@ -846,7 +846,7 @@ var preclearSortableHelper = function(e,i)
 
 var preclearStartSorting = function(e,i)
 {
-  clearTimeout(timers.preclear);
+  clearTimeout(timers.getPreclearContent);
   $(i.item).find("div[class*=toggle-]:visible").prev().addClass("sortable_toggled");
   $(i.item).find("div[class*=toggle-]:visible").prev().trigger("click");
   // $(i.item).height($(i.item).find("span.toggle-reports").first().height());
@@ -855,7 +855,7 @@ var preclearStartSorting = function(e,i)
 
 var preclearStopSorting = function(e,i)
 {
-  timers.preclear = setTimeout('getPreclearContent()', 1500);
+  timers.getPreclearContent = setTimeout('getPreclearContent()', 1500);
   $(i.item).find(".sortable_toggled").trigger("click").removeClass("sortable_toggled");
 };
 
@@ -869,7 +869,7 @@ var preclearUpdateSorting = function(e,i)
   });
   $.post(PreclearURL ,{'action':'save_sort', 'devices':devices}, function(data)
   {
-    clearTimeout(timers.preclear);
+    clearTimeout(timers.getPreclearContent);
     timers.preclear = setTimeout('getPreclearContent()', 1500);
     // getPreclearContent();
   });

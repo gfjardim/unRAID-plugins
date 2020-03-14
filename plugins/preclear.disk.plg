@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2020.03.06a">
+<!ENTITY version   "2020.03.14">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,12 @@
 
 <CHANGES>
 ##&name;
+
+###2020.03.14
+- Fix: fix timer name so Unraid can stop/restart webgui updates
+- Fix: script - version 1.0.14
+- Fix: script - pre-read will ignore read errors so bad sectors can be detected
+- Fix: script - write resume info to flash drive timelapse increased from 60 to 120 seconds
 
 ###2020.03.06a
 - Fix: change the use of system original tail_log to custom tail_log

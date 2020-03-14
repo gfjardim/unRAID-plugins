@@ -28,8 +28,8 @@ $Preclear = new Preclear;
       {
         $('#usb_devices_list').bind("change", function(e)
         {
-          clearTimeout(timers.preclear);
-          timers.preclear = setTimeout('getPreclearContent()', 100);
+          clearTimeout(timers.getPreclearContent);
+          timers.getPreclearContent = setTimeout('getPreclearContent()', 100);
         });
         $('#usb_devices_list').trigger("change");
       }
