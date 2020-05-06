@@ -52,6 +52,40 @@ debug() {
   fi
 }
 
+do_exit()
+{
+  trap '' EXIT 1 2 3 9 15;
+  while [ -f "${all_files[wait]}" ]; do 
+    sleep 0.1; 
+  done
+  
+  dd_pid=${all_files[dd_pid]}
+
+  case "$1" in
+    0)
+      debug "SIG${2} received, exiting..."
+      rm -f "${all_files[pid]}" "${all_files[pause]}" "${all_files[queued]}"
+      save_current_status 1;
+      kill -9 $dd_pid 2>/dev/null
+      exit 0
+      ;;
+    1)
+      debug 'error encountered, exiting...'
+      rm -f "${all_files[resume_file]}"
+      rm -f "${all_files[resume_temp]}"
+      rm -rf ${all_files[dir]};
+      kill -9 $dd_pid 2>/dev/null
+      exit 1
+      ;;
+    *)
+      rm -rf ${all_files[dir]};
+      rm -f "${all_files[resume_file]}"
+      rm -f "${all_files[resume_temp]}"
+      exit 0
+      ;;
+  esac
+}
+
 # Redirect errors to log
 exec 2> >(while read err; do debug "${err}"; echo "${err}"; done; do_exit 1 >&2)
 
@@ -1864,40 +1898,6 @@ syslog_to_debug()
     line=$(trim $(echo "$line" | cut -d':' -f4- ))
     debug "syslog: $line"
   done < <(tail -f -n0 /var/log/syslog 2>&1)
-}
-
-do_exit()
-{
-  trap '' EXIT 1 2 3 9 15;
-  while [ -f "${all_files[wait]}" ]; do 
-    sleep 0.1; 
-  done
-  
-  dd_pid=${all_files[dd_pid]}
-
-  case "$1" in
-    0)
-      debug "SIG${2} received, exiting..."
-      rm -f "${all_files[pid]}" "${all_files[pause]}" "${all_files[queued]}"
-      save_current_status 1;
-      kill -9 $dd_pid 2>/dev/null
-      exit 0
-      ;;
-    1)
-      debug 'error encountered, exiting...'
-      rm -f "${all_files[resume_file]}"
-      rm -f "${all_files[resume_temp]}"
-      rm -rf ${all_files[dir]};
-      kill -9 $dd_pid 2>/dev/null
-      exit 1
-      ;;
-    *)
-      rm -rf ${all_files[dir]};
-      rm -f "${all_files[resume_file]}"
-      rm -f "${all_files[resume_temp]}"
-      exit 0
-      ;;
-  esac
 }
 
 trap_with_arg() {
