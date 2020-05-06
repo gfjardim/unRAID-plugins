@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2020.03.14a">
+<!ENTITY version   "2020.05.05">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,10 @@
 
 <CHANGES>
 ##&name;
+
+###2020.05.05
+- Add: dialog package
+- Add: &lt;preclear&gt; command line utility to start/stop/watch preclear sessions
 
 ###2020.03.14a
 - Fix: wrong CSRF token will open an alert instead of trying to update the token in the background
@@ -564,6 +568,12 @@ The 'plugin' package MD5 hash.
 <URL>&gitURL;/source/packages/readvz</URL>
 </FILE>
 
+<!--The 'dialog' install package.-->
+<FILE Name="/boot/config/plugins/&name;/dialog-1.3_20200327-x86_64-1.txz" Mode="666">
+<URL>&gitURL;/source/packages/dialog-1.3_20200327-x86_64-1.txz</URL>
+<MD5>f7de2c4a0984e8f0e32a2140845dc862</MD5>
+</FILE>
+  
 <!--The 'preclear_disk_ori.sh' script.-->
 <FILE Name="/usr/local/sbin/preclear_disk_ori.sh" Mode="755">
 <URL>&gitURL;/source/packages/preclear_disk_20.sh</URL>

@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="1.0.14"
+version="1.0.15"
 
 # PID
 script_pid=$BASHPID
@@ -160,6 +160,24 @@ list_device_names() {
     done
   else
     echo "No un-assigned disks detected."
+  fi
+}
+
+list_unassigned_disks() {
+  list_unraid_disks unraid_disks
+  list_all_disks all_disks
+  unassigned=($(comm -23 <(for X in "${all_disks[@]}"; do echo "${X}"; done|sort)  <(for X in "${unraid_disks[@]}"; do echo "${X}"; done|sort)))
+
+  if [ ${#unassigned[@]} -gt 0 ]
+  then
+    for disk in "${unassigned[@]}"
+    do
+      if [ $(cat /proc/mounts|grep -Poc "^${disk}") -eq 0 ]
+      then
+        serial=$(udevadm info --query=property --path $(udevadm info -q path -n $disk 2>/dev/null) 2>/dev/null|grep -Po "ID_SERIAL=\K.*")
+        echo $(basename $disk) = $serial
+      fi
+    done
   fi
 }
 
@@ -635,7 +653,7 @@ write_disk(){
       fi
 
       if (( $percent_wrote % 10 == 0 )) && [ "$last_progress" -ne $percent_wrote ]; then
-        debug "${write_type_s}: progress - ${percent_wrote}% $write_type_v"
+        debug "${write_type_s}: progress - ${percent_wrote}% $write_type_v @ $current_speed MB/s"
         last_progress=$percent_wrote
       fi
 
@@ -1929,9 +1947,9 @@ smart_type=auto
 notify_channel=0
 notify_freq=0
 opts_long="frequency:,notify:,skip-preread,skip-postread,read-size:,write-size:,read-blocks:,test,no-stress,list,"
-opts_long+="cycles:,signature,verify,no-prompt,version,preclear-only,format-html,erase,erase-clear,load-file:"
+opts_long+="cycles:,signature,verify,no-prompt,version,preclear-only,format-html,erase,erase-clear,load-file:,unassigned"
 
-OPTS=$(getopt -o f:n:sSr:w:b:tdlc:ujvomera: \
+OPTS=$(getopt -o f:n:sSr:w:b:tdlc:ujvomera:u \
       --long $opts_long -n "$(basename $0)" -- "$@")
 
 if [ "$?" -ne "0" ]; then
@@ -1962,6 +1980,7 @@ while true ; do
     -e|--erase)          erase_disk=y;                        shift 1;;
     -r|--erase-clear)    erase_preclear=y;                    shift 1;;
     -a|--load-file)      load_file="$2";                      shift 2;;
+    -u|--unassigned)     list_unassigned_disks;       exit 0; shift 1;;
 
     --) shift ; break ;;
     * ) echo "Internal error!" ; exit 1 ;;

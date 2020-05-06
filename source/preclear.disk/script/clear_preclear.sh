@@ -33,8 +33,9 @@ get_serial()
   attrs=$(udevadm info --query=property --name="${1}" 2>/dev/null)
   serial_number=$(echo -e "$attrs" | awk -F'=' '/ID_SCSI_SERIAL/{print $2}')
   if [ -z "$serial_number" ]; then
-    echo $(echo -e "$attrs" | awk -F'=' '/ID_SERIAL_SHORT/{print $2}')
+    serial_number=$(echo -e "$attrs" | awk -F'=' '/ID_SERIAL_SHORT/{print $2}')
   fi
+  echo $serial_number
 }
 
 
