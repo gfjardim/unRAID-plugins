@@ -5,38 +5,13 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="1.0.15"
+version="1.0.16"
 
-# PID
-script_pid=$BASHPID
-
-# Serial
-cmd_disk=""
-for arg in "$@"; do
-  if [ -b "$arg" ]; then
-    cmd_disk=$arg
-    attrs=$(udevadm info --query=property --name="${arg}")
-    serial_number=$(echo -e "$attrs" | awk -F'=' '/ID_SCSI_SERIAL/{print $2}')
-    if [ -z "$serial_number" ]; then
-      serial_number=$(echo -e "$attrs" | awk -F'=' '/ID_SERIAL_SHORT/{print $2}')
-    fi
-    break
-  else
-    serial_number=""
-  fi
-done
-
-# Log prefix
-if [ -n "$serial_number" ]; then
-  syslog_prefix="preclear_disk_${serial_number}"
-  log_prefix="preclear_disk_${serial_number}_${script_pid}:"
-elif [[ -n "$cmd_disk" ]]; then
-  syslog_prefix="preclear_disk_${cmd_disk}"
-  log_prefix="preclear_disk_${script_pid}:"
-else
-  syslog_prefix="preclear_disk"
-  log_prefix="preclear_disk_${script_pid}:"
-fi
+######################################################
+##                                                  ##
+##                 PROGRAM FUNCTIONS                ##
+##                                                  ##
+######################################################
 
 # Send debug messages to log
 debug() {
@@ -51,66 +26,6 @@ debug() {
     logger --id="${script_pid}" -t "${syslog_prefix}" "${msg}"
   fi
 }
-
-do_exit()
-{
-  trap '' EXIT 1 2 3 9 15;
-  while [ -f "${all_files[wait]}" ]; do 
-    sleep 0.1; 
-  done
-  
-  dd_pid=${all_files[dd_pid]}
-
-  case "$1" in
-    0)
-      debug "SIG${2} received, exiting..."
-      rm -f "${all_files[pid]}" "${all_files[pause]}" "${all_files[queued]}"
-      save_current_status 1;
-      kill -9 $dd_pid 2>/dev/null
-      exit 0
-      ;;
-    1)
-      debug 'error encountered, exiting...'
-      rm -f "${all_files[resume_file]}"
-      rm -f "${all_files[resume_temp]}"
-      rm -rf ${all_files[dir]};
-      kill -9 $dd_pid 2>/dev/null
-      exit 1
-      ;;
-    *)
-      rm -rf ${all_files[dir]};
-      rm -f "${all_files[resume_file]}"
-      rm -f "${all_files[resume_temp]}"
-      exit 0
-      ;;
-  esac
-}
-
-# Redirect errors to log
-exec 2> >(while read err; do debug "${err}"; echo "${err}"; done; do_exit 1 >&2)
-
-# Let's make sure some features are supported by BASH
-BV=$(echo $BASH_VERSION|tr '.' "\n"|grep -Po "^\d+"|xargs printf "%.2d\n"|tr -d '\040\011\012\015')
-if [ "$BV" -lt "040253" ]; then
-  echo -e "Sorry, your BASH version isn't supported.\nThe minimum required version is 4.2.53.\nPlease update."
-  debug "Sorry, your BASH version isn't supported.\nThe minimum required version is 4.2.53.\nPlease update."
-  exit 2
-fi
-
-# Let's verify all dependencies
-for dep in cat awk basename blockdev comm date dd find fold getopt grep kill openssl printf readlink seq sort sum tac tmux todos tput udevadm xargs; do
-  if ! type $dep >/dev/null 2>&1 ; then
-    echo -e "The following dependency isn't met: [$dep]. Please install it and try again."
-    debug "The following dependency isn't met: [$dep]. Please install it and try again."
-    exit 1
-  fi
-done
-
-######################################################
-##                                                  ##
-##                 PROGRAM FUNCTIONS                ##
-##                                                  ##
-######################################################
 
 trim() {
   local var="$*"
@@ -209,7 +124,8 @@ list_unassigned_disks() {
       if [ $(cat /proc/mounts|grep -Poc "^${disk}") -eq 0 ]
       then
         serial=$(udevadm info --query=property --path $(udevadm info -q path -n $disk 2>/dev/null) 2>/dev/null|grep -Po "ID_SERIAL=\K.*")
-        echo $(basename $disk) = $serial
+        name=$(basename $disk)
+        echo "$name = $serial"
       fi
     done
   fi
@@ -1900,6 +1816,41 @@ syslog_to_debug()
   done < <(tail -f -n0 /var/log/syslog 2>&1)
 }
 
+
+do_exit()
+{
+  trap '' EXIT 1 2 3 9 15;
+  while [ -f "${all_files[wait]}" ]; do 
+    sleep 0.1; 
+  done
+  
+  dd_pid=${all_files[dd_pid]}
+
+  case "$1" in
+    0)
+      debug "SIG${2} received, exiting..."
+      rm -f "${all_files[pid]}" "${all_files[pause]}" "${all_files[queued]}"
+      save_current_status 1;
+      kill -9 $dd_pid 2>/dev/null
+      exit 0
+      ;;
+    1)
+      debug 'error encountered, exiting...'
+      rm -f "${all_files[resume_file]}"
+      rm -f "${all_files[resume_temp]}"
+      rm -rf ${all_files[dir]};
+      kill -9 $dd_pid 2>/dev/null
+      exit 1
+      ;;
+    *)
+      rm -rf ${all_files[dir]};
+      rm -f "${all_files[resume_file]}"
+      rm -f "${all_files[resume_temp]}"
+      exit 0
+      ;;
+  esac
+}
+
 trap_with_arg() {
     func="$1" ; shift
     for sig ; do
@@ -1919,6 +1870,63 @@ is_current_op() {
 }
 
 keep_pid_updated(){ while [ -e "${all_files[dir]}" ]; do echo "$script_pid" > "${all_files[pid]}"; sleep 2; done }
+
+######################################################
+##                                                  ##
+##                  INITIAL SETUP                   ##
+##                                                  ##
+######################################################
+
+# PID
+script_pid=$BASHPID
+
+# Serial
+cmd_disk=""
+for arg in "$@"; do
+  if [ -b "$arg" ]; then
+    cmd_disk=$arg
+    attrs=$(udevadm info --query=property --name="${arg}")
+    serial_number=$(echo -e "$attrs" | awk -F'=' '/ID_SCSI_SERIAL/{print $2}')
+    if [ -z "$serial_number" ]; then
+      serial_number=$(echo -e "$attrs" | awk -F'=' '/ID_SERIAL_SHORT/{print $2}')
+    fi
+    break
+  else
+    serial_number=""
+  fi
+done
+
+# Log prefix
+if [ -n "$serial_number" ]; then
+  syslog_prefix="preclear_disk_${serial_number}"
+  log_prefix="preclear_disk_${serial_number}_${script_pid}:"
+elif [[ -n "$cmd_disk" ]]; then
+  syslog_prefix="preclear_disk_${cmd_disk}"
+  log_prefix="preclear_disk_${script_pid}:"
+else
+  syslog_prefix="preclear_disk"
+  log_prefix="preclear_disk_${script_pid}:"
+fi
+
+# Redirect errors to log
+exec 2> >(while read err; do debug "${err}"; echo "${err}"; done; >&2)
+
+# Let's make sure some features are supported by BASH
+BV=$(echo $BASH_VERSION|tr '.' "\n"|grep -Po "^\d+"|xargs printf "%.2d\n"|tr -d '\040\011\012\015')
+if [ "$BV" -lt "040253" ]; then
+  echo -e "Sorry, your BASH version isn't supported.\nThe minimum required version is 4.2.53.\nPlease update."
+  debug "Sorry, your BASH version isn't supported.\nThe minimum required version is 4.2.53.\nPlease update."
+  exit 2
+fi
+
+# Let's verify all dependencies
+for dep in cat awk basename blockdev comm date dd find fold getopt grep kill openssl printf readlink seq sort sum tac tmux todos tput udevadm xargs; do
+  if ! type $dep >/dev/null 2>&1 ; then
+    echo -e "The following dependency isn't met: [$dep]. Please install it and try again."
+    debug "The following dependency isn't met: [$dep]. Please install it and try again."
+    exit 1
+  fi
+done
 
 ######################################################
 ##                                                  ##
@@ -1949,7 +1957,7 @@ notify_freq=0
 opts_long="frequency:,notify:,skip-preread,skip-postread,read-size:,write-size:,read-blocks:,test,no-stress,list,"
 opts_long+="cycles:,signature,verify,no-prompt,version,preclear-only,format-html,erase,erase-clear,load-file:,unassigned"
 
-OPTS=$(getopt -o f:n:sSr:w:b:tdlc:ujvomera:u \
+OPTS=$(getopt -o f:n:sSr:w:b:tdlc:ujvomera:U \
       --long $opts_long -n "$(basename $0)" -- "$@")
 
 if [ "$?" -ne "0" ]; then
@@ -1974,13 +1982,13 @@ while true ; do
     -u|--signature)      verify_disk_mbr=y;                   shift 1;;
     -p|--verify)         verify_disk_mbr=y;  verify_zeroed=y; shift 1;;
     -j|--no-prompt)      no_prompt=y;                         shift 1;;
-    -v|--version)        echo "$0 version: $version"; exit 0; shift 1;;
+    -v|--version)        echo "$0 version: $version";         exit 0;;
     -o|--preclear-only)  write_disk_mbr=y;                    shift 1;;
     -m|--format-html)    format_html=y;                       shift 1;;
     -e|--erase)          erase_disk=y;                        shift 1;;
     -r|--erase-clear)    erase_preclear=y;                    shift 1;;
     -a|--load-file)      load_file="$2";                      shift 2;;
-    -u|--unassigned)     list_unassigned_disks;       exit 0; shift 1;;
+    -U|--unassigned)     list_unassigned_disks;               exit 0;;
 
     --) shift ; break ;;
     * ) echo "Internal error!" ; exit 1 ;;

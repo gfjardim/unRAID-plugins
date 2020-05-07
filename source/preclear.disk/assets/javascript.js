@@ -122,9 +122,19 @@ function getPreclearContent()
       startPreclear(startDisk);
       delete window.startDisk;
     }
-  },'json').always(function(data)
-  {
-    timers.getPreclearContent = setTimeout('getPreclearContent()', ($(data.status).length > 0) ? 5000 : 15000);
+  },'json').always(function(jqXHR, textStatus, error){
+    if (jqXHR.status == 200)
+    {
+      clearTimeout(timers.getPreclearContent);
+    }
+    else if (jqXHR.status == 404)
+    {  
+      setTimeout( clearTimeout, 300, timers.getPreclearContent);
+    }
+    else
+    {
+      timers.getPreclearContent = setTimeout('getPreclearContent()', ($(jqXHR.status).length > 0) ? 5000 : 15000);
+    }
   });
 }
 
