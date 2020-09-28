@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="1.0.16"
+version="1.0.17"
 
 ######################################################
 ##                                                  ##
@@ -832,7 +832,7 @@ time_elapsed(){
   if [ "$#" -eq "2" ]; then
     if [ "$2" == "display" ]; then
       eval "local _time=\$$_elapsed"
-      printf '%d:%02d:%02d' $((_time / 3600)) $(((_time / 60) % 60)) $((_time % 60))
+      printf '%d:%02d:%02d' $(($_time / 3600)) $((($_time / 60) % 60)) $(($_time % 60))
       return 0
     elif [ "$2" == "export" ]; then
       eval "echo \$$_elapsed" && return 0
@@ -2078,10 +2078,9 @@ else
   append disk_properties 'start_sector' "0"
 fi
 
-
 # Disable read_stress if preclearing a SSD
-discard=$(cat "/sys/block/${disk_properties[name]}/queue/discard_max_bytes")
-if [ "$discard" -gt "0" ]; then
+eval $( lsblk -nbP --nodeps -o ROTA $theDisk )
+if [ "$ROTA" -eq 0 ]; then 
   debug "Disk ${theDisk} is a SSD, disabling head stress test." 
   read_stress=n
 fi

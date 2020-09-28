@@ -15,8 +15,8 @@ echo_tmux() {
   while true; do
     # tmux capture-pane -t "$1" 2>/dev/null;
     lines=$(tmux capture-pane -t "$1" 2>/dev/null;tmux show-buffer 2>&1 | sed '/^$/{:a;N;s/\n$//;ta}')
-    echo "$lines" >> "$2"
     for i in $(seq $(echo "$lines" | wc -l) 50 ); do echo " " >> "$2"; done
+    echo "$lines" >> "$2"
     sleep 2
   done
 }
@@ -136,6 +136,11 @@ dialog_script_gfjardim_op() {
     tmux new-session -d -x 140 -y 200 -s "$session" 2>/dev/null
     tmux send -t "$session" "$CMD" ENTER 2>/dev/null
   fi
+  sleep 1
+  tmux_exist=$(tmux ls 2>/dev/null|grep -c $session)
+  if [ "$tmux_exist" -gt 0 ]; then
+    dialog --clear --backtitle "$BACKTITLE" --title "$TITLE" --msgbox "\n\n\n\nPreclear session for disk $serial started successfully." $HEIGHT $WIDTH 2>&1 1>&3
+  fi
 }
 
 
@@ -195,6 +200,8 @@ dialog_output() {
   kill $pid
   rm "$tmpfile"
 }
+
+trap "clear" INT TERM EXIT SIGKILL
 
 dialog_path=$(which dialog 2>/dev/null)
 if [ -z "$dialog_path" ]; then

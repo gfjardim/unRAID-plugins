@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2020.05.07">
+<!ENTITY version   "2020.09.28">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,12 @@
 
 <CHANGES>
 ##&name;
+
+###2020.09.28
+- Fix: footer icons keeps showing even if preclear has stopped
+- Fix: packages updated to 6.9.0-beta22
+- Fix: script - version 1.0.17
+- Fix: check for the rotational status instead of discard availability to detect ssd
 
 ###2020.05.07
 - Fix: error showing in the logs for no reason
@@ -672,10 +678,15 @@ elif is_unraid_version '&gt;=' '6.8.0-b1' &amp;&amp; is_unraid_version '&lt;' '6
   download_install a6e7015c850fcfc5a56f42b740c0a4ba  libevent-2.1.11-x86_64-1.txz
   download_install 1af347c4d9feff774320d9c1e7920ac3  utempter-1.1.6-x86_64-3.txz
 
-elif is_unraid_version '&gt;=' '6.8.3'; then
+elif is_unraid_version '&gt;=' '6.8.3' &amp;&amp; is_unraid_version '&lt;' '6.9.0-beta22'; then
   download_install c8367090c89d26690be706c7fb3db5fc  tmux-3.1b-x86_64-1.txz
   download_install a6e7015c850fcfc5a56f42b740c0a4ba  libevent-2.1.11-x86_64-1.txz
   download_install 1af347c4d9feff774320d9c1e7920ac3  utempter-1.1.6-x86_64-3.txz
+
+elif is_unraid_version '&gt;=' '6.9.0-beta22'; then
+  download_install c8367090c89d26690be706c7fb3db5fc  tmux-3.1b-x86_64-1.txz
+  download_install 0ba0a06b7e079585060b9e32fd90c58f  libevent-2.1.12-x86_64-1.txz
+  download_install 008650a8b81cd52222058d54a464102e  utempter-1.2.0-x86_64-1.txz
 
 else
   echo "unRAID version ($version) not supported."

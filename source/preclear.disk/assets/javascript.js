@@ -68,17 +68,21 @@ function getPreclearContent()
       toggleReports(currentToggled);
       $(window).scrollTop(currentScroll);
     }
+    
+    leftover_icons = $("[id^=preclear_footer_]");
 
     $.each(data.status, function(i,v)
     {
       var target = $("#preclear_"+i);
-      var icon = "#preclear_footer_" + i;
-      
+      var icon = "preclear_footer_" + i;
+
+      leftover_icons = $.grep(leftover_icons, function (el, i) { return $(el).attr('id') != icon });
+
       $("#preclear_"+i).html("<i class='fa fa-tachometer hdd'></i><span style='margin-left: 0px;'></span>"+v.status);
 
-      if (! $(icon).length)
+      if (! $("#"+icon).length)
       {
-        el  = "<a class='exec' title='' id='"+icon.substring(1)+"'><img src='/plugins/"+plugin+"/icons/precleardisk.png'></a>";
+        el  = "<a class='exec' title='' id='"+icon+"'><img src='/plugins/"+plugin+"/icons/precleardisk.png'></a>";
         el  = $(el).prependTo("#preclear-footer").css("margin-right", "6px");
         el.tooltipster(
         {
@@ -99,8 +103,10 @@ function getPreclearContent()
       content = $("<div>").append(v.footer);
       content.find("a[id^='preclear_rm_']").attr("id", "preclear_footer_rm_" + i);
       content.find("a[id^='preclear_open_']").attr("id", "preclear_footer_open_" + i);
-      $(icon).tooltipster('content', content.html());
+      $("#"+icon).tooltipster('content', content.html());
     });
+
+    $.each(leftover_icons, function(i,v){ $(v).remove(); });
 
     $("a[id^='preclear_footer_']").each(function(i,v)
     {
