@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2020.09.28">
+<!ENTITY version   "2020.10.22">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,9 @@
 
 <CHANGES>
 ##&name;
+
+###2020.10.22
+- Fix: plugin become uninstalled if there is no internet connection at installation
 
 ###2020.09.28
 - Fix: footer icons keeps showing even if preclear has stopped
@@ -575,7 +578,7 @@ The 'plugin' package MD5 hash.
 </FILE>
 
 <!--The 'readvz' executable.-->
-<FILE Name="/usr/local/sbin/readvz" Mode="755">
+<FILE Name="/boot/config/plugins/&name;/readvz">
 <URL>&gitURL;/source/packages/readvz</URL>
 </FILE>
 
@@ -726,6 +729,8 @@ else
   upgradepkg --install-new /boot/config/plugins/&name;/&name;-&version;.txz
 fi
 
+cp /boot/config/plugins/&name;/readvz /usr/local/sbin/readvz
+chmod 755 /usr/local/sbin/readvz
 </INLINE>
 </FILE>
 
