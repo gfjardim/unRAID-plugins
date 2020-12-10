@@ -27,8 +27,6 @@ $zipFile  = sprintf("log/%s-%s-%s.zip", str_replace(' ','_',strtoupper($var['NAM
 
 <script type="text/javascript">
 
-  <?=$Preclear->Script();?>
-
   function cleanUp() {
     if (document.hasFocus()) {
       $('input[value="Downloading..."]').val('Download').prop('disabled',false);

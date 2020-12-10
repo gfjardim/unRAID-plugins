@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="1.0.17"
+version="1.0.18"
 
 ######################################################
 ##                                                  ##
@@ -400,6 +400,134 @@ maxExecTime() {
   echo $exec_time
 }
 
+format_number() {
+  echo " $1 " | sed -r ':L;s=\b([0-9]+)([0-9]{3})\b=\1,\2=g;t L'|trim
+}
+
+# Keep track of the elapsed time of the preread/clear/postread process
+timer() {
+  if [[ $# -eq 0 ]]; then
+    echo $(date '+%s')
+  else
+    local  stime=$1
+    etime=$(date '+%s')
+
+    if [[ -z "$stime" ]]; 
+      then stime=$etime; 
+    fi
+
+    dt=$((etime - stime))
+    ds=$((dt % 60))
+    dm=$(((dt / 60) % 60))
+    dh=$((dt / 3600))
+    printf '%d:%02d:%02d' $dh $dm $ds
+  fi
+}
+
+format_time() {
+  local time=$1
+  ds=$((time % 60))
+  dm=$(((time / 60) % 60))
+  dh=$((time / 3600))
+  printf '%d:%02d:%02d' $dh $dm $ds
+}
+
+time_elapsed(){
+  local _elapsed="_time_elapsed_$1" _last="_time_elapsed_last_$1" _current=$(date '+%s') _delta
+
+  eval "local x=\${$_elapsed+x}"
+  if [ -z "$x" ]; then
+    eval "declare -g $_elapsed=0 $_last=$_current"
+  fi
+
+  # return without computing time if paused
+  if [ "$#" -eq "2" ] && [ "$2" == "paused" ]; then
+    eval "$_last=$_current" && return 0
+  fi
+
+  # set a new elapsed time if requested
+  if [ "$#" -eq "3" ] && [ "$2" == "set" ]; then
+    eval "$_last=$_current;$_elapsed=$3" && return 0
+  fi
+
+  # display formatted or export not formatted elapsed time
+  if [ "$#" -eq "2" ]; then
+    if [ "$2" == "display" ]; then
+      eval "local _time=\$$_elapsed"
+      printf '%d:%02d:%02d' $(($_time / 3600)) $((($_time / 60) % 60)) $(($_time % 60))
+      return 0
+    elif [ "$2" == "export" ]; then
+      eval "echo \$$_elapsed" && return 0
+    fi
+  fi
+
+  # compute the elapsed time
+  eval "_delta=\$(( $_current - \$$_last ));"
+  eval "$_last=$_current && $_elapsed=\$(( \$$_elapsed + \$_delta ))"
+}
+
+is_numeric() {
+  local _var=$2 _num=$3
+  if [ ! -z "${_num##*[!0-9]*}" ]; then
+    eval "$1=$_num"
+  else
+    echo "$_var value [$_num] is not a number. Please verify your commad arguments.";
+    exit 2
+  fi
+}
+
+root_free_space() {
+  local free=$(df --output=size / | tail -n +2 )
+  local avail=$(df --output=avail / | tail -n +2 )
+  local pcent=$(( avail * 100 / free ))
+
+  if [ "$pcent" -gt "15" ]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+save_current_status() {
+  touch "${all_files[wait]}"
+  local current_op=${diskop[current_op]}
+  local current_pos=${diskop[current_pos]}
+  local current_timer=${diskop[current_timer]}
+  local tmp_resume="${all_files[resume_temp]}.tmp"
+
+  echo -e '# parsed arguments'  > "$tmp_resume"
+  for arg in "${!arguments[@]}"; do
+    echo "$arg='${arguments[$arg]}'" >> "$tmp_resume"
+  done
+  echo -e '' >> "$tmp_resume"
+  echo -e '# current operation' >> "$tmp_resume"
+  echo -e "current_op='$current_op'" >> "$tmp_resume"
+  echo -e "current_pos='$current_pos'" >> "$tmp_resume"
+  echo -e "current_timer='$current_timer'" >> "$tmp_resume"
+  echo -e "current_cycle='$cycle'\n" >> "$tmp_resume"
+  echo -e '# previous operations' >> "$tmp_resume"
+  echo -e "preread_average='$preread_average'" >> "$tmp_resume"
+  echo -e "preread_speed='$preread_speed'" >> "$tmp_resume"
+  echo -e "write_average='$write_average'" >> "$tmp_resume"
+  echo -e "write_speed='$write_speed'" >> "$tmp_resume"
+  echo -e "postread_average='$postread_average'" >> "$tmp_resume"
+  echo -e "postread_speed='$postread_speed'\n" >> "$tmp_resume"
+  echo -e '# current elapsed time' >> "$tmp_resume"
+  echo -e "main_elapsed_time='$( time_elapsed main export )'" >> "$tmp_resume"
+  echo -e "cycle_elapsed_time='$( time_elapsed cycle export )'" >> "$tmp_resume"
+  mv -f "$tmp_resume" "${all_files[resume_temp]}"
+
+  local last_updated=$(( $(timer) - ${diskop[last_update]} ))
+ 
+  if [ "$1" = "1" ] || [ "$last_updated" -gt "${diskop[update_interval]}" ]; then
+    cp "${all_files[resume_temp]}" "${all_files[resume_file]}.tmp"
+    mv "${all_files[resume_file]}.tmp" "${all_files[resume_file]}"
+    diskop[last_update]=$(timer)
+  fi
+
+  sleep 0.1 && rm -f "${all_files[wait]}"
+}
+
 write_disk(){
   # called write_disk
   local blkpid=${all_files[blkpid]}
@@ -528,6 +656,12 @@ write_disk(){
 
   while kill -0 $dd_pid &>/dev/null; do
 
+    # kill if low memory available
+    if ! root_free_space; then
+      debug "Low memory detected, aborting..."
+      return 1
+    fi
+
     # update elapsed time
     if [ "$is_paused" == "y" ]; then
       time_elapsed $write_type paused && time_elapsed cycle paused && time_elapsed main paused
@@ -546,7 +680,7 @@ write_disk(){
       kill -USR1 $dd_pid 2>/dev/null && sleep 1
 
       # Calculate the current status
-      bytes_dd=$(awk 'END{print $1}' $dd_output|trim)
+      bytes_dd=$(tail -n 15 $dd_output | grep -P "bytes.*copied" | tail -n 1 | awk 'END{print $1}' | trim)
 
       # Ensure bytes_wrote is a number
       if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
@@ -704,7 +838,7 @@ write_disk(){
     fi
 
     # Kill dd if hung
-    if [ "$dd_hang" -gt 150 ]; then
+    if [ "$dd_hang" -gt 30 ]; then
       eval "$initial_bytes='$bytes_wrote';"
       eval "$initial_timer='$current_elapsed';"
       while read l; do debug "${write_type_s}: dd output: ${l}"; done < <(tail -n20 "$dd_output")
@@ -778,121 +912,7 @@ write_disk(){
   return $exit_code
 }
 
-format_number() {
-  echo " $1 " | sed -r ':L;s=\b([0-9]+)([0-9]{3})\b=\1,\2=g;t L'|trim
-}
 
-# Keep track of the elapsed time of the preread/clear/postread process
-timer() {
-  if [[ $# -eq 0 ]]; then
-    echo $(date '+%s')
-  else
-    local  stime=$1
-    etime=$(date '+%s')
-
-    if [[ -z "$stime" ]]; 
-      then stime=$etime; 
-    fi
-
-    dt=$((etime - stime))
-    ds=$((dt % 60))
-    dm=$(((dt / 60) % 60))
-    dh=$((dt / 3600))
-    printf '%d:%02d:%02d' $dh $dm $ds
-  fi
-}
-
-format_time() {
-  local time=$1
-  ds=$((time % 60))
-  dm=$(((time / 60) % 60))
-  dh=$((time / 3600))
-  printf '%d:%02d:%02d' $dh $dm $ds
-}
-
-time_elapsed(){
-  local _elapsed="_time_elapsed_$1" _last="_time_elapsed_last_$1" _current=$(date '+%s') _delta
-
-  eval "local x=\${$_elapsed+x}"
-  if [ -z "$x" ]; then
-    eval "declare -g $_elapsed=0 $_last=$_current"
-  fi
-
-  # return without computing time if paused
-  if [ "$#" -eq "2" ] && [ "$2" == "paused" ]; then
-    eval "$_last=$_current" && return 0
-  fi
-
-  # set a new elapsed time if requested
-  if [ "$#" -eq "3" ] && [ "$2" == "set" ]; then
-    eval "$_last=$_current;$_elapsed=$3" && return 0
-  fi
-
-  # display formatted or export not formatted elapsed time
-  if [ "$#" -eq "2" ]; then
-    if [ "$2" == "display" ]; then
-      eval "local _time=\$$_elapsed"
-      printf '%d:%02d:%02d' $(($_time / 3600)) $((($_time / 60) % 60)) $(($_time % 60))
-      return 0
-    elif [ "$2" == "export" ]; then
-      eval "echo \$$_elapsed" && return 0
-    fi
-  fi
-
-  # compute the elapsed time
-  eval "_delta=\$(( $_current - \$$_last ));"
-  eval "$_last=$_current && $_elapsed=\$(( \$$_elapsed + \$_delta ))"
-}
-
-is_numeric() {
-  local _var=$2 _num=$3
-  if [ ! -z "${_num##*[!0-9]*}" ]; then
-    eval "$1=$_num"
-  else
-    echo "$_var value [$_num] is not a number. Please verify your commad arguments.";
-    exit 2
-  fi
-}
-
-save_current_status() {
-  touch "${all_files[wait]}"
-  local current_op=${diskop[current_op]}
-  local current_pos=${diskop[current_pos]}
-  local current_timer=${diskop[current_timer]}
-  local tmp_resume="${all_files[resume_temp]}.tmp"
-
-  echo -e '# parsed arguments'  > "$tmp_resume"
-  for arg in "${!arguments[@]}"; do
-    echo "$arg='${arguments[$arg]}'" >> "$tmp_resume"
-  done
-  echo -e '' >> "$tmp_resume"
-  echo -e '# current operation' >> "$tmp_resume"
-  echo -e "current_op='$current_op'" >> "$tmp_resume"
-  echo -e "current_pos='$current_pos'" >> "$tmp_resume"
-  echo -e "current_timer='$current_timer'" >> "$tmp_resume"
-  echo -e "current_cycle='$cycle'\n" >> "$tmp_resume"
-  echo -e '# previous operations' >> "$tmp_resume"
-  echo -e "preread_average='$preread_average'" >> "$tmp_resume"
-  echo -e "preread_speed='$preread_speed'" >> "$tmp_resume"
-  echo -e "write_average='$write_average'" >> "$tmp_resume"
-  echo -e "write_speed='$write_speed'" >> "$tmp_resume"
-  echo -e "postread_average='$postread_average'" >> "$tmp_resume"
-  echo -e "postread_speed='$postread_speed'\n" >> "$tmp_resume"
-  echo -e '# current elapsed time' >> "$tmp_resume"
-  echo -e "main_elapsed_time='$( time_elapsed main export )'" >> "$tmp_resume"
-  echo -e "cycle_elapsed_time='$( time_elapsed cycle export )'" >> "$tmp_resume"
-  mv -f "$tmp_resume" "${all_files[resume_temp]}"
-
-  local last_updated=$(( $(timer) - ${diskop[last_update]} ))
- 
-  if [ "$1" = "1" ] || [ "$last_updated" -gt "${diskop[update_interval]}" ]; then
-    cp "${all_files[resume_temp]}" "${all_files[resume_file]}.tmp"
-    mv "${all_files[resume_file]}.tmp" "${all_files[resume_file]}"
-    diskop[last_update]=$(timer)
-  fi
-
-  sleep 0.1 && rm -f "${all_files[wait]}"
-}
 
 read_entire_disk() { 
   local average_speed bytes_dd current_speed current_elapsed count disktemp dd_cmd resume_skip report_out status tb_formatted
@@ -1075,6 +1095,12 @@ read_entire_disk() {
 
   while kill -0 $dd_pid >/dev/null 2>&1; do
 
+    # kill if low memory available
+    if ! root_free_space; then
+      debug "Low memory detected, aborting..."
+      return 1
+    fi
+
     # Stress the disk header
     if [ "$read_stress" == "y" ]; then
       # read a random block
@@ -1127,7 +1153,7 @@ read_entire_disk() {
       kill -USR1 $dd_pid 2>/dev/null && sleep 1
 
       # Calculate the current status
-      bytes_dd=$(awk 'END{print $1}' $dd_output|trim)
+      bytes_dd=$(tail -n 15 $dd_output | grep -P "bytes.*copied" | tail -n 1 | awk 'END{print $1}' | trim)
 
       # Ensure bytes_read is a number
       if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
@@ -1281,9 +1307,9 @@ read_entire_disk() {
     fi
 
     # Kill dd if hung
-    if [ "$dd_hang" -gt 150 ]; then
+    if [ "$dd_hang" -gt 30 ]; then
       eval "$initial_bytes='"$bytes_read"';"
-      eval "$initial_timer='$(time_elapsed $read_type display)';"
+      eval "$initial_timer='$(time_elapsed $read_type export)';"
       while read l; do debug "${read_type_s}: dd output: ${l}"; done < <(tail -n20 "$dd_output")
 
       kill -9 $dd_pid
@@ -1819,7 +1845,7 @@ syslog_to_debug()
 
 do_exit()
 {
-  trap '' EXIT 1 2 3 9 15;
+  trap '' ERR EXIT 1 2 3 9 15;
   while [ -f "${all_files[wait]}" ]; do 
     sleep 0.1; 
   done
@@ -1836,6 +1862,7 @@ do_exit()
       ;;
     1)
       debug 'error encountered, exiting...'
+      echo "${disk_properties[name]}|NY|Error encountered, please verify the log|$$" > ${all_files[stat]}
       rm -f "${all_files[resume_file]}"
       rm -f "${all_files[resume_temp]}"
       rm -rf ${all_files[dir]};
@@ -2165,6 +2192,7 @@ append all_files 'wait'          "${all_files[dir]}/wait"
 mkdir -p "${all_files[dir]}"
 
 trap_with_arg "do_exit 0" INT TERM EXIT SIGKILL
+trap_with_arg "do_exit 1" ERR
 
 if [ ! -p "${all_files[fifo]}" ]; then
   mkfifo "${all_files[fifo]}" || exit
@@ -2377,6 +2405,8 @@ else
   write_op="zero"
 fi
 
+retries=5
+
 for cycle in $(seq $cycles); do
   # Continue to next cycle if restoring new-session
   if [ -n "$current_op" ] && [ "$cycle" != "$current_cycle" ]; then
@@ -2452,24 +2482,25 @@ for cycle in $(seq $cycles); do
       # update elapsed time
       time_elapsed main && time_elapsed cycle 
 
-      for x in $(seq 1 10); do
+      for x in $(seq 1 $retries); do
         read_entire_disk no-verify preread start_bytes start_timer preread_average preread_speed
         ret_val=$?
         if [ "$ret_val" -eq 0 ]; then
           append display_step "Pre-read verification:|[${preread_average}] ***SUCCESS***"
           display_status
           break
-        elif [ "$ret_val" -eq 2 -a "$x" -le 10 ]; then
+        elif [ "$ret_val" -eq 2 -a "$x" -le $retries ]; then
           debug "dd process hung at ${start_bytes}, killing...."
           continue
         else
           append display_step "Pre-read verification:|${bold}FAIL${norm}"
-          display_status
           echo "${disk_properties[name]}|NY|Pre-read failed - Aborted|$$" > ${all_files[stat]}
           send_mail "FAIL! Pre-read $diskName ($theDisk) failed" "FAIL! Pre-read $diskName ($theDisk) failed." "Pre-read $diskName ($theDisk) failed - Aborted" "" "alert"
           echo -e "--> FAIL: Result: Pre-Read failed.\n\n"
           save_report "No - Pre-read $diskName ($theDisk) failed." "$preread_speed" "$postread_speed" "$write_speed"
           debug_smart $theDisk "$smart_type"
+          display_status
+          wait $!
 
           do_exit 1
         fi
@@ -2504,7 +2535,7 @@ for cycle in $(seq $cycles); do
       save_current_status
 
       # Erase the disk
-      for x in $(seq 1 10); do
+      for x in $(seq 1 $retries); do
 
         # update elapsed time
         time_elapsed main && time_elapsed cycle 
@@ -2515,17 +2546,18 @@ for cycle in $(seq $cycles); do
           append display_step "Erasing the disk:|[${write_average}] ***SUCCESS***"
           display_status
           break
-        elif [ "$ret_val" -eq 2 -a "$x" -le 10 ]; then
+        elif [ "$ret_val" -eq 2 -a "$x" -le $retries ]; then
           debug "dd process hung at ${start_bytes}, killing...."
           continue
         else
           append display_step "Erasing the disk:|${bold}FAIL${norm}"
-          display_status
           echo "${disk_properties[name]}|NY|Erasing failed - Aborted|$$" > ${all_files[stat]}
           send_mail "FAIL! Erasing $diskName ($theDisk) failed" "FAIL! Erasing $diskName ($theDisk) failed." "Erasing $diskName ($theDisk) failed - Aborted" "" "alert"
           echo -e "--> FAIL: Result: Erasing the disk failed.\n\n"
           save_report "No - Erasing the disk failed." "$preread_speed" "$postread_speed" "$write_speed"
           debug_smart $theDisk "$smart_type"
+          display_status
+          wait $!
 
           do_exit 1
         fi
@@ -2557,7 +2589,7 @@ for cycle in $(seq $cycles); do
     diskop+=([current_op]="$write_op" [current_pos]="$start_bytes" [current_timer]="$start_timer" )
     save_current_status
 
-    for x in $(seq 1 10); do
+    for x in $(seq 1 $retries); do
 
       # update elapsed time
       time_elapsed main && time_elapsed cycle 
@@ -2567,17 +2599,18 @@ for cycle in $(seq $cycles); do
       if [ "$ret_val" -eq 0 ]; then
         append display_step "${title_write} the disk:|[${write_average}] ***SUCCESS***"
         break
-      elif [ "$ret_val" -eq 2 -a "$x" -le 10 ]; then
+      elif [ "$ret_val" -eq 2 -a "$x" -le $retries ]; then
         debug "dd process hung at ${start_bytes}, killing...."
         continue
       else
         append display_step "${title_write} the disk:|${bold}FAIL${norm}"
-        display_status
         echo "${disk_properties[name]}|NY|${title_write} the disk failed - Aborted|$$" > ${all_files[stat]}
         send_mail "FAIL! ${title_write} $diskName ($theDisk) failed" "FAIL! ${title_write} $diskName ($theDisk) failed." "${title_write} $diskName ($theDisk) failed - Aborted" "" "alert"
         echo -e "--> FAIL: Result: ${title_write} $diskName ($theDisk) failed.\n\n"
         save_report "No - ${title_write} the disk failed." "$preread_speed" "$postread_speed" "$write_speed"
         debug_smart $theDisk "$smart_type"
+        display_status
+        wait $!
 
         do_exit 1
       fi
@@ -2623,12 +2656,14 @@ for cycle in $(seq $cycles); do
         echo "${disk_properties[name]}|NN|unRAID's signature on the MBR is valid|$$" > ${all_files[stat]}
       else
         append display_step "Verifying unRAID's Preclear signature:|***FAIL*** "
-        display_status
         echo -e "--> FAIL: unRAID's Preclear signature not valid. \n\n"
         echo "${disk_properties[name]}|NY|unRAID's signature on the MBR failed - Aborted|$$" > ${all_files[stat]}
         send_mail "FAIL! Invalid unRAID's MBR signature on $diskName ($theDisk)" "FAIL! Invalid unRAID's MBR signature on $diskName ($theDisk)." "Invalid unRAID's MBR signature on $diskName ($theDisk) - Aborted" "" "alert"
         save_report  "No - Invalid unRAID's MBR signature." "$preread_speed" "$postread_speed" "$write_speed"
         debug_smart $theDisk "$smart_type"
+        display_status
+        wait $!
+
         do_exit 1
       fi
     else
@@ -2660,7 +2695,7 @@ for cycle in $(seq $cycles); do
       display_status "Post-Read in progress ..." ""
       diskop+=([current_op]="postread" [current_pos]="$start_bytes" [current_timer]="$start_timer" )
       save_current_status
-      for x in $(seq 1 10); do
+      for x in $(seq 1 $retries); do
 
         # update elapsed time
         time_elapsed main && time_elapsed cycle
@@ -2672,17 +2707,19 @@ for cycle in $(seq $cycles); do
           display_status
           echo "${disk_properties[name]}|NY|Post-Read verification successful|$$" > ${all_files[stat]}
           break
-        elif [ "$ret_val" -eq 2 -a "$x" -le 10 ]; then
+        elif [ "$ret_val" -eq 2 -a "$x" -le $retries ]; then
           debug "dd process hung at ${start_bytes}, killing...."
           continue
         else
           append display_step "Post-Read verification:| ***FAIL***"
-          display_status
           echo -e "--> FAIL: Post-Read verification failed. Your drive is not zeroed.\n\n"
           echo "${disk_properties[name]}|NY|Post-Read failed - Aborted|$$" > ${all_files[stat]}
           send_mail "FAIL! Post-Read $diskName ($theDisk) failed" "FAIL! Post-Read $diskName ($theDisk) failed." "Post-Read $diskName ($theDisk) failed - Aborted" "" "alert"
           save_report "No - Post-Read verification failed" "$preread_speed" "$postread_speed" "$write_speed"
           debug_smart $theDisk "$smart_type"
+          display_status
+          wait $!
+
           do_exit 1
         fi
       done

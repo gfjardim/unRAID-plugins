@@ -52,7 +52,8 @@ $dismissed = [ "/boot/config/plugins/statistics.sender/dismissed", "/tmp/.statis
 
 $is_dismissed = array_reduce($dismissed, function ($result, $item) { return $result || is_file($item); }, false);
 $plugin_file  = "https://raw.githubusercontent.com/gfjardim/unRAID-plugins/master/plugins/statistics.sender.plg";
-if (! $is_installed && ! $is_dismissed):
+// if (! $is_installed && ! $is_dismissed):
+if (false):
 ?>
 <script type="text/javascript">
   var original_plugin = "Preclear Disks<br>";

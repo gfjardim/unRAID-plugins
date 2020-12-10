@@ -189,11 +189,19 @@ class Preclear
 
   public function Script()
   {
+    global $display, $var;
+    echo "var display = ".json_encode($display).";";
+    echo "var vars    = ".json_encode($var).";";
     echo "var plugin = '".$this->plugin."';\n";
     echo "var authors = ".json_encode($this->Authors()).";\n";
     echo "var scope  = 'gfjardim';\n";
     echo "var scripts = ".json_encode($this->scriptFiles()).";\n";
     printf("var zip = '%s-%s-%s.zip';\n", str_replace(' ','_',strtolower($var['NAME'])), $this->plugin, date('Ymd-Hi') );
+
+    echo (intval(shell_exec("grep -c 'preclear' '/usr/local/emhttp/webGui/styles/font-unraid.svg' 2>/dev/null")) > 0) ? 
+            "var preclear_footer_icon = \"<i class='icon-preclear'></i>\"" :
+            "var preclear_footer_icon = \"<img src='/plugins/preclear.disk/icons/precleardisk.png'>\"";
+
     echo "</script>\n";
     echo "<script type='text/javascript' src='";autov("/plugins/$this->plugin/assets/javascript.js"); echo "'></script>\n";
     echo "<script>\n";
@@ -274,7 +282,7 @@ class Preclear
           }
           else
           {
-            if (preg_match("#failed|FAIL#", $stat[2]))
+            if (preg_match("#failed|FAIL#", $stat[2]) || preg_match("#Error|error#", $stat[2]))
               {
               $status .= "<span style='color:#CC0000;margin-right:8px;'>{$stat[2]}</span>";
             }

@@ -51,7 +51,7 @@ $('body').on('mouseenter', '.tooltip, .tooltip-toggle', function()
 function getPreclearContent()
 {
   clearTimeout(timers.getPreclearContent);
-  $.post(PreclearURL,{action:'get_content'},function(data)
+  $.post(PreclearURL,{action:'get_content', display:display},function(data)
   {
     var hovered = $( ".tooltip:hover" ).map(function(){return this.id;}).get();
     if ( $('#preclear-table-body').length )
@@ -82,7 +82,7 @@ function getPreclearContent()
 
       if (! $("#"+icon).length)
       {
-        el  = "<a class='exec' title='' id='"+icon+"'><img src='/plugins/"+plugin+"/icons/precleardisk.png'></a>";
+        el  = "<span class='exec' title='' id='"+icon+"'>"+preclear_footer_icon+"</span> &nbsp;";
         el  = $(el).prependTo("#preclear-footer").css("margin-right", "6px");
         el.tooltipster(
         {
