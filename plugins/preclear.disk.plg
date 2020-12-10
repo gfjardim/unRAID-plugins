@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2020.12.09">
+<!ENTITY version   "2020.12.09a">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -18,11 +18,11 @@
 ###2020.12.09
 - Fix: temperature unit not being correctly displayed
 - Fix: change footer display from image to icon if supported
-- Update: script version 1.0.18
-- Fix: elapsed time not being exported correctly when dd hung is detected
-- Fix: system gone out of memory if a disk got dropped while being read by dd 
-- Fix: stop preclear script if low memory is detected
-- Fix: correctly capture errors and do the correct cleanup when script exits
+- Fix: script - version 1.0.18
+- Fix: script - elapsed time not being exported correctly when dd hung is detected
+- Fix: script - system going out of memory if a disk got dropped while being read by dd 
+- Fix: script - stop preclear script if low memory is detected
+- Fix: script - correctly capture errors and do the correct cleanup when script exits
 
 ###2020.10.22
 - Fix: plugin become uninstalled if there is no internet connection at installation
@@ -31,7 +31,7 @@
 - Fix: footer icons keeps showing even if preclear has stopped
 - Fix: packages updated to 6.9.0-beta22
 - Fix: script - version 1.0.17
-- Fix: check for the rotational status instead of discard availability to detect ssd
+- Fix: check for the rotational status instead of discard capability to detect ssd
 
 ###2020.05.07
 - Fix: error showing in the logs for no reason
