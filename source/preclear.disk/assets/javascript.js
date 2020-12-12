@@ -170,6 +170,22 @@ function openPreclear(serial)
 }
 
 
+function openPreclearLog(serial)
+{
+  var width   = 1000;
+  var height  = 730;
+  var top     = (screen.height-height)/2;
+  var left    = (screen.width-width)/2;
+  var options = 'resizeable=yes,scrollbars=yes,height='+height+',width='+width+',top='+top+',left='+left;
+  title = "Preclear Disk Log";
+  if (typeof(serial) !== 'undefined') {
+    window.open('/plugins/'+plugin+'/logger.php?file=/var/log/preclear.disk.log&title='+title+'&search='+serial+'&done=Done', '_blank', options);
+  } else {
+    window.open('/plugins/'+plugin+'/logger.php?file=/var/log/preclear.disk.log&title='+title+'&done=Done', '_blank', options);
+  }
+}
+
+
 function toggleScript(el, serial, multiple)
 {
   window.scope = $(el).val();

@@ -267,7 +267,7 @@ class Preclear
       {
         case 4:
           $running = file_exists( "/proc/".trim($stat[3]) );
-          $log     = "<a class='exec tooltip' title='Preclear Log' style='margin:0px -3px 0px 8px;color:#1E90FF;' onclick='openWindow(\"/plugins/preclear.disk/script/tail_log&amp;arg1=preclear_disk_${serial}_".trim($stat[3])."\",\"Log Information\",600,900);'><i class='fa fa-file-text-o'></i></a>";
+          $log     = "<a class='exec tooltip' title='Preclear Log' style='margin:0px -3px 0px 8px;color:#1E90FF;' onclick='openPreclearLog(\"preclear_disk_${serial}_".trim($stat[3])."\");'><i class='fa fa-file-text-o'></i></a>";
           
           if ($running)
           {

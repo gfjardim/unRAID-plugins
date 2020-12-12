@@ -2192,7 +2192,6 @@ append all_files 'wait'          "${all_files[dir]}/wait"
 mkdir -p "${all_files[dir]}"
 
 trap_with_arg "do_exit 0" INT TERM EXIT SIGKILL
-trap_with_arg "do_exit 1" ERR
 
 if [ ! -p "${all_files[fifo]}" ]; then
   mkfifo "${all_files[fifo]}" || exit
