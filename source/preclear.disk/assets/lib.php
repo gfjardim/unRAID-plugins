@@ -110,6 +110,7 @@ class Preclear
   {
     global $diskinfo;
     $this->allDisks = Misc::get_json($diskinfo);
+    $this->log_file = $GLOBALS['log_file'];
   }
 
 
@@ -282,6 +283,7 @@ class Preclear
           }
           else
           {
+            $in_logs = (intval(shell_exec("grep ".escapeshellarg("preclear_disk_${serial}_".trim($stat[3]))." ".escapeshellarg($this->log_file)."")) > 0);
             if (preg_match("#failed|FAIL#", $stat[2]) || preg_match("#Error|error#", $stat[2]))
               {
               $status .= "<span style='color:#CC0000;margin-right:8px;'>{$stat[2]}</span>";
@@ -292,7 +294,7 @@ class Preclear
               $status .= "<span style='margin-right:8px;'>{$stat[2]}</span>";
             }
           }
-          $preview = is_dir("/tmp/.preclear/${disk}") ? "${paused}${log}${preview}" : "${paused}${preview}";
+          $preview = $in_logs ? "${paused}${log}${preview}" : "${paused}${log}${preview}";
           break;
 
         default:

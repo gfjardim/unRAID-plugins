@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="1.0.18"
+version="1.0.19"
 
 ######################################################
 ##                                                  ##
@@ -133,9 +133,9 @@ list_unassigned_disks() {
 
 # gfjardim - add notification system capability without breaking legacy mail.
 send_mail() {
-  subject=$(echo ${1} | tr "'" '`' )
-  description=$(echo ${2} | tr "'" '`' )
-  message=$(echo ${3} | tr "'" '`' )
+  subject=$(echo ${1})
+  description=$(echo ${2})
+  message=$(echo ${3})
   recipient=${4}
   if [ -n "${5}" ]; then
     importance="${5}"
@@ -401,7 +401,8 @@ maxExecTime() {
 }
 
 format_number() {
-  echo " $1 " | sed -r ':L;s=\b([0-9]+)([0-9]{3})\b=\1,\2=g;t L'|trim
+  # echo " $1 " | sed -r ':L;s=\b([0-9]+)([0-9]{3})\b=\1,\2=g;t L'|trim
+  numfmt --to=si --suffix= --format='%1.1f' --round=nearest "$1"|trim
 }
 
 # Keep track of the elapsed time of the preread/clear/postread process
@@ -642,9 +643,9 @@ write_disk(){
 
   # Send initial notification
   if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 3 ] ; then
-    report_out="${write_type_s} started on $disk_serial ($disk_name).\\n Disk temperature: $(get_disk_temp $disk "$smart_type")\\n"
+    report_out="${write_type_s} started on $disk_serial ($disk_name).\\nDisk temperature: $(get_disk_temp $disk "$smart_type")\\n"
     send_mail "${write_type_s} started on $disk_serial ($disk_name)" "${write_type_s} started on $disk_serial ($disk_name). Cycle $cycle of ${cycles}. " "$report_out"
-    next_notify=25
+    local next_notify=0
   fi
 
   local timelapse=$(( $(timer) - 20 ))
@@ -736,9 +737,10 @@ write_disk(){
         paused_by["sync"]=n
       fi
 
-      if (( $percent_wrote % 10 == 0 )) && [ "$last_progress" -ne $percent_wrote ]; then
+      local decile=$(( $percent_wrote / 10 ))
+      if [ $decile -gt $last_progress ]; then
         debug "${write_type_s}: progress - ${percent_wrote}% $write_type_v @ $current_speed MB/s"
-        last_progress=$percent_wrote
+        last_progress=$decile
       fi
 
       timelapse=$(timer)
@@ -847,16 +849,17 @@ write_disk(){
     fi
 
     # Send mid notification
-    if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -eq 4 ] && [ "$percent_wrote" -ge "$next_notify" ] && [ "$percent_wrote" -ne 100 ]; then
+    local decile=$(( $percent_wrote / 25 ))
+    if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -eq 4 ] && [ "$decile" -gt "$next_notify" ] && [ "$percent_wrote" -ne 100 ]; then
       disktemp="$(get_disk_temp $disk "$smart_type")"
       report_out="${write_type_s} in progress on $disk_serial ($disk_name): ${percent_wrote}% complete.\\n"
-      report_out+="Wrote $(format_number ${bytes_wrote}) of ${tb_formatted} @ ${current_speed} \\n"
+      report_out+="Wrote $(format_number ${bytes_wrote}) of ${tb_formatted} @ ${current_speed} MB/s\\n"
       report_out+="Disk temperature: ${disktemp}\\n"
       report_out+="${write_type_s} Elapsed Time: $(time_elapsed $write_type display)\\n"
       report_out+="Cycle's Elapsed Time: $(time_elapsed cycle display)\\n"
       report_out+="Total Elapsed time: $(time_elapsed main display)"
-      send_mail "${write_type_s} in progress on $disk_serial ($disk_name)" "${write_type_s} in progress on $disk_serial ($disk_name): ${percent_wrote}% @ ${current_speed}. Temp: ${disktemp}. Cycle ${cycle} of ${cycles}." "${report_out}"
-      let next_notify=($next_notify + 25)
+      send_mail "${write_type_s} in progress on $disk_serial ($disk_name)" "${write_type_s} in progress on $disk_serial ($disk_name): ${percent_wrote}% @ ${current_speed} MB/s. Temp: ${disktemp}. Cycle ${cycle} of ${cycles}." "${report_out}"
+      ((next_notify+=1))
     fi
 
   done
@@ -897,7 +900,7 @@ write_disk(){
   # Send final notification
   if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 3 ] ; then
     report_out="${write_type_s} finished on $disk_serial ($disk_name).\\n"
-    report_out+="Wrote $(format_number ${bytes_wrote}) of ${tb_formatted} @ ${current_speed} \\n"
+    report_out+="Wrote $(format_number ${bytes_wrote}) of ${tb_formatted} @ ${average_speed} MB/s\\n"
     report_out+="Disk temperature: $(get_disk_temp $disk "$smart_type").\\n"
     report_out+="${write_type_s} Elapsed Time: $(time_elapsed $write_type display).\\n"
     report_out+="Cycle's Elapsed Time: $(time_elapsed cycle display).\\n"
@@ -1009,9 +1012,9 @@ read_entire_disk() {
 
   # Send initial notification
   if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 3 ] ; then
-    report_out="$read_type_s started on $disk_serial ($disk_name).\\n Disk temperature: $(get_disk_temp $disk "$smart_type")\\n"
+    report_out="$read_type_s started on $disk_serial ($disk_name).\\nDisk temperature: $(get_disk_temp $disk "$smart_type")\\n"
     send_mail "$read_type_s started on $disk_serial ($disk_name)" "$read_type_s started on $disk_serial ($disk_name). Cycle $cycle of ${cycles}. " "$report_out" &
-    next_notify=25
+    local next_notify=0
   fi
 
   # Start the disk read
@@ -1205,9 +1208,10 @@ read_entire_disk() {
         paused_by["sync"]=n
       fi
 
-      if (( $percent_read  % 10 == 0 )) && [ "$last_progress" -ne $percent_read ]; then
+      local decile=$(( $percent_read / 10 ))
+      if [ $decile -gt $last_progress ]; then
         debug "${read_type_s}: progress - ${percent_read}% $read_type_v @ $current_speed MB/s"
-        last_progress=$percent_read
+        last_progress=$decile
       fi
 
       timelapse=$(timer)
@@ -1317,16 +1321,17 @@ read_entire_disk() {
     fi
 
     # Send mid notification
-    if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -eq 4 ] && [ "$percent_read" -ge "$next_notify" ] && [ "$percent_read" -ne 100 ]; then
+    local decile=$(( $percent_read / 25 ))
+    if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -eq 4 ] && [ "$decile" -gt "$next_notify" ] && [ "$percent_read" -ne 100 ]; then
       disktemp="$(get_disk_temp $disk "$smart_type")"
       report_out="${read_type_s} in progress on $disk_serial ($disk_name): ${percent_read}% complete.\\n"
-      report_out+="Read $(format_number ${bytes_read}) of ${tb_formatted} @ ${current_speed} \\n"
+      report_out+="Read $(format_number ${bytes_read}) of ${tb_formatted} @ ${current_speed} MB/s\\n"
       report_out+="Disk temperature: ${disktemp}\\n"
       report_out+="${read_type_s} Elapsed Time: $(time_elapsed $read_type display).\\n"
       report_out+="Cycle's Elapsed Time: $(time_elapsed cycle display).\\n"
       report_out+="Total Elapsed time: $(time_elapsed main display)."
-      send_mail "$read_type_s in progress on $disk_serial ($disk_name)" "${read_type_s} in progress on $disk_serial ($disk_name): ${percent_read}% @ ${current_speed}. Temp: ${disktemp}. Cycle ${cycle} of ${cycles}." "${report_out}" &
-      let next_notify=($next_notify + 25)
+      send_mail "$read_type_s in progress on $disk_serial ($disk_name)" "${read_type_s} in progress on $disk_serial ($disk_name): ${percent_read}% @ ${current_speed} MB/s. Temp: ${disktemp}. Cycle ${cycle} of ${cycles}." "${report_out}" &
+      ((next_notify+=1))
     fi
 
   done
@@ -1634,7 +1639,7 @@ save_smart_info() {
 compare_smart() {
   local initial="${all_files[smart_prefix]}$1"
   local current="${all_files[smart_prefix]}$2"
-  local final="${all_files[smart_final]}"
+  local final="${all_files[smart_final]}$4"
   local title=$3
   if [ -e "$final" -a -n "$title" ]; then
     sed -i " 1 s/$/|$title/" $final
@@ -1648,7 +1653,7 @@ compare_smart() {
   while read line; do
     attr=$(echo $line | cut -d'|' -f1)
     name=$(echo $line | cut -d'|' -f2)
-    name="${attr}-${name}"
+    name="${name}"
     nvalue=$(echo $line | cut -d'|' -f3)
     ivalue=$(cat $initial| grep "^${attr}"|cut -d'|' -f3)
     if [ "$(cat $final 2>/dev/null|grep -c "$name")" -gt "0" ]; then
@@ -1660,10 +1665,10 @@ compare_smart() {
 }
 
 output_smart() {
-  local final="${all_files[smart_final]}"
-  local output="${all_files[smart_out]}"
   local device=$1
   local type=$2
+  local final="${all_files[smart_final]}$3"
+  local output="${all_files[smart_out]}$4"
   local msg
   local nfinal="${final}_$(( $RANDOM * 19318203981230 + 40 ))"
   cp -f "$final" "$nfinal"
@@ -1693,6 +1698,7 @@ output_smart() {
   done < <(cat $nfinal | tail -n +2)
   cat $nfinal | column -t -s '|' -o '  '> $output
   timeout -s 9 30 smartctl --health $type $device | sed -n '/SMART DATA SECTION/,/^$/p'| tail -n +2 | head -n 1 >> $output
+  rm $nfinal
 }
 
 get_disk_temp() {
@@ -1804,12 +1810,21 @@ debug_smart()
 {
   local disk=$1
   local smart=$2
-  [ "$disable_smart" != "y" ] && save_smart_info $disk "$smart" "error"
-  if [ -f "${all_files[smart_prefix]}error" ]; then
+  local id=$RANDOM
+  [ "$disable_smart" != "y" ] && compare_smart   "cycle_initial_start" "" "" "_${id}"
+  [ "$disable_smart" != "y" ] && save_smart_info $disk "$smart" "${id}"
+  [ "$disable_smart" != "y" ] && compare_smart   "cycle_initial_start" "${id}" "NOW" "_${id}"
+  [ "$disable_smart" != "y" ] && output_smart    $disk "$smart" "_${id}" "_${id}"
+  if [ -f "${all_files[smart_out]}_${id}" ]; then
+    debug "S.M.A.R.T.: $3"
+    debug "S.M.A.R.T.:"
     while read l; do 
       debug "S.M.A.R.T.: ${l}"; 
-    done < <(cat "${all_files[smart_prefix]}error" | column --separator '|' --table)
+    done < <(cat "${all_files[smart_out]}_${id}")
   fi
+  rm "${all_files[smart_prefix]}${id}"
+  rm "${all_files[smart_final]}_${id}"
+  rm "${all_files[smart_out]}_${id}"
 }
 
 debug_syslog()
@@ -1870,9 +1885,9 @@ do_exit()
       exit 1
       ;;
     *)
-      rm -rf ${all_files[dir]};
       rm -f "${all_files[resume_file]}"
       rm -f "${all_files[resume_temp]}"
+      # rm -rf ${all_files[dir]};
       exit 0
       ;;
   esac
@@ -2314,7 +2329,7 @@ if [ "$verify_disk_mbr" == "y" ]; then
     display_status
     echo -e "--> RESULT: FAIL! $theDisk DOESN'T have a valid unRAID MBR signature!!!\n\n"
     if [ "$notify_channel" -gt 0 ]; then
-      send_mail "FAIL! $diskName ($theDisk) DOESN'T have a valid unRAID MBR signature!!!" "$diskName ($theDisk) DOESN'T have a valid unRAID MBR signature!!!" "$diskName ($theDisk) DOESN'T have a valid unRAID MBR signature!!!" "" "alert"
+      send_mail "FAIL! $diskName (${disk_properties[name]}) DOESN'T have a valid unRAID MBR signature!!!" "$diskName (${disk_properties[name]}) DOESN'T have a valid unRAID MBR signature!!!" "$diskName (${disk_properties[name]}) DOESN'T have a valid unRAID MBR signature!!!" "" "alert"
     fi
     do_exit 1
   fi
@@ -2354,7 +2369,7 @@ if [ "$verify_disk_mbr" == "y" ]; then
         display_status
         echo -e "--> RESULT: FAIL! $diskName ($theDisk) IS NOT zeroed!!!\n\n"
         if [ "$notify_channel" -gt 0 ]; then
-          send_mail "FAIL! $diskName ($theDisk) IS NOT zeroed!!!" "FAIL! $diskName ($theDisk) IS NOT zeroed!!!" "FAIL! $diskName ($theDisk) IS NOT zeroed!!!" "" "alert"
+          send_mail "FAIL! $diskName (${disk_properties[name]}) IS NOT zeroed!!!" "FAIL! $diskName (${disk_properties[name]}) IS NOT zeroed!!!" "FAIL! $diskName (${disk_properties[name]}) IS NOT zeroed!!!" "" "alert"
         fi
         do_exit 1
       fi
@@ -2365,7 +2380,7 @@ if [ "$verify_disk_mbr" == "y" ]; then
   time_elapsed main && time_elapsed cycle 
   
   if [ "$notify_channel" -gt 0 ]; then
-    send_mail "Disk $diskName ($theDisk) is precleared!" "Disk $diskName ($theDisk) is precleared!" "Disk $diskName ($theDisk) is precleared!"
+    send_mail "Disk $diskName (${disk_properties[name]}) is precleared!" "Disk $diskName (${disk_properties[name]}) is precleared!" "Disk $diskName (${disk_properties[name]}) is precleared!"
   fi
   echo "${disk_properties[name]}|NN|The disk is Precleared!|$$" > ${all_files[stat]}
   echo -e "--> RESULT: SUCCESS! Disk ${disk_properties['serial']} is precleared!\n\n"
@@ -2494,10 +2509,10 @@ for cycle in $(seq $cycles); do
         else
           append display_step "Pre-read verification:|${bold}FAIL${norm}"
           echo "${disk_properties[name]}|NY|Pre-read failed - Aborted|$$" > ${all_files[stat]}
-          send_mail "FAIL! Pre-read $diskName ($theDisk) failed" "FAIL! Pre-read $diskName ($theDisk) failed." "Pre-read $diskName ($theDisk) failed - Aborted" "" "alert"
+          send_mail "FAIL! Pre-read $diskName (${disk_properties[name]}) failed" "FAIL! Pre-read $diskName (${disk_properties[name]}) failed." "Pre-read $diskName (${disk_properties[name]}) failed - Aborted" "" "alert"
           echo -e "--> FAIL: Result: Pre-Read failed.\n\n"
-          save_report "No - Pre-read $diskName ($theDisk) failed." "$preread_speed" "$postread_speed" "$write_speed"
-          debug_smart $theDisk "$smart_type"
+          save_report "No - Pre-read $diskName (${disk_properties[name]}) failed." "$preread_speed" "$postread_speed" "$write_speed"
+          debug_smart $theDisk "$smart_type"  "Error:"
           display_status
           wait $!
 
@@ -2551,10 +2566,10 @@ for cycle in $(seq $cycles); do
         else
           append display_step "Erasing the disk:|${bold}FAIL${norm}"
           echo "${disk_properties[name]}|NY|Erasing failed - Aborted|$$" > ${all_files[stat]}
-          send_mail "FAIL! Erasing $diskName ($theDisk) failed" "FAIL! Erasing $diskName ($theDisk) failed." "Erasing $diskName ($theDisk) failed - Aborted" "" "alert"
+          send_mail "FAIL! Erasing $diskName (${disk_properties[name]}) failed" "FAIL! Erasing $diskName (${disk_properties[name]}) failed." "Erasing $diskName (${disk_properties[name]}) failed - Aborted" "" "alert"
           echo -e "--> FAIL: Result: Erasing the disk failed.\n\n"
           save_report "No - Erasing the disk failed." "$preread_speed" "$postread_speed" "$write_speed"
-          debug_smart $theDisk "$smart_type"
+          debug_smart $theDisk "$smart_type"  "Error:"
           display_status
           wait $!
 
@@ -2604,10 +2619,10 @@ for cycle in $(seq $cycles); do
       else
         append display_step "${title_write} the disk:|${bold}FAIL${norm}"
         echo "${disk_properties[name]}|NY|${title_write} the disk failed - Aborted|$$" > ${all_files[stat]}
-        send_mail "FAIL! ${title_write} $diskName ($theDisk) failed" "FAIL! ${title_write} $diskName ($theDisk) failed." "${title_write} $diskName ($theDisk) failed - Aborted" "" "alert"
-        echo -e "--> FAIL: Result: ${title_write} $diskName ($theDisk) failed.\n\n"
+        send_mail "FAIL! ${title_write} $diskName (${disk_properties[name]}) failed" "FAIL! ${title_write} $diskName (${disk_properties[name]}) failed." "${title_write} $diskName (${disk_properties[name]}) failed - Aborted" "" "alert"
+        echo -e "--> FAIL: Result: ${title_write} $diskName (${disk_properties[name]}) failed.\n\n"
         save_report "No - ${title_write} the disk failed." "$preread_speed" "$postread_speed" "$write_speed"
-        debug_smart $theDisk "$smart_type"
+        debug_smart $theDisk "$smart_type" "Error:"
         display_status
         wait $!
 
@@ -2657,9 +2672,9 @@ for cycle in $(seq $cycles); do
         append display_step "Verifying unRAID's Preclear signature:|***FAIL*** "
         echo -e "--> FAIL: unRAID's Preclear signature not valid. \n\n"
         echo "${disk_properties[name]}|NY|unRAID's signature on the MBR failed - Aborted|$$" > ${all_files[stat]}
-        send_mail "FAIL! Invalid unRAID's MBR signature on $diskName ($theDisk)" "FAIL! Invalid unRAID's MBR signature on $diskName ($theDisk)." "Invalid unRAID's MBR signature on $diskName ($theDisk) - Aborted" "" "alert"
+        send_mail "FAIL! Invalid unRAID's MBR signature on $diskName (${disk_properties[name]})" "FAIL! Invalid unRAID's MBR signature on $diskName (${disk_properties[name]})." "Invalid unRAID's MBR signature on $diskName (${disk_properties[name]}) - Aborted" "" "alert"
         save_report  "No - Invalid unRAID's MBR signature." "$preread_speed" "$postread_speed" "$write_speed"
-        debug_smart $theDisk "$smart_type"
+        debug_smart $theDisk "$smart_type" "Error:"
         display_status
         wait $!
 
@@ -2713,9 +2728,9 @@ for cycle in $(seq $cycles); do
           append display_step "Post-Read verification:| ***FAIL***"
           echo -e "--> FAIL: Post-Read verification failed. Your drive is not zeroed.\n\n"
           echo "${disk_properties[name]}|NY|Post-Read failed - Aborted|$$" > ${all_files[stat]}
-          send_mail "FAIL! Post-Read $diskName ($theDisk) failed" "FAIL! Post-Read $diskName ($theDisk) failed." "Post-Read $diskName ($theDisk) failed - Aborted" "" "alert"
+          send_mail "FAIL! Post-Read $diskName (${disk_properties[name]}) failed" "FAIL! Post-Read $diskName (${disk_properties[name]}) failed." "Post-Read $diskName (${disk_properties[name]}) failed - Aborted" "" "alert"
           save_report "No - Post-Read verification failed" "$preread_speed" "$postread_speed" "$write_speed"
-          debug_smart $theDisk "$smart_type"
+          debug_smart $theDisk "$smart_type" "Error:"
           display_status
           wait $!
 
@@ -2735,26 +2750,35 @@ for cycle in $(seq $cycles); do
   # Add current SMART status to display_smart
   [ "$disable_smart" != "y" ] && output_smart $theDisk "$smart_type"
   display_status '' ''
-  debug_smart $theDisk "$smart_type"
+  debug_smart $theDisk "$smart_type" "Cycle $cycle"
 
   debug "Cycle: elapsed time: $(time_elapsed cycle display)"
 
   # Send end of the cycle notification
-  if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 2 ]; then
-    report_out="Disk ${disk_properties[name]} has successfully finished a preclear cycle!\\n\\n"
-    report_out+="Finished Cycle $cycle of $cycles cycles.\\n"
-    [ "$skip_preread" != "y" ] && report_out+="Last Cycle's Pre-Read Time: ${preread_average}.\\n"
-    if [ "$erase_disk" == "y" ]; then
-      report_out+="Last Cycle's Erasing Time: ${write_average}.\\n"
+  if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 1 ]; then
+    if [ $cycle -eq $cycles ]; then
+      subject="Disk $diskName (${disk_properties[name]}) preclear finished!"
+      description="${op_title}: Disk $diskName (${disk_properties[name]}) preclear finished!"
+      report_out="Disk ${disk_properties[name]} has successfully finished it's preclear!\\n\\n"
     else
-      report_out+="Last Cycle's Zeroing Time: ${write_average}.\\n"
+      subject="Disk $diskName (${disk_properties[name]}) PASSED cycle ${cycle}!"
+      description="${op_title}: Disk $diskName (${disk_properties[name]}) PASSED cycle ${cycle}!"
+      report_out="Disk ${disk_properties[name]} has successfully finished a preclear cycle!\\n\\n"
+      report_out+="Finished Cycle $cycle of $cycles cycles.\\n"
     fi
-    [ "$skip_postread" != "y" ] && report_out+="Last Cycle's Post-Read Time: ${postread_average}.\\n"
-    report_out+="Last Cycle's Elapsed TIme: $(time_elapsed cycle display)\\n"
+    [ "$skip_preread" != "y" ] && report_out+="Last Cycle's Pre-Read Time: $(time_elapsed preread display).\\n"
+    if [ "$erase_disk" == "y" ]; then
+      report_out+="Last Cycle's Erasing Time:  $(time_elapsed erase display).\\n"
+    else
+      report_out+="Last Cycle's Zeroing Time:  $(time_elapsed zero display).\\n"
+    fi
+    [ "$skip_postread" != "y" ] && report_out+="Last Cycle's Post-Read Time: $(time_elapsed postread display).\\n"
+    report_out+="Last Cycle's Elapsed Time: $(time_elapsed cycle display)\\n"
     report_out+="Disk Start Temperature: ${disk_properties[temp]}\n"
     report_out+="Disk Current Temperature: $(get_disk_temp $theDisk "$smart_type")\\n"
-    [ "$cycles" -gt 1 ] && report_out+="\\nStarting a new cycle.\\n"
-    send_mail "Disk $diskName ($theDisk) PASSED cycle ${cycle}!" "${op_title}: Disk $diskName ($theDisk) PASSED cycle ${cycle}!" "$report_out"
+    [ "$cycle" -lt "$cycles" ] && report_out+="\\nStarting a new cycle.\\n"
+
+    send_mail "$subject" "$description" "$report_out"
   fi
 done
 
@@ -2803,28 +2827,6 @@ mkdir -p /boot/preclear_reports/
 date_formated=$(date "+%Y.%m.%d_%H.%M.%S")
 file_name=$(echo "preclear_report_${disk_properties[serial]}_${date_formated}.txt" | sed -e 's/[^A-Za-z0-9._-]/_/g')
 todos < $report > "/boot/preclear_reports/${file_name}"
-
-# Send end of the script notification
-if [ "$notify_channel" -gt 0 ] && [ "$notify_freq" -ge 1 ]; then
-  report_out="Disk ${disk_properties[name]} has successfully finished a preclear cycle!\\n\\n"
-  report_out+="Ran $cycles cycles.\\n"
-  [ "$skip_preread" != "y" ] && report_out+="Last Cycle\'s Pre-Read Time: ${preread_average}.\\n"
-  if [ "$erase_disk" == "y" ]; then
-    report_out+="Last Cycle\'s Erasing Time: ${write_average}.\\n"
-  else
-    report_out+="Last Cycle\'s Zeroing Time: ${write_average}.\\n"
-  fi
-  [ "$skip_postread" != "y" ] && report_out+="Last Cycle\'s Post-Read Time: ${postread_average}.\\n"
-  report_out+="Last Cycle\'s Elapsed TIme: $(time_elapsed cycle display)\\n"
-  report_out+="Disk Start Temperature: ${disk_properties[temp]}\\n"
-  report_out+="Disk Current Temperature: $(get_disk_temp $theDisk "$smart_type")\\n"
-  if [ "$disable_smart" != "y" ]; then
-    report_out+="\\n\\nS.M.A.R.T. Report\\n"
-    while read -r line; do report_out+="${line}\\n"; done < ${all_files[smart_out]}
-  fi
-  report_out+="\\n\\n"
-  send_mail "${op_title}: PASS! Preclearing Disk $diskName ($theDisk) Finished!!!" "${op_title}: PASS! Preclearing Disk $diskName ($theDisk) Finished!!! Cycle ${cycle} of ${cycles}" "${report_out}"
-fi
 
 save_report "Yes" "$preread_speed" "$postread_speed" "$write_speed"
 

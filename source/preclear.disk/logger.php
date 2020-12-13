@@ -89,7 +89,7 @@ if (CLI) {
 				$return = "";
 				$timer = time();
 			}
-			if (isTimeout($timer,15)) break;
+			if (isTimeout($timer,60)) break;
 		}
 	}
 	// syslog(LOG_INFO, "KILLING SERVER: ".$socket_name);
@@ -98,13 +98,7 @@ if (CLI) {
 	@ unlink($socket_file);
 	exit(0);
 } else if (isset($_POST["socket_name"]) ) {
-	if ( strlen($_POST["socket_name"]) == 0 ) {
-		$log_file   = $_POST["file"];
-		$log_search = $_POST["search"];
-		$random_name = mt_rand();
-		exec("php ".__FILE__." ".escapeshellarg($random_name)." ".escapeshellarg($log_file)." ".escapeshellarg($log_search)." 1>/dev/null 2>&1 &");
-		echo json_encode(["socket_name" => $random_name]);
-	} else {
+	if ( strlen($_POST["socket_name"]) > 0 ) {
 		$socket_name = $_POST["socket_name"];
 		$socket_file = "/tmp/.".$socket_name.".sock";
 
@@ -150,6 +144,12 @@ if (CLI) {
 	  if (!is_file("$docroot/state/var.ini")) shell_exec("wget -qO /dev/null localhost:$(lsof -nPc emhttp | grep -Po 'TCP[^\d]*\K\d+')");
 	  $var = @parse_ini_file("$docroot/state/var.ini");
 	}
+
+	$log_file   = $_GET["file"];
+	$log_search = $_GET["search"];
+	$random_name = mt_rand();
+	exec("php ".__FILE__." ".escapeshellarg($random_name)." ".escapeshellarg($log_file)." ".escapeshellarg($log_search)." 1>/dev/null 2>&1 &");
+	// echo json_encode(["socket_name" => $random_name]);
 ?>
 
 <!DOCTYPE html>
@@ -198,14 +198,29 @@ if (CLI) {
 		span.login{color:#D63301;background-color:#FFDDD1;display:block;width:100%}
 		span.label{padding:4px 8px;margin-right:10px;border-radius:4px;display:inline;width:auto}
 		#button_receiver {position: fixed;left: 0;bottom: 0;width: 100%;text-align: center;background: #f2f2f2;}
+		div.spinner{margin:48px auto;text-align:center}
+		div.spinner.fixed{display:none;position:fixed;top:50%;left:50%;margin-top:-16px;margin-left:-64px;z-index:10000;}
+		div.spinner .unraid_mark{height:64px}
+		div.spinner .unraid_mark_2,div .unraid_mark_4{animation:mark_2 1.5s ease infinite}
+		div.spinner .unraid_mark_3{animation:mark_3 1.5s ease infinite}
+		div.spinner .unraid_mark_6,div .unraid_mark_8{animation:mark_6 1.5s ease infinite}
+		div.spinner .unraid_mark_7{animation:mark_7 1.5s ease infinite}
+		@keyframes mark_2{50% {transform:translateY(-40px)} 100% {transform:translateY(0px)}}
+		@keyframes mark_3{50% {transform:translateY(-62px)} 100% {transform:translateY(0px)}}
+		@keyframes mark_6{50% {transform:translateY(40px)} 100% {transform:translateY(0px)}}
+		@keyframes mark_7{50% {transform:translateY(62px)} 100% {transform: translateY(0px)}}
+
 	</style>
+	<link type="text/css" rel="stylesheet" href="/webGui/styles/default-fonts.css?v=1607102280">
 	<script src="/webGui/javascript/dynamix.js"></script>
 	<script type="text/javascript">
+		var unraid_logo = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 133.52 76.97" class="unraid_mark"><defs><linearGradient id="unraid_logo" x1="23.76" y1="81.49" x2="109.76" y2="-4.51" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#e32929"/><stop offset="1" stop-color="#ff8d30"/></linearGradient></defs><path d="m70,19.24zm57,0l6.54,0l0,38.49l-6.54,0l0,-38.49z" fill="url(#unraid_logo)" class="unraid_mark_9"/><path d="m70,19.24zm47.65,11.9l-6.55,0l0,-23.79l6.55,0l0,23.79z" fill="url(#unraid_logo)" class="unraid_mark_8"/><path d="m70,19.24zm31.77,-4.54l-6.54,0l0,-14.7l6.54,0l0,14.7z" fill="url(#unraid_logo)" class="unraid_mark_7"/><path d="m70,19.24zm15.9,11.9l-6.54,0l0,-23.79l6.54,0l0,23.79z" fill="url(#unraid_logo)" class="unraid_mark_6"/><path d="m63.49,19.24l6.51,0l0,38.49l-6.51,0l0,-38.49z" fill="url(#unraid_logo)" class="unraid_mark_5"/><path d="m70,19.24zm-22.38,26.6l6.54,0l0,23.78l-6.54,0l0,-23.78z" fill="url(#unraid_logo)" class="unraid_mark_4"/><path d="m70,19.24zm-38.26,43.03l6.55,0l0,14.73l-6.55,0l0,-14.73z" fill="url(#unraid_logo)" class="unraid_mark_3"/><path d="m70,19.24zm-54.13,26.6l6.54,0l0,23.78l-6.54,0l0,-23.78z" fill="url(#unraid_logo)" class="unraid_mark_2"/><path d="m70,19.24zm-63.46,38.49l-6.54,0l0,-38.49l6.54,0l0,38.49z" fill="url(#unraid_logo)" class="unraid_mark_1"/></svg>';
+
 		var progressframe = parent.document.getElementById('progressFrame');
 		if (progressframe) progressframe.style.zIndex = 10;
 		var lastLine = 0;
 		var cursor;
-		var logSocketName = "";
+		var logSocketName = "<?=$random_name;?>";
 		var timers = {};
 		var log_file = "<?=$_GET["file"];?>";
 		var log_search = "<?=$_GET["search"];?>";
@@ -249,13 +264,13 @@ if (CLI) {
 		function getLogContent()
 		{
 		  clearTimeout(timers.getLogContent);
+		  timers.logo = setTimeout(function(){$('div.spinner.fixed').show('slow');},500);
 		  $.post("<?=$relative_path;?>",{action:'get_log',file:log_file,csrf_token:"<?=$var['csrf_token'];?>", socket_name:logSocketName,search:log_search},function(data) 
 		  {
-		  	if (data.socket_name) {
-		  		logSocketName = data.socket_name;
-		  		timers.getLogContent = setTimeout(getLogContent, 100);
-		  	} else if (data.error) {
+		  	clearTimeout(timers.logo);
+		  	if (data.error) {
 		  		addLog(data.error);
+		  		addCloseButton();
 		  	} else {
 	    		$.each(data, function(k,v) { 
 	    			if(v.length) {
@@ -264,6 +279,7 @@ if (CLI) {
 	    		});
 		  		timers.getLogContent = setTimeout(getLogContent, 500);
 		  	}
+		  	$('div.spinner.fixed').hide('slow');
 		  },'json');
 		}
 		function inIframe () {
@@ -274,11 +290,15 @@ if (CLI) {
  		   	}
  		}
 
-		$(function() { getLogContent() });
+		$(function() { 
+			$('div.spinner.fixed').html(unraid_logo);
+			getLogContent();
+		});
 	</script>
 </head>
 
-<body class="logLine" onload="addCloseButton();">
+<body class="logLine" onload="">
+	<div class="spinner fixed"></div>
 	<div id="log_receiver" style="padding-bottom: 60px;">
 		<p style='text-align:center'><span class='error label'>Error</span><span class='warn label'>Warning</span><span class='system label'>System</span><span class='array label'>Array</span><span class='login label'>Login</span></p>
 	</div>
