@@ -78,7 +78,7 @@ function getPreclearContent()
 
       leftover_icons = $.grep(leftover_icons, function (el, i) { return $(el).attr('id') != icon });
 
-      $("#preclear_"+i).html("<i class='fa fa-tachometer hdd'></i><span style='margin-left: 0px;'></span>"+v.status);
+      $("#preclear_"+i).html("<i style='margin-left: -10px;' class='icon-preclear'></i><span style='margin-left: 4px;'></span>"+v.status);
 
       if (! $("#"+icon).length)
       {
@@ -170,19 +170,19 @@ function openPreclear(serial)
 }
 
 
-function openPreclearLog(serial)
+function openPreclearLog(search)
 {
-  var width   = 1000;
-  var height  = 730;
-  var top     = (screen.height-height)/2;
-  var left    = (screen.width-width)/2;
-  var options = 'resizeable=yes,scrollbars=yes,height='+height+',width='+width+',top='+top+',left='+left;
-  title = "Preclear Disk Log";
-  if (typeof(serial) !== 'undefined') {
-    window.open('/plugins/'+plugin+'/logger.php?file=/var/log/preclear.disk.log&title='+title+'&search='+serial+'&done=Done', '_blank', options);
-  } else {
-    window.open('/plugins/'+plugin+'/logger.php?file=/var/log/preclear.disk.log&title='+title+'&done=Done', '_blank', options);
+  var title = "Preclear Disk Log";
+  var form = $("<form />", { action: "/plugins/"+plugin+"/logger.php", target:"_blank", method:"POST" });
+  form.append('<input type="hidden" name="file" value="/var/log/preclear.disk.log" />');
+  form.append('<input type="hidden" name="csrf_token" value="'+vars.csrf_token+'" />');
+  if (typeof(search) !== 'undefined') {
+    form.append('<input type="hidden" name="search" value="'+search+'" />');
+    title = title + " of disk " + search.split("_")[2];
   }
+  form.append('<input type="hidden" name="title" value="'+title+'" />');
+  form.appendTo( document.body ).submit();
+  form.remove();
 }
 
 

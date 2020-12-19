@@ -28,7 +28,7 @@ dialog_main() {
   TITLE="Preclear Plugin"
   MENU="Choose one of the following options:"
   OPTIONS=(1 "Start a preclear session" 2 "Stop a preclear session" 3 "Output a preclear session")
-  CHOICE=$(dialog --clear --backtitle "$BACKTITLE" --title "$TITLE" --menu "$MENU" $HEIGHT $WIDTH $CHOICE_HEIGHT "${OPTIONS[@]}" 2>&1 1>&3)
+  CHOICE=$(dialog --clear --backtitle "$BACKTITLE" --title "$TITLE" --cancel-label "Exit" --menu "$MENU" $HEIGHT $WIDTH $CHOICE_HEIGHT "${OPTIONS[@]}" 2>&1 1>&3)
   if [ "$?" -eq 0 ]; then
     echo $CHOICE
   fi
@@ -60,7 +60,7 @@ dialog_script_gfjardim_op() {
             OPTIONS+=( "$disk_name" "$disk_serial" )
           done < <($gfjardim_script --unassigned 2>/dev/null)
           if [ "${#OPTIONS[@]}" -gt 0 ]; then
-            DISK=$(dialog --clear --backtitle "$BACKTITLE" --title "$TITLE" --menu "Choose Disk:" $HEIGHT $WIDTH $((${#OPTIONS[@]} / 2 + 1)) "${OPTIONS[@]}" 2>&1 1>&3)
+            DISK=$(dialog --clear --backtitle "$BACKTITLE" --title "$TITLE" --cancel-label "Back" --menu "Choose Disk:" $HEIGHT $WIDTH $((${#OPTIONS[@]} / 2 + 1)) "${OPTIONS[@]}" 2>&1 1>&3)
             if ! status_ok $?; then return 1; fi
           else
             dialog --clear --backtitle "$BACKTITLE" --title "$TITLE" --msgbox "\n\nNo unassigned disks available for preclear." $HEIGHT $WIDTH 2>&1 1>&3
@@ -68,25 +68,25 @@ dialog_script_gfjardim_op() {
           fi
       ;;
       1)  OPTIONS=(1 "Clear" 2 "Verify All the Disk" 3 "Verify MBR Only" 4 "Erase All the Disk" 5 "Erase and Clear All the Disk")
-          OPERATION=$(dialog --clear --backtitle "$BACKTITLE" --title "$TITLE" --menu "Operation:" $HEIGHT $WIDTH $CHOICE_HEIGHT "${OPTIONS[@]}" 2>&1 1>&3)
+          OPERATION=$(dialog --clear --backtitle "$BACKTITLE" --title "$TITLE" --cancel-label "Back" --menu "Operation:" $HEIGHT $WIDTH $CHOICE_HEIGHT "${OPTIONS[@]}" 2>&1 1>&3)
           if ! status_ok $?; then QUESTION=$(($QUESTION - 2)); fi
           # if ! status_ok $?; then return 1; fi
       ;;  
       2)  if [ "$OPERATION" -eq 1 ] || [ "$OPERATION" -eq 5 ]; then
             OPTIONS=(1 "1" 2 "2" 3 "3" 4 "4" 5 "5" 6 "6" 7 "7" )
-            CYCLES=$(dialog --clear --backtitle "$BACKTITLE" --title "$TITLE" --menu "Cycles:" $HEIGHT $WIDTH 8 "${OPTIONS[@]}" 2>&1 1>&3)
+            CYCLES=$(dialog --clear --backtitle "$BACKTITLE" --title "$TITLE" --cancel-label "Back" --menu "Cycles:" $HEIGHT $WIDTH 8 "${OPTIONS[@]}" 2>&1 1>&3)
             if ! status_ok $?; then QUESTION=$(($QUESTION - 2)); fi
           fi
       ;;
       3)  OPTIONS=(1 "Browser" OFF 2 "Email" OFF 4 "Agents" OFF)
-          CHANNELS=$(dialog --clear --backtitle "$BACKTITLE" --title "$TITLE" --checklist "Notifications:" $HEIGHT $WIDTH 8 "${OPTIONS[@]}" 2>&1 1>&3 )
+          CHANNELS=$(dialog --clear --backtitle "$BACKTITLE" --title "$TITLE" --cancel-label "Back" --checklist "Notifications:" $HEIGHT $WIDTH 8 "${OPTIONS[@]}" 2>&1 1>&3 )
           if ! status_ok $?; then QUESTION=$(($QUESTION - 2)); fi
           CHANNELS=$(echo $CHANNELS | awk '{sum=$1+$2+$3} END {print sum}')
           CHANNELS=${CHANNELS:-0}
       ;;
       4)  if [ "$CHANNELS" -gt 0 ]; then
             OPTIONS=(1 "On preclear end" 2 "On every cycle end" 3 "On every cycle and step end" 4 "On every 25% of progress")
-            FREQUENCY=$(dialog --clear --backtitle "$BACKTITLE" --title "$TITLE" --menu "Notifications:" $HEIGHT $WIDTH 8 "${OPTIONS[@]}" 2>&1 1>&3)
+            FREQUENCY=$(dialog --clear --backtitle "$BACKTITLE" --title "$TITLE" --cancel-label "Back" --menu "Notifications:" $HEIGHT $WIDTH 8 "${OPTIONS[@]}" 2>&1 1>&3)
             if ! status_ok $?; then QUESTION=$(($QUESTION - 2)); fi
           fi
       ;;
@@ -254,5 +254,5 @@ while [[ true ]]; do
   esac
 done
 
-exec 3>&-;
+exec 3>&-
 clear

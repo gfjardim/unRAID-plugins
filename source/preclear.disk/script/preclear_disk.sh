@@ -467,6 +467,21 @@ time_elapsed(){
   eval "$_last=$_current && $_elapsed=\$(( \$$_elapsed + \$_delta ))"
 }
 
+dd_parse_status() {
+  local output_file=$1
+  local regex="([0-9]*) bytes.*copied, ([^\s]*) [^0-9]*(.*)"
+  echo > "${output_file}_complete"
+  while read line; do 
+    if [ $(wc -l < "${output_file}_complete") -gt 30 ]; then
+      echo "$(tail -n 30 "${output_file}_complete")" > "${output_file}_complete"
+    fi
+    echo "$line" >> "${output_file}_complete"
+    if [[ $line =~ $regex ]]; then
+      echo "${BASH_REMATCH[1]}|${BASH_REMATCH[2]}|${BASH_REMATCH[3]}" > "$output_file"
+    fi
+  done
+}
+
 is_numeric() {
   local _var=$2 _num=$3
   if [ ! -z "${_num##*[!0-9]*}" ]; then
@@ -478,13 +493,14 @@ is_numeric() {
 }
 
 root_free_space() {
-  local free=$(df --output=size / | tail -n +2 )
+  local size=$(df --output=size / | tail -n +2 )
   local avail=$(df --output=avail / | tail -n +2 )
-  local pcent=$(( avail * 100 / free ))
-
-  if [ "$pcent" -gt "15" ]; then
+  local pfree=$(( $avail * 100 / $size ))
+  if [ "$pfree" -gt "15" ]; then
     return 0
   else
+    debug "size: $size, available: $avail, free: ${pfree}%"
+    df | debug
     return 1
   fi
 }
@@ -632,7 +648,8 @@ write_disk(){
 
   # running dd
   debug "${write_type_s}: $dd_cmd"
-  $dd_cmd 2>$dd_output & dd_pid=$!
+  $dd_cmd 2> >(dd_parse_status $dd_output) & dd_pid=$!
+
   debug "${write_type_s}: dd pid [$dd_pid]"
 
   # update elapsed time
@@ -681,7 +698,7 @@ write_disk(){
       kill -USR1 $dd_pid 2>/dev/null && sleep 1
 
       # Calculate the current status
-      bytes_dd=$(tail -n 15 $dd_output | grep -P "bytes.*copied" | tail -n 1 | awk 'END{print $1}' | trim)
+      bytes_dd=$(cat $dd_output | cut -d '|' -f 1 | trim)
 
       # Ensure bytes_wrote is a number
       if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
@@ -702,7 +719,7 @@ write_disk(){
         current_speed=$average_speed
       fi
 
-      current_dd_time=$(awk -F',' 'END{print $3}' $dd_output | sed 's/[^0-9.]*//g' | trim);
+      current_dd_time=$(cat $dd_output | cut -d '|' -f 2 | trim)
       if [ ! -z "${current_dd_time##*[!0-9.]*}" ]; then
         local bytes_diff=$(awk "BEGIN {printf \"%.2f\",${bytes_dd_current} - ${current_speed_bytes}}")
         local time_diff=$(awk "BEGIN {printf \"%.2f\",${current_dd_time} - ${current_speed_time}}")
@@ -843,7 +860,7 @@ write_disk(){
     if [ "$dd_hang" -gt 30 ]; then
       eval "$initial_bytes='$bytes_wrote';"
       eval "$initial_timer='$current_elapsed';"
-      while read l; do debug "${write_type_s}: dd output: ${l}"; done < <(tail -n20 "$dd_output")
+      while read l; do debug "${write_type_s}: dd output: ${l}"; done < <(cat "${dd_output}_complete")
       kill -9 $dd_pid
       return 2
     fi
@@ -866,8 +883,9 @@ write_disk(){
 
   wait $dd_pid
   dd_exit_code=$?
+  sleep 2
 
-  bytes_dd=$(awk 'END{print $1}' $dd_output|trim)
+  bytes_dd=$(cat $dd_output | cut -d '|' -f 1 | trim)
   if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
     bytes_wrote=$(( $bytes_dd + $resume_seek ))
   fi
@@ -887,7 +905,7 @@ write_disk(){
   # Check dd status
   if test "$dd_exit_code" -ne 0; then
     debug "${write_type_s}: dd command failed, exit code [$dd_exit_code]."
-    while read l; do debug "${write_type_s}: dd output: ${l}"; done < <(tail -n20 "$dd_output")
+    while read l; do debug "${write_type_s}: dd output: ${l}"; done < <(cat "${output_file}_complete")
 
     diskop+=([current_op]="$write_type" [current_pos]="$bytes_wrote" [current_timer]=$current_elapsed )
     save_current_status
@@ -1032,7 +1050,7 @@ read_entire_disk() {
       # exec dd/compare command
       $cmp_cmd &> $cmp_output & cmp_pid=$!
       sleep 1
-      $dd_cmd 2> $dd_output & dd_pid=$!
+      $dd_cmd 2> >(dd_parse_status $dd_output) & dd_pid=$!
 
       wait $dd_pid
       dd_exit=$?
@@ -1042,7 +1060,7 @@ read_entire_disk() {
         debug "${read_type_s}: fail - beggining of the disk not zeroed"
         return 1
       elif test $dd_exit -ne 0; then
-        debug "${read_type_s}: dd command failed -> $(cat $dd_output)"
+        debug "${read_type_s}: dd command failed -> $(cat "${dd_output}_complete")"
         return 1
       fi
     fi
@@ -1060,7 +1078,7 @@ read_entire_disk() {
     # exec dd/compare command
     $cmp_cmd &> $cmp_output & cmp_pid=$!
     sleep 1
-    $dd_cmd 2> $dd_output & dd_pid=$!
+    $dd_cmd 2> >(dd_parse_status $dd_output) & dd_pid=$!
 
   else
     if [ "$skip_initial" -eq 0 ]; then
@@ -1071,18 +1089,17 @@ read_entire_disk() {
     debug "${read_type_s}: $dd_cmd"
 
     # exec dd command
-    $dd_cmd 2>$dd_output &
-    dd_pid=$!
+    $dd_cmd 2> >(dd_parse_status $dd_output) & dd_pid=$!
   fi
 
   if [ -z "$dd_pid" ]; then
-    debug "${read_type_s}: dd command failed -> $(cat $dd_output)"
+    debug "${read_type_s}: dd command failed -> $(cat "${dd_output}_complete")"
     return 1
   fi
 
   # return 1 if dd failed
   if ! ps -p $dd_pid &>/dev/null; then
-    debug "${read_type_s}: dd command failed -> $(cat $dd_output)"
+    debug "${read_type_s}: dd command failed -> $(cat "${dd_output}_complete")"
     return 1
   fi
 
@@ -1156,7 +1173,7 @@ read_entire_disk() {
       kill -USR1 $dd_pid 2>/dev/null && sleep 1
 
       # Calculate the current status
-      bytes_dd=$(tail -n 15 $dd_output | grep -P "bytes.*copied" | tail -n 1 | awk 'END{print $1}' | trim)
+      bytes_dd=$(cat $dd_output | cut -d '|' -f 1 | trim)
 
       # Ensure bytes_read is a number
       if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
@@ -1173,7 +1190,7 @@ read_entire_disk() {
         current_speed=$average_speed
       fi
 
-      current_dd_time=$(awk -F',' 'END{print $3}' $dd_output | sed 's/[^0-9.]*//g' | trim);
+      current_dd_time=$(cat $dd_output | cut -d '|' -f 2 | trim)
       if [ ! -z "${current_dd_time##*[!0-9.]*}" ]; then
         local bytes_diff=$(awk "BEGIN {printf \"%.2f\",${bytes_dd_current} - ${current_speed_bytes}}")
         local time_diff=$(awk "BEGIN {printf \"%.2f\",${current_dd_time} - ${current_speed_time}}")
@@ -1314,7 +1331,7 @@ read_entire_disk() {
     if [ "$dd_hang" -gt 30 ]; then
       eval "$initial_bytes='"$bytes_read"';"
       eval "$initial_timer='$(time_elapsed $read_type export)';"
-      while read l; do debug "${read_type_s}: dd output: ${l}"; done < <(tail -n20 "$dd_output")
+      while read l; do debug "${read_type_s}: dd output: ${l}"; done < <(cat "${dd_output}_complete")
 
       kill -9 $dd_pid
       return 2
@@ -1338,6 +1355,7 @@ read_entire_disk() {
 
   wait $dd_pid
   dd_exit_code=$?
+  sleep 2
 
   # Verify status
   if [ "$verify" == "verify" ]; then
@@ -1355,7 +1373,7 @@ read_entire_disk() {
     sleep 1
   done
 
-  bytes_dd=$(awk 'END{print $1}' $dd_output|trim)
+  bytes_dd=$(cat $dd_output | cut -d '|' -f 1 | trim)
   if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
     bytes_read=$(( $bytes_dd + $resume_skip ))
   fi
@@ -1365,7 +1383,7 @@ read_entire_disk() {
 
   if test "$dd_exit_code" -ne 0; then
     debug "${read_type_s}: dd command failed, exit code [$dd_exit_code]."
-    while read l; do debug "${read_type_s}: dd output: ${l}"; done < <(tail -n20 "$dd_output")
+    while read l; do debug "${read_type_s}: dd output: ${l}"; done < <(cat "${output_file}_complete")
 
     diskop+=([current_op]="$read_type" [current_pos]="$bytes_read" [current_timer]=$(time_elapsed $read_type display) )
     save_current_status
@@ -1822,9 +1840,6 @@ debug_smart()
       debug "S.M.A.R.T.: ${l}"; 
     done < <(cat "${all_files[smart_out]}_${id}")
   fi
-  rm "${all_files[smart_prefix]}${id}"
-  rm "${all_files[smart_final]}_${id}"
-  rm "${all_files[smart_out]}_${id}"
 }
 
 debug_syslog()
@@ -2274,7 +2289,7 @@ else
   echo "$script_pid" > ${all_files[pid]}
 fi
 
-keep_pid_updated &
+# keep_pid_updated &
 
 if ! is_preclear_candidate $theDisk; then
   tput reset

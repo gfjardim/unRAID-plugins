@@ -1,11 +1,17 @@
 #!/bin/bash
+script_pid=$BASHPID
 
 debug() {
   local msg="$*"
   if [ -z "$msg" ]; then
-    read msg;
+    while read msg; do 
+      cat <<< "$(date +"%b %d %T" ) preclear_queue: $msg" >> /var/log/preclear.disk.log
+      logger --id="${script_pid}" -t "preclear_queue" "${msg}"
+    done
+  else
+    cat <<< "$(date +"%b %d %T" ) preclear_queue: $msg" >> /var/log/preclear.disk.log
+    logger --id="${script_pid}" -t "preclear_queue" "${msg}"
   fi
-  cat <<< "$(date +"%b %d %T" ) preclear_queue: $msg" >> /var/log/preclear.disk.log
 }
 
 # Redirect errors to log
@@ -41,10 +47,7 @@ sort_running()
   local i=999999
   if [ -f "$sort_file" ]; then
     for disk in $(get_running_sessions); do
-      local line=""
-      if [ -f "$sort_file" ]; then
-        line=$(awk "/$disk/{ print NR; exit }" $sort_file)
-      fi
+      line=$(grep -n "$disk" "$sort_file" | cut -d : -f 1)
       if [ -n "$line" ]; then
         sort_order[$line]=$disk
       else
@@ -52,6 +55,7 @@ sort_running()
         i=$((i+1))
       fi
     done
+
     for disk in "${sort_order[@]}"; do
       echo $disk
     done
