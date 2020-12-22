@@ -191,17 +191,19 @@ class Preclear
   public function Script()
   {
     global $display, $var;
-    echo "var display = ".json_encode($display).";";
-    echo "var vars    = ".json_encode($var).";";
-    echo "var plugin = '".$this->plugin."';\n";
-    echo "var authors = ".json_encode($this->Authors()).";\n";
-    echo "var scope  = 'gfjardim';\n";
-    echo "var scripts = ".json_encode($this->scriptFiles()).";\n";
+    $trim_var     = array_intersect_key( $var, array_flip( ["csrf_token"] ));
+    $trim_display = array_intersect_key( $display, array_flip( ["unit","number"] ));
+    echo "var preclear_display = ".json_encode($trim_display).";\n";
+    echo "var preclear_vars    = ".json_encode($trim_var).";\n";
+    echo "var preclear_plugin = '".$this->plugin."';\n";
+    echo "var preclear_authors = ".json_encode($this->Authors()).";\n";
+    echo "var preclear_scope  = 'gfjardim';\n";
+    echo "var preclear_scripts = ".json_encode($this->scriptFiles()).";\n";
     printf("var zip = '%s-%s-%s.zip';\n", str_replace(' ','_',strtolower($var['NAME'])), $this->plugin, date('Ymd-Hi') );
 
     echo (intval(shell_exec("grep -c 'preclear' '/usr/local/emhttp/webGui/styles/font-unraid.svg' 2>/dev/null")) > 0) ? 
-            "var preclear_footer_icon = \"<i class='icon-preclear'></i>\"" :
-            "var preclear_footer_icon = \"<img src='/plugins/preclear.disk/icons/precleardisk.png'>\"";
+    "var preclear_footer_icon = \"<i class='icon-preclear'></i>\"" :
+    "var preclear_footer_icon = \"<img src='/plugins/preclear.disk/icons/precleardisk.png'>\"";
 
     echo "</script>\n";
     echo "<script type='text/javascript' src='";autov("/plugins/$this->plugin/assets/javascript.js"); echo "'></script>\n";

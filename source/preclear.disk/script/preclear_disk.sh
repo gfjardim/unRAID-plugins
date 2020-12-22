@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="1.0.19"
+version="1.0.20"
 
 ######################################################
 ##                                                  ##
@@ -264,7 +264,7 @@ verify_mbr() {
   for i in $(seq 0 $((${#patterns[@]}-1)) ); do
     if [ "${sectors[$i]}" != "${patterns[$i]}" ]; then
       echo "Failed test 1: MBR signature is not valid, byte $i [${sectors[$i]}] != [${patterns[$i]}]"
-      debug "Failed test 1: MBR signature is not valid, byte $i [${sectors[$i]}] != [${patterns[$i]}]"
+      debug "Signature: failed test 1: MBR signature is not valid, byte $i [${sectors[$i]}] != [${patterns[$i]}]"
       array_enumerate2 sectors
       return 1
     fi
@@ -292,20 +292,20 @@ verify_mbr() {
     1)
       if [ "$over_mbr_size" != "y" ]; then
         echo "Failed test 2: GPT start sector [$start_sector] is wrong, should be [1]."
-        debug "Failed test 2: GPT start sector [$start_sector] is wrong, should be [1]."
+        debug "Signature: failed test 2: GPT start sector [$start_sector] is wrong, should be [1]."
         array_enumerate2 sectors
         return 1
       fi
       ;;
     *)
       echo "Failed test 3: start sector is different from those accepted by unRAID."
-      debug "Failed test 3: start sector is different from those accepted by unRAID."
+      debug "Signature: failed test 3: start sector is different from those accepted by unRAID."
       array_enumerate2 sectors
       ;;
   esac
   if [ $partition_size -ne $mbr_blocks ]; then
     echo "Failed test 4: physical size didn't match MBR declared size. [$partition_size] != [$mbr_blocks]"
-    debug "Failed test 4: physical size didn't match MBR declared size. [$partition_size] != [$mbr_blocks]"
+    debug "Signature: failed test 4: physical size didn't match MBR declared size. [$partition_size] != [$mbr_blocks]"
     array_enumerate2 sectors
     return 1
   fi
@@ -370,7 +370,7 @@ write_signature() {
   strtonum("0x" substr(sprintf( "%08x\n", ARGV[4]),3,2)),
   strtonum("0x" substr(sprintf( "%08x\n", ARGV[4]),1,2)))
   }' $size1 $size2 $start_sector $partition_size | od -An -vtu1 )
-  debug "Writing signature: ${sig}"
+  debug "Signature: writing signature: ${sig}"
 }
 
 maxExecTime() {
@@ -473,7 +473,7 @@ dd_parse_status() {
   echo > "${output_file}_complete"
   while read line; do 
     if [ $(wc -l < "${output_file}_complete") -gt 30 ]; then
-      echo "$(tail -n 30 "${output_file}_complete")" > "${output_file}_complete"
+      echo "$(tail -n 29 "${output_file}_complete")" > "${output_file}_complete"
     fi
     echo "$line" >> "${output_file}_complete"
     if [[ $line =~ $regex ]]; then
@@ -857,7 +857,7 @@ write_disk(){
     fi
 
     # Kill dd if hung
-    if [ "$dd_hang" -gt 30 ]; then
+    if [ "$dd_hang" -gt 120 ]; then
       eval "$initial_bytes='$bytes_wrote';"
       eval "$initial_timer='$current_elapsed';"
       while read l; do debug "${write_type_s}: dd output: ${l}"; done < <(cat "${dd_output}_complete")
@@ -890,7 +890,7 @@ write_disk(){
     bytes_wrote=$(( $bytes_dd + $resume_seek ))
   fi
 
-  debug "${write_type_s}: dd - wrote ${bytes_wrote} of ${total_bytes}."
+  debug "${write_type_s}: dd - wrote ${bytes_wrote} of ${total_bytes} ($(( $total_bytes - $bytes_wrote )))."
   debug "${write_type_s}: elapsed time - $(time_elapsed $write_type display)"
 
   # Wait last display refresh
@@ -949,8 +949,8 @@ read_entire_disk() {
   local cycles=$cycles
   local display_pid=0
   local dd_exit=${all_files[dd_exit]}
-  local dd_flags_verify="conv=notrunc iflag=nocache,count_bytes,skip_bytes"
-  local dd_flags_read="conv=notrunc,noerror iflag=nocache,count_bytes,skip_bytes"
+  local dd_flags_verify="iflag=nocache,count_bytes,skip_bytes"
+  local dd_flags_read="conv=noerror iflag=nocache,count_bytes,skip_bytes"
   local dd_hang=0
   local dd_last_bytes=0
   local dd_output=${all_files[dd_out]}
@@ -1040,7 +1040,7 @@ read_entire_disk() {
 
     if [ "$skip_initial" -eq 0 ]; then
       # Verify the beginning of the disk skipping the MBR
-      debug "${read_type_s}: verifying the beggining of the disk."
+      debug "${read_type_s}: verifying the beginning of the disk."
       cmp_cmd="cmp ${all_files[fifo]} /dev/zero"
       debug "${read_type_s}: $cmp_cmd"
 
@@ -1057,7 +1057,7 @@ read_entire_disk() {
 
       # Fail if not zeroed or error
       if grep -q "differ" "$cmp_output" &>/dev/null; then
-        debug "${read_type_s}: fail - beggining of the disk not zeroed"
+        debug "${read_type_s}: fail - beginning of the disk not zeroed"
         return 1
       elif test $dd_exit -ne 0; then
         debug "${read_type_s}: dd command failed -> $(cat "${dd_output}_complete")"
@@ -1083,6 +1083,7 @@ read_entire_disk() {
   else
     if [ "$skip_initial" -eq 0 ]; then
       dd_skip="skip=0 count=$total_bytes"
+      resume_skip=0
     fi
 
     dd_cmd="dd if=$disk of=/dev/null bs=$read_bs $dd_skip $dd_flags_read"
@@ -1328,7 +1329,7 @@ read_entire_disk() {
     fi
 
     # Kill dd if hung
-    if [ "$dd_hang" -gt 30 ]; then
+    if [ "$dd_hang" -gt 120 ]; then
       eval "$initial_bytes='"$bytes_read"';"
       eval "$initial_timer='$(time_elapsed $read_type export)';"
       while read l; do debug "${read_type_s}: dd output: ${l}"; done < <(cat "${dd_output}_complete")
@@ -1378,7 +1379,8 @@ read_entire_disk() {
     bytes_read=$(( $bytes_dd + $resume_skip ))
   fi
 
-  debug "${read_type_s}: dd - read ${bytes_read} of ${total_bytes}."
+  # debug "${read_type_s}: dd - read ${bytes_read} of ${total_bytes}."
+  debug "${read_type_s}: dd - read ${bytes_read} of ${total_bytes} ($(( $total_bytes - $bytes_read )))."
   debug "${read_type_s}: elapsed time - $(time_elapsed $read_type display)"
 
   if test "$dd_exit_code" -ne 0; then
@@ -1902,7 +1904,7 @@ do_exit()
     *)
       rm -f "${all_files[resume_file]}"
       rm -f "${all_files[resume_temp]}"
-      # rm -rf ${all_files[dir]};
+      rm -rf ${all_files[dir]};
       exit 0
       ;;
   esac
@@ -2331,16 +2333,19 @@ if [ "$verify_disk_mbr" == "y" ]; then
   # if ! is_current_op "zeroed"; then
 
   display_status "Verifying unRAID's signature on the MBR ..." ""
+  debug "verifying unRAID's signature on the MBR ..."
   echo "${disk_properties[name]}|NN|Verifying unRAID's signature on the MBR...|$$" > ${all_files[stat]}
   sleep 5
 
   if verify_mbr $theDisk; then
     append display_step "Verifying unRAID's Preclear MBR:|***SUCCESS***"
+    debug "success - Unraid preclear signature valid!"
     echo "${disk_properties[name]}|NN|Verifying unRAID's signature on the MBR successful|$$" > ${all_files[stat]}
     display_status
   else
     append display_step "Verifying unRAID's signature:| ***FAIL***"
     echo "${disk_properties[name]}|NY|Verifying unRAID's signature on the MBR failed|$$" > ${all_files[stat]}
+    debug "fail - Unraid preclear signature invalid!"
     display_status
     echo -e "--> RESULT: FAIL! $theDisk DOESN'T have a valid unRAID MBR signature!!!\n\n"
     if [ "$notify_channel" -gt 0 ]; then
@@ -2373,13 +2378,18 @@ if [ "$verify_disk_mbr" == "y" ]; then
         start_bytes=0
         current_timer=0
       fi
+
+      debug "verifying if disk is zeroed..." > ${all_files[stat]}
+
       if read_entire_disk verify zeroed start_bytes start_timer preread_average preread_speed; then
         append display_step "Verifying if disk is zeroed:|${preread_average} ***SUCCESS***"
+        debug "success - the disk is zeroed!"
         echo "${disk_properties[name]}|NN|Verifying if disk is zeroed: SUCCESS|$$" > ${all_files[stat]}
         display_status
         sleep 10
       else
         append display_step "Verifying if disk is zeroed:|***FAIL***"
+        debug "fail - the disk is NOT zeroed!"
         echo "${disk_properties[name]}|NY|Verifying if disk is zeroed: FAIL|$$" > ${all_files[stat]}
         display_status
         echo -e "--> RESULT: FAIL! $diskName ($theDisk) IS NOT zeroed!!!\n\n"
@@ -2508,21 +2518,25 @@ for cycle in $(seq $cycles); do
       diskop+=([current_op]="preread" [current_pos]="$start_bytes" [current_timer]="$start_timer" )
       save_current_status
 
-      # update elapsed time
-      time_elapsed main && time_elapsed cycle 
 
       for x in $(seq 1 $retries); do
+        # update elapsed time
+        time_elapsed main && time_elapsed cycle
+        debug "Pre-read: pre-read verification started ($x/$retries)...."
+        
         read_entire_disk no-verify preread start_bytes start_timer preread_average preread_speed
         ret_val=$?
         if [ "$ret_val" -eq 0 ]; then
           append display_step "Pre-read verification:|[${preread_average}] ***SUCCESS***"
+          debug "Pre-read: pre-read verification completed!"
           display_status
           break
-        elif [ "$ret_val" -eq 2 -a "$x" -le $retries ]; then
+        elif [ "$ret_val" -eq 2 -a "$x" -lt $retries ]; then
           debug "dd process hung at ${start_bytes}, killing...."
           continue
         else
           append display_step "Pre-read verification:|${bold}FAIL${norm}"
+          debug "Pre-read: pre-read verification failed!"
           echo "${disk_properties[name]}|NY|Pre-read failed - Aborted|$$" > ${all_files[stat]}
           send_mail "FAIL! Pre-read $diskName (${disk_properties[name]}) failed" "FAIL! Pre-read $diskName (${disk_properties[name]}) failed." "Pre-read $diskName (${disk_properties[name]}) failed - Aborted" "" "alert"
           echo -e "--> FAIL: Result: Pre-Read failed.\n\n"
@@ -2568,18 +2582,21 @@ for cycle in $(seq $cycles); do
 
         # update elapsed time
         time_elapsed main && time_elapsed cycle 
+        debug "Erasing: erasing the disk started ($x/$retries)...."
 
         write_disk erase start_bytes start_timer write_average write_speed
         ret_val=$?
         if [ "$ret_val" -eq 0 ]; then
+          debug "Erasing: erasing the disk completed!"
           append display_step "Erasing the disk:|[${write_average}] ***SUCCESS***"
           display_status
           break
-        elif [ "$ret_val" -eq 2 -a "$x" -le $retries ]; then
+        elif [ "$ret_val" -eq 2 -a "$x" -lt $retries ]; then
           debug "dd process hung at ${start_bytes}, killing...."
           continue
         else
           append display_step "Erasing the disk:|${bold}FAIL${norm}"
+          debug "Erasing: erasing the disk failed!"
           echo "${disk_properties[name]}|NY|Erasing failed - Aborted|$$" > ${all_files[stat]}
           send_mail "FAIL! Erasing $diskName (${disk_properties[name]}) failed" "FAIL! Erasing $diskName (${disk_properties[name]}) failed." "Erasing $diskName (${disk_properties[name]}) failed - Aborted" "" "alert"
           echo -e "--> FAIL: Result: Erasing the disk failed.\n\n"
@@ -2619,20 +2636,22 @@ for cycle in $(seq $cycles); do
     save_current_status
 
     for x in $(seq 1 $retries); do
-
       # update elapsed time
       time_elapsed main && time_elapsed cycle 
+      debug "${title_write}: ${title_write,,} the disk started ($x/$retries)...."
 
       write_disk $write_op start_bytes start_timer write_average write_speed
       ret_val=$?
       if [ "$ret_val" -eq 0 ]; then
         append display_step "${title_write} the disk:|[${write_average}] ***SUCCESS***"
+        debug "${title_write}: ${title_write,,} the disk completed!"
         break
-      elif [ "$ret_val" -eq 2 -a "$x" -le $retries ]; then
+      elif [ "$ret_val" -eq 2 -a "$x" -lt $retries ]; then
         debug "dd process hung at ${start_bytes}, killing...."
         continue
       else
         append display_step "${title_write} the disk:|${bold}FAIL${norm}"
+        debug "${title_write}: ${title_write,,} the disk failed!"
         echo "${disk_properties[name]}|NY|${title_write} the disk failed - Aborted|$$" > ${all_files[stat]}
         send_mail "FAIL! ${title_write} $diskName (${disk_properties[name]}) failed" "FAIL! ${title_write} $diskName (${disk_properties[name]}) failed." "${title_write} $diskName (${disk_properties[name]}) failed - Aborted" "" "alert"
         echo -e "--> FAIL: Result: ${title_write} $diskName (${disk_properties[name]}) failed.\n\n"
@@ -2679,13 +2698,17 @@ for cycle in $(seq $cycles); do
       diskop+=([current_op]="read_mbr" [current_pos]="0" [current_timer]="0" )
       save_current_status
       echo "${disk_properties[name]}|NN|Verifying unRAID's signature on the MBR|$$" > ${all_files[stat]}
+      debug "Signature: verifying unRAID's signature on the MBR ..."
+
       if verify_mbr $theDisk; then
         append display_step "Verifying unRAID's Preclear signature:|***SUCCESS*** "
         display_status
+        debug "Signature: Unraid preclear signature is valid!"
         echo "${disk_properties[name]}|NN|unRAID's signature on the MBR is valid|$$" > ${all_files[stat]}
       else
         append display_step "Verifying unRAID's Preclear signature:|***FAIL*** "
-        echo -e "--> FAIL: unRAID's Preclear signature not valid. \n\n"
+        debug "Signature: Unraid preclear signature is invalid!"
+        echo -e "--> FAIL: unRAID's Preclear signature is invalid. \n\n"
         echo "${disk_properties[name]}|NY|unRAID's signature on the MBR failed - Aborted|$$" > ${all_files[stat]}
         send_mail "FAIL! Invalid unRAID's MBR signature on $diskName (${disk_properties[name]})" "FAIL! Invalid unRAID's MBR signature on $diskName (${disk_properties[name]})." "Invalid unRAID's MBR signature on $diskName (${disk_properties[name]}) - Aborted" "" "alert"
         save_report  "No - Invalid unRAID's MBR signature." "$preread_speed" "$postread_speed" "$write_speed"
@@ -2725,22 +2748,24 @@ for cycle in $(seq $cycles); do
       diskop+=([current_op]="postread" [current_pos]="$start_bytes" [current_timer]="$start_timer" )
       save_current_status
       for x in $(seq 1 $retries); do
-
         # update elapsed time
         time_elapsed main && time_elapsed cycle
+        debug "Post-Read: post-read verification started ($x/$retries)...."
 
         read_entire_disk verify postread start_bytes start_timer postread_average postread_speed
         ret_val=$?
         if [ "$ret_val" -eq 0 ]; then
           append display_step "Post-Read verification:|[${postread_average}] ***SUCCESS*** "
+          debug "Post-Read: post-read verification completed!"
           display_status
           echo "${disk_properties[name]}|NY|Post-Read verification successful|$$" > ${all_files[stat]}
           break
-        elif [ "$ret_val" -eq 2 -a "$x" -le $retries ]; then
+        elif [ "$ret_val" -eq 2 -a "$x" -lt $retries ]; then
           debug "dd process hung at ${start_bytes}, killing...."
           continue
         else
           append display_step "Post-Read verification:| ***FAIL***"
+          debug "Post-Read: post-read verification failed!"
           echo -e "--> FAIL: Post-Read verification failed. Your drive is not zeroed.\n\n"
           echo "${disk_properties[name]}|NY|Post-Read failed - Aborted|$$" > ${all_files[stat]}
           send_mail "FAIL! Post-Read $diskName (${disk_properties[name]}) failed" "FAIL! Post-Read $diskName (${disk_properties[name]}) failed." "Post-Read $diskName (${disk_properties[name]}) failed - Aborted" "" "alert"

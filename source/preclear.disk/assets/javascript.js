@@ -1,9 +1,9 @@
-var PreclearURL = '/plugins/'+plugin+'/Preclear.php'
+var PreclearURL = '/plugins/'+preclear_plugin+'/Preclear.php'
 
 if (! $.tooltipster)
 {
-  $("<link rel='stylesheet' type='text/css' href='/plugins/"+plugin+"/assets/tooltipster.bundle.hibrid.css'>").appendTo("head");
-  $("<script type='text/javascript' src='/plugins/"+plugin+"/assets/tooltipster.bundle.min.js'>").appendTo("head");
+  $("<link rel='stylesheet' type='text/css' href='/plugins/"+preclear_plugin+"/assets/tooltipster.bundle.hibrid.css'>").appendTo("head");
+  $("<script type='text/javascript' src='/plugins/"+preclear_plugin+"/assets/tooltipster.bundle.min.js'>").appendTo("head");
 }
 
 if (typeof " ".formatUnicorn !== "function")
@@ -51,7 +51,7 @@ $('body').on('mouseenter', '.tooltip, .tooltip-toggle', function()
 function getPreclearContent()
 {
   clearTimeout(timers.getPreclearContent);
-  $.post(PreclearURL,{action:'get_content', display:display},function(data)
+  $.post(PreclearURL,{action:'get_content', display:preclear_display},function(data)
   {
     var hovered = $( ".tooltip:hover" ).map(function(){return this.id;}).get();
     if ( $('#preclear-table-body').length )
@@ -139,7 +139,7 @@ function getPreclearContent()
     }
     else
     {
-      timers.getPreclearContent = setTimeout('getPreclearContent()', ($(jqXHR.status).length > 0) ? 5000 : 15000);
+      timers.getPreclearContent = setTimeout(getPreclearContent, ($(jqXHR.status).length > 0) ? 5000 : 15000);
     }
   });
 }
@@ -166,16 +166,16 @@ function openPreclear(serial)
   var top     = (screen.height-height)/2;
   var left    = (screen.width-width)/2;
   var options = 'resizeable=yes,scrollbars=yes,height='+height+',width='+width+',top='+top+',left='+left;
-  window.open('/plugins/'+plugin+'/Preclear.php?action=show_preclear&serial='+serial, '_blank', options);
+  window.open('/plugins/'+preclear_plugin+'/Preclear.php?action=show_preclear&serial='+serial, '_blank', options);
 }
 
 
 function openPreclearLog(search)
 {
   var title = "Preclear Disk Log";
-  var form = $("<form />", { action: "/plugins/"+plugin+"/logger.php", target:"_blank", method:"POST" });
+  var form = $("<form />", { action: "/plugins/"+preclear_plugin+"/logger.php", target:"_blank", method:"POST" });
   form.append('<input type="hidden" name="file" value="/var/log/preclear.disk.log" />');
-  form.append('<input type="hidden" name="csrf_token" value="'+vars.csrf_token+'" />');
+  form.append('<input type="hidden" name="csrf_token" value="'+preclear_vars.csrf_token+'" />');
   if (typeof(search) !== 'undefined') {
     form.append('<input type="hidden" name="search" value="'+search+'" />');
     title = title + " of disk " + search.split("_")[2];
@@ -188,7 +188,7 @@ function openPreclearLog(search)
 
 function toggleScript(el, serial, multiple)
 {
-  window.scope = $(el).val();
+  window.preclear_scope = $(el).val();
  
   startPreclear( serial, multiple );
 }
@@ -246,17 +246,17 @@ function startPreclear(serial, multiple = "no")
     preclear_dialog.append("<hr style='margin-left:12px;'>");
   }
 
-  if (typeof(scripts) !== 'undefined')
+  if (typeof(preclear_scripts) !== 'undefined')
   {
-    size = Object.keys(scripts).length;
+    size = Object.keys(preclear_scripts).length;
 
     if (size)
     {
       var options = "<dl class='dl-dialog'><dt>Script:<st><dd><select onchange='toggleScript(this,\""+serial+"\",\""+multiple+"\");'>";
-      $.each( scripts, function( key, value )
+      $.each( preclear_scripts, function( key, value )
         {
-          var sel = ( key == scope ) ? "selected" : "";
-          options += "<option value='"+key+"' "+sel+">"+authors[key]+"</option>";
+          var sel = ( key == preclear_scope ) ? "selected" : "";
+          options += "<option value='"+key+"' "+sel+">"+preclear_authors[key]+"</option>";
         }
       );
       preclear_dialog.append(options+"</select></dd></dl>");
@@ -264,7 +264,7 @@ function startPreclear(serial, multiple = "no")
   }
 
 
-  preclear_dialog.append($("#"+scope+"-start-defaults").html());
+  preclear_dialog.append($("#"+preclear_scope+"-start-defaults").html());
 
   swal2({
     title: "Start Preclear",
@@ -286,7 +286,7 @@ function startPreclear(serial, multiple = "no")
       popup = $(".swal-content");
       opts["action"] = "start_preclear";
       opts["op"]     = getVal(popup, "op");
-      opts["scope"]  = scope;
+      opts["scope"]  = preclear_scope;
 
       if (popup.find('#multiple_preclear :selected').length)
       {
@@ -296,7 +296,7 @@ function startPreclear(serial, multiple = "no")
         });
       }
 
-      if (scope == "gfjardim")
+      if (preclear_scope == "gfjardim")
       {
         opts["--cycles"]        = getVal(popup, "--cycles");
         opts["--notify"]        = getVal(popup, "preclear_notify1") == "on" ? 1 : 0;
