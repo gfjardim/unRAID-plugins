@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2020.12.13c">
+<!ENTITY version   "2020.12.22">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,11 @@
 
 <CHANGES>
 ##&name;
+
+###2020.12.22
+- Fix: parse dd output through a function
+- Fix: typos
+- Fix: script failing during drive zeroing
 
 ###2020.12.13
 - Fix: Some output polishing
