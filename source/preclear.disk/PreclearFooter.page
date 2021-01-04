@@ -26,12 +26,14 @@ $Preclear = new Preclear;
       getPreclearContent();
       if ( $('#usb_devices_list').length )
       {
-        $('#usb_devices_list').bind("change", function(e)
+        $("#usb_devices_list").arrive("span[id^=preclear_]",{onceOnly:false},function()
         {
-          clearTimeout(timers.getPreclearContent);
-          timers.getPreclearContent = setTimeout('getPreclearContent()', 100);
+          span = $(this);
+          id = span.attr('id').replace(/preclear_/g, '');
+          if (id in PreclearData.status) {
+            span.html("<i style='margin-left: -10px;' class='icon-preclear'></i><span style='margin-left: 4px;'></span>"+PreclearData.status[id].status);
+          }
         });
-        $('#usb_devices_list').trigger("change");
       }
     }
   );
@@ -43,7 +45,10 @@ $Preclear = new Preclear;
     addBannerWarning('<b>Preclear Plugin (<?=$plugin_version;?>):</b> unsupported Unraid version (<?=$unraid_version;?>). Please upgrade your OS/plugin or request proper support at the <a href="https://forums.unraid.net/topic/54648-preclear-plugin/" target="_blank">forum support thread</a>.', true, false);
   }
   <?endif;?>
+
 </script>
+
+
 
 <!-- Status installer -->
 <?

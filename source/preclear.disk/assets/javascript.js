@@ -1,4 +1,5 @@
 var PreclearURL = '/plugins/'+preclear_plugin+'/Preclear.php'
+var PreclearData = {};
 
 if (! $.tooltipster)
 {
@@ -53,6 +54,7 @@ function getPreclearContent()
   clearTimeout(timers.getPreclearContent);
   $.post(PreclearURL,{action:'get_content', display:preclear_display},function(data)
   {
+    PreclearData = data;
     var hovered = $( ".tooltip:hover" ).map(function(){return this.id;}).get();
     if ( $('#preclear-table-body').length )
     {

@@ -905,7 +905,7 @@ write_disk(){
   # Check dd status
   if test "$dd_exit_code" -ne 0; then
     debug "${write_type_s}: dd command failed, exit code [$dd_exit_code]."
-    while read l; do debug "${write_type_s}: dd output: ${l}"; done < <(cat "${output_file}_complete")
+    while read l; do debug "${write_type_s}: dd output: ${l}"; done < <(cat "${dd_output}_complete")
 
     diskop+=([current_op]="$write_type" [current_pos]="$bytes_wrote" [current_timer]=$current_elapsed )
     save_current_status
@@ -1385,7 +1385,7 @@ read_entire_disk() {
 
   if test "$dd_exit_code" -ne 0; then
     debug "${read_type_s}: dd command failed, exit code [$dd_exit_code]."
-    while read l; do debug "${read_type_s}: dd output: ${l}"; done < <(cat "${output_file}_complete")
+    while read l; do debug "${read_type_s}: dd output: ${l}"; done < <(cat "${dd_output}_complete")
 
     diskop+=([current_op]="$read_type" [current_pos]="$bytes_read" [current_timer]=$(time_elapsed $read_type display) )
     save_current_status
