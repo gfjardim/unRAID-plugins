@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="1.0.20"
+version="1.0.21"
 
 ######################################################
 ##                                                  ##
@@ -470,9 +470,12 @@ time_elapsed(){
 dd_parse_status() {
   local output_file=$1
   local regex="([0-9]*) bytes.*copied, ([^\s]*) [^0-9]*(.*)"
+  echo > "${output_file}"
   echo > "${output_file}_complete"
-  while read line; do 
-    if [ $(wc -l < "${output_file}_complete") -gt 30 ]; then
+  while read line; do
+    complete_lines=$(wc -l < "${output_file}_complete" 2>/dev/null)
+    complete_lines=${complete_lines:-0}
+    if [ $complete_lines -gt 30 ]; then
       echo "$(tail -n 29 "${output_file}_complete")" > "${output_file}_complete"
     fi
     echo "$line" >> "${output_file}_complete"
@@ -1894,11 +1897,12 @@ do_exit()
       ;;
     1)
       debug 'error encountered, exiting...'
+      kill -9 $dd_pid 2>/dev/null
       echo "${disk_properties[name]}|NY|Error encountered, please verify the log|$$" > ${all_files[stat]}
       rm -f "${all_files[resume_file]}"
       rm -f "${all_files[resume_temp]}"
+      sleep 2
       rm -rf ${all_files[dir]};
-      kill -9 $dd_pid 2>/dev/null
       exit 1
       ;;
     *)

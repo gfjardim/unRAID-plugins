@@ -4,7 +4,7 @@
 <!ENTITY name      "preclear.disk">
 <!ENTITY repo      "unRAID-plugins">
 <!ENTITY author    "gfjardim">
-<!ENTITY version   "2021.01.03">
+<!ENTITY version   "2021.03.18">
 <!ENTITY launch    "Tools/Preclear">
 <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/master">
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
@@ -14,6 +14,11 @@
 
 <CHANGES>
 ##&name;
+
+###2021.03.18
+- Fix: add resume files to gitignore list
+- Fix: change all packages ownership to 755 for directories and 644 to files
+- Fix: script 1.0.21: dd_output and dd_output_complete files not exist
 
 ###2021.01.03
 - Fix: status in Unassigned Devices flickering
@@ -812,9 +817,12 @@ find /boot/config/plugins/&name;/ -type f -iname "&name;*.md5" ! -iname "*&versi
 find /boot/config/plugins/&name;/ -type f -iname "tor-*.txz" -delete
 
 # Start diskinfo
-/etc/rc.d/rc.diskinfo --quit &amp;&gt;/dev/null
+/etc/rc.d/rc.diskinfo --restart &amp;&gt;/dev/null
 rm -f /var/local/emhttp/plugins/diskinfo/diskinfo.json &amp;&gt;/dev/null
 echo "sleep 5 ; /etc/rc.d/rc.diskinfo --daemon &amp;&gt;/dev/null" | at now &amp;&gt;/dev/null
+
+# Add ignore rule to Unraid Flash Backup
+echo "*.resume" > /boot/config/plugins/&name;/.gitignore
 
 # Plugin version
 echo "&version;" &gt; /var/state/preclear.disk/version

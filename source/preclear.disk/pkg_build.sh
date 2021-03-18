@@ -27,7 +27,11 @@ while read f; do
   cp --parents -f "$f" "${DESTDIR}/"
 done < <(find . -type f ! \( -iname "pkg_build.sh" -o -iname "sftp-config.json" -o -iname ".DS_Store"  \) )
 cd "$TMPDIR/"
-makepkg -l y -c y "${PACKAGE}"
+
+find . -type d -print0 | xargs -0 chmod 755 
+find . -type f -print0 | xargs -0 chmod 644
+
+makepkg -l y -c n "${PACKAGE}"
 cd "$ARCHIVE/"
 md5sum $(basename "$PACKAGE") > "$MD5"
 rm -rf "$TMPDIR"
