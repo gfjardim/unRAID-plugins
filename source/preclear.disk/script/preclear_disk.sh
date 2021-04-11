@@ -5,7 +5,7 @@ export LC_CTYPE
 ionice -c3 -p$BASHPID
 
 # Version
-version="1.0.21"
+version="1.0.22"
 
 ######################################################
 ##                                                  ##
@@ -485,6 +485,19 @@ dd_parse_status() {
   done
 }
 
+get_dd_output() {
+  init=$(stat -c %Z "$2")
+  kill -USR1 $1 2>/dev/null
+  for x in $(seq 10); do
+    now=$(stat -c %Z "$2")
+    if [ $init -lt $now ]; then
+      cat "$2"
+      return 0
+    fi
+    sleep 1
+  done
+}
+
 is_numeric() {
   local _var=$2 _num=$3
   if [ ! -z "${_num##*[!0-9]*}" ]; then
@@ -698,10 +711,11 @@ write_disk(){
 
       current_elapsed=$(time_elapsed $write_type export)
 
-      kill -USR1 $dd_pid 2>/dev/null && sleep 1
+      dd_status=$(get_dd_output $dd_pid $dd_output)
 
       # Calculate the current status
-      bytes_dd=$(cat $dd_output | cut -d '|' -f 1 | trim)
+      bytes_dd=$(echo $dd_status | cut -d '|' -f 1 | trim)
+      current_dd_time=$(echo $dd_status | cut -d '|' -f 2 | trim)
 
       # Ensure bytes_wrote is a number
       if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
@@ -722,7 +736,6 @@ write_disk(){
         current_speed=$average_speed
       fi
 
-      current_dd_time=$(cat $dd_output | cut -d '|' -f 2 | trim)
       if [ ! -z "${current_dd_time##*[!0-9.]*}" ]; then
         local bytes_diff=$(awk "BEGIN {printf \"%.2f\",${bytes_dd_current} - ${current_speed_bytes}}")
         local time_diff=$(awk "BEGIN {printf \"%.2f\",${current_dd_time} - ${current_speed_time}}")
@@ -1173,11 +1186,11 @@ read_entire_disk() {
 
       current_elapsed=$(time_elapsed $read_type export)
 
-      # Refresh dd status
-      kill -USR1 $dd_pid 2>/dev/null && sleep 1
+      dd_status=$(get_dd_output $dd_pid $dd_output)
 
       # Calculate the current status
-      bytes_dd=$(cat $dd_output | cut -d '|' -f 1 | trim)
+      bytes_dd=$(echo $dd_status | cut -d '|' -f 1 | trim)
+      current_dd_time=$(echo $dd_status | cut -d '|' -f 2 | trim)
 
       # Ensure bytes_read is a number
       if [ ! -z "${bytes_dd##*[!0-9]*}" ]; then
@@ -1194,7 +1207,6 @@ read_entire_disk() {
         current_speed=$average_speed
       fi
 
-      current_dd_time=$(cat $dd_output | cut -d '|' -f 2 | trim)
       if [ ! -z "${current_dd_time##*[!0-9.]*}" ]; then
         local bytes_diff=$(awk "BEGIN {printf \"%.2f\",${bytes_dd_current} - ${current_speed_bytes}}")
         local time_diff=$(awk "BEGIN {printf \"%.2f\",${current_dd_time} - ${current_speed_time}}")
