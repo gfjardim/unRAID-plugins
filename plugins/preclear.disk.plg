@@ -10,7 +10,13 @@
 <!ENTITY pluginURL "&gitURL;/plugins/&name;.plg">
 <!ENTITY scriptVer "20">
 ]>
-<PLUGIN name="&name;" author="&author;" launch="&launch;" version="&version;" pluginURL="&pluginURL;" icon="icon-preclear">
+<PLUGIN name="&name;"
+		author="&author;"
+		launch="&launch;"
+		version="&version;"
+		pluginURL="&pluginURL;"
+		icon="icon-preclear"
+		max="6.8.9">
 
 <CHANGES>
 ##&name;
